@@ -11,6 +11,7 @@
 *.userprefs
 
 # Build results
+.codelite/
 [Dd]ebug/
 [Dd]ebugPublic/
 [Rr]elease/
