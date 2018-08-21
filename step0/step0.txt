@@ -1,0 +1,1 @@
+./Debug/main.c.o ./Debug/sfc_famicom.c.o   

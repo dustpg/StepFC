@@ -1,0 +1,39 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="src">
+      <UniqueIdentifier>{fd8bcc6b-f00a-48dd-9439-6bd9abe7fc7e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="header">
+      <UniqueIdentifier>{09948c0e-037b-4cb9-ba1c-3a5ceb89f90e}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="main.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="sfc_famicom.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="sfc_cpu.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="sfc_mapper.c">
+      <Filter>src</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="sfc_famicom.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="sfc_rom.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="sfc_code.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="sfc_cpu.h">
+      <Filter>header</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>
