@@ -77,18 +77,18 @@ static inline void sfc_setup_nametable_bank(sfc_famicom_t* famicom) {
         famicom->ppu.banks[0xa] = famicom->video_memory_ex + 0x400 * 0;
         famicom->ppu.banks[0xb] = famicom->video_memory_ex + 0x400 * 1;
     }
-    // 纵版
-    else if (famicom->rom_info.vmirroring) {
-        famicom->ppu.banks[0x8] = famicom->video_memory + 0x400 * 0;
-        famicom->ppu.banks[0x9] = famicom->video_memory + 0x400 * 0;
-        famicom->ppu.banks[0xa] = famicom->video_memory + 0x400 * 1;
-        famicom->ppu.banks[0xb] = famicom->video_memory + 0x400 * 1;
-    }
     // 横版
-    else {
+    else if (famicom->rom_info.vmirroring) {
         famicom->ppu.banks[0x8] = famicom->video_memory + 0x400 * 0;
         famicom->ppu.banks[0x9] = famicom->video_memory + 0x400 * 1;
         famicom->ppu.banks[0xa] = famicom->video_memory + 0x400 * 0;
+        famicom->ppu.banks[0xb] = famicom->video_memory + 0x400 * 1;
+    }
+    // 纵版
+    else {
+        famicom->ppu.banks[0x8] = famicom->video_memory + 0x400 * 0;
+        famicom->ppu.banks[0x9] = famicom->video_memory + 0x400 * 0;
+        famicom->ppu.banks[0xa] = famicom->video_memory + 0x400 * 1;
         famicom->ppu.banks[0xb] = famicom->video_memory + 0x400 * 1;
     }
 }
@@ -99,6 +99,8 @@ static inline void sfc_setup_nametable_bank(sfc_famicom_t* famicom) {
 /// <param name="famicom">The famicom.</param>
 /// <returns></returns>
 sfc_ecode sfc_famicom_reset(sfc_famicom_t* famicom) {
+    // 清空PPU数据
+    memset(&famicom->ppu, 0, sizeof(famicom->ppu));
     // 重置mapper
     sfc_ecode ecode = famicom->mapper.reset(famicom);
     if (ecode) return ecode;
@@ -113,8 +115,6 @@ sfc_ecode sfc_famicom_reset(sfc_famicom_t* famicom) {
     famicom->registers.status = 0
         | SFC_FLAG_R    //  一直为1
         ;
-    // 重置PPU
-    memset(&famicom->ppu, 0, sizeof(famicom->ppu));
     // 调色板
     // 名称表
     sfc_setup_nametable_bank(famicom);
@@ -156,6 +156,7 @@ extern inline void sfc_vblank_end(sfc_famicom_t* famicom) {
 sfc_ecode sfc_load_default_rom(void* arg, sfc_rom_info_t* info) {
     assert(info->data_prgrom == NULL && "FREE FIRST");
     FILE* const file = fopen("nestest.nes", "rb");
+    //FILE* const file = fopen("01-basics.nes", "rb");
     // 文本未找到
     if (!file) return SFC_ERROR_FILE_NOT_FOUND;
     sfc_ecode code = SFC_ERROR_ILLEGAL_FILE;

@@ -63,7 +63,7 @@ enum sfc_cpu_vector {
 };
 
 // read cpu address
-uint8_t sfc_read_cpu_address(uint16_t, const sfc_famicom_t*);
+uint8_t sfc_read_cpu_address(uint16_t, sfc_famicom_t*);
 // write cpu address
 void sfc_write_cpu_address(uint16_t, uint8_t, sfc_famicom_t*);
 // sfc cpu execute one instruction

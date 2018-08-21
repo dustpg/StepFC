@@ -52,7 +52,7 @@ void sfc_fc_disassembly(uint16_t address, const sfc_famicom_t* famicom, char buf
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
 /// <returns></returns>
-uint8_t sfc_read_cpu_address(uint16_t address, const sfc_famicom_t* famicom) {
+uint8_t sfc_read_cpu_address(uint16_t address, sfc_famicom_t* famicom) {
     /* 
     CPU 地址空间
     +---------+-------+-------+-----------------------+
@@ -81,10 +81,12 @@ uint8_t sfc_read_cpu_address(uint16_t address, const sfc_famicom_t* famicom) {
         return famicom->main_memory[address & (uint16_t)0x07ff];
     case 1:
         // 高三位为1, [$2000, $4000): PPU寄存器, 8字节步进镜像
-        return sfc_read_ppu_register_via_cpu(address, (sfc_ppu_t*)&famicom->ppu);
+        return sfc_read_ppu_register_via_cpu(address, &famicom->ppu);
     case 2:
         // 高三位为2, [$4000, $6000): pAPU寄存器 扩展ROM区
-        assert(!"NOT IMPL");
+        if (address < 0x4020) {
+        }
+        else assert(!"NOT IMPL");
         return 0;
     case 3:
         // 高三位为3, [$6000, $8000): 存档 SRAM区

@@ -14,6 +14,18 @@ static inline void sfc_load_prgrom_8k(
     famicom->prg_banks[4 + des] = famicom->rom_info.data_prgrom + 8 * 1024 * src;
 }
 
+
+/// <summary>
+/// 实用函数-StepFC: 载入1k CHR-ROM
+/// </summary>
+/// <param name="famicom">The famicom.</param>
+/// <param name="des">The DES.</param>
+/// <param name="src">The source.</param>
+static inline void sfc_load_chrrom_1k(
+    sfc_famicom_t* famicom, int des, int src) {
+    famicom->ppu.banks[des] = famicom->rom_info.data_chrrom + 1024 * src;
+}
+
 // mapper000 - NROM
 static inline sfc_ecode sfc_load_mapper_00(sfc_famicom_t* famicom);
 
@@ -47,6 +59,8 @@ extern sfc_ecode sfc_load_mapper(sfc_famicom_t* famicom, uint8_t id) {
 static sfc_ecode sfc_mapper_00_reset(sfc_famicom_t* famicom) {
     assert(famicom->rom_info.count_prgrom16kb && "bad count");
     assert(famicom->rom_info.count_prgrom16kb <= 2 && "bad count");
+    // PRG-ROM
+
     // 16KB -> 载入 $8000-$BFFF, $C000-$FFFF 为镜像
     const int id2 = famicom->rom_info.count_prgrom16kb & 2;
     // 32KB -> 载入 $8000-$FFFF
@@ -54,6 +68,10 @@ static sfc_ecode sfc_mapper_00_reset(sfc_famicom_t* famicom) {
     sfc_load_prgrom_8k(famicom, 1, 1);
     sfc_load_prgrom_8k(famicom, 2, id2 + 0);
     sfc_load_prgrom_8k(famicom, 3, id2 + 1);
+
+    // CHR-ROM
+    for (int i = 0; i != 8; ++i) 
+        sfc_load_chrrom_1k(famicom, i, i);
     return SFC_ERROR_OK;
 }
 

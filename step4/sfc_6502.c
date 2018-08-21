@@ -525,7 +525,16 @@ static inline void sfc_operation_RTI(uint16_t address, sfc_famicom_t* famicom) {
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
 static inline void sfc_operation_BRK(uint16_t address, sfc_famicom_t* famicom) {
-    sfc_operation_UNK(address, famicom);
+    ++SFC_PC;
+    const uint8_t pch = (uint8_t)((SFC_PC) >> 8);
+    const uint8_t pcl = (uint8_t)SFC_PC;
+    SFC_PUSH(pch);
+    SFC_PUSH(pcl);
+    SFC_PUSH(SFC_P | (uint8_t)(SFC_FLAG_R) | (uint8_t)(SFC_FLAG_B));
+    SFC_IF_SE;
+    const uint8_t pcl2 = sfc_read_cpu_address(SFC_VERCTOR_IRQBRK + 0, famicom);
+    const uint8_t pch2 = sfc_read_cpu_address(SFC_VERCTOR_IRQBRK + 1, famicom);
+    famicom->registers.program_counter = (uint16_t)pcl2 | (uint16_t)pch2 << 8;
 }
 
 /// <summary>
@@ -850,8 +859,7 @@ static inline void sfc_operation_SEI(uint16_t address, sfc_famicom_t* famicom) {
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
 static inline void sfc_operation_CLI(uint16_t address, sfc_famicom_t* famicom) {
-    //SFC_IF_CL;
-    sfc_operation_UNK(address, famicom);
+    SFC_IF_CL;
 }
 
 /// <summary>
@@ -1197,10 +1205,10 @@ extern inline void sfc_operation_NMI(sfc_famicom_t* famicom) {
     const uint8_t pcl = (uint8_t)SFC_PC;
     SFC_PUSH(pch);
     SFC_PUSH(pcl);
-    SFC_PUSH(SFC_P | (uint8_t)(SFC_FLAG_R | SFC_FLAG_B));
+    SFC_PUSH(SFC_P | (uint8_t)(SFC_FLAG_R));
     SFC_IF_SE;
-    const uint8_t pcl2 = sfc_read_cpu_address(SFC_VERCTOR_RESET + 0, famicom);
-    const uint8_t pch2 = sfc_read_cpu_address(SFC_VERCTOR_RESET + 1, famicom);
+    const uint8_t pcl2 = sfc_read_cpu_address(SFC_VERCTOR_NMI + 0, famicom);
+    const uint8_t pch2 = sfc_read_cpu_address(SFC_VERCTOR_NMI + 1, famicom);
     famicom->registers.program_counter = (uint16_t)pcl2 | (uint16_t)pch2 << 8;
 }
 

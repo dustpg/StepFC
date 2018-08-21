@@ -7,6 +7,7 @@
     <ClCompile Include="sfc_6502.c" />
     <ClCompile Include="sfc_cpu.c" />
     <ClCompile Include="sfc_ppu.c" />
+    <ClCompile Include="d2d_draw.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="sfc_famicom.h" />
