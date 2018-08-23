@@ -1,6 +1,20 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
+    <Filter Include="cpp">
+      <UniqueIdentifier>{1e5b44f7-fc90-4c5f-8048-41d7db24719e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="header">
+      <UniqueIdentifier>{d9451b40-ce05-4055-ac42-f47ec30d8a09}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src">
+      <UniqueIdentifier>{55a3f119-f521-43c3-a39c-58281688df90}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\common\d2d_draw.cpp">
+      <Filter>cpp</Filter>
+    </ClCompile>
     <ClCompile Include="main.c">
       <Filter>src</Filter>
     </ClCompile>
@@ -19,19 +33,13 @@
     <ClCompile Include="sfc_ppu.c">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="..\common\d2d_draw.cpp">
-      <Filter>cpp</Filter>
+    <ClCompile Include="sfc_addr4020.c">
+      <Filter>src</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="sfc_6502.h">
-      <Filter>header</Filter>
-    </ClInclude>
-    <ClInclude Include="sfc_code.h">
-      <Filter>header</Filter>
-    </ClInclude>
-    <ClInclude Include="sfc_cpu.h">
-      <Filter>header</Filter>
+    <ClInclude Include="..\common\d2d_interface.h">
+      <Filter>cpp</Filter>
     </ClInclude>
     <ClInclude Include="sfc_famicom.h">
       <Filter>header</Filter>
@@ -42,19 +50,14 @@
     <ClInclude Include="sfc_rom.h">
       <Filter>header</Filter>
     </ClInclude>
-    <ClInclude Include="..\common\d2d_interface.h">
-      <Filter>cpp</Filter>
+    <ClInclude Include="sfc_6502.h">
+      <Filter>header</Filter>
     </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <Filter Include="header">
-      <UniqueIdentifier>{1e229b97-8b54-4e1a-bd27-cbe4f8ca8b54}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="src">
-      <UniqueIdentifier>{d4543c43-dd9f-4c09-b062-16bcf0ceeb90}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="cpp">
-      <UniqueIdentifier>{7407d1a4-523b-4db7-ad0e-8b6c7e7f896e}</UniqueIdentifier>
-    </Filter>
+    <ClInclude Include="sfc_code.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="sfc_cpu.h">
+      <Filter>header</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

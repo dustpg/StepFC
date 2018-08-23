@@ -410,7 +410,7 @@ void sfc_6502_disassembly(sfc_6502_code_t code, char buf[SFC_DISASSEMBLY_BUF_LEN
         sfc_btoh(buf + ADDR_FIRSH + 2, code.a1);
         buf[ADDR_FIRSH + 4] = ')';
         buf[ADDR_FIRSH + 5] = ',';
-        buf[ADDR_FIRSH + 7] = 'X';
+        buf[ADDR_FIRSH + 7] = 'Y';
         break;
     case SFC_AM_IND:
         // XXX ($ABCD)

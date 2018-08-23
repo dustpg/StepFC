@@ -52,6 +52,11 @@ void sfc_fc_disassembly(uint16_t address, const sfc_famicom_t* famicom, char buf
     sfc_6502_disassembly(code, buf + OFFSET);
 }
 
+// StepFC: 读取CPU地址数据4020
+extern inline uint8_t sfc_read_cpu_address4020(uint16_t, sfc_famicom_t*);
+// StepFC: 写入CPU地址数据4020
+extern inline void    sfc_write_cpu_address4020(uint16_t, uint8_t, sfc_famicom_t*);
+
 /// <summary>
 /// StepFC: 读取CPU地址数据
 /// </summary>
@@ -90,8 +95,8 @@ uint8_t sfc_read_cpu_address(uint16_t address, sfc_famicom_t* famicom) {
         return sfc_read_ppu_register_via_cpu(address, &famicom->ppu);
     case 2:
         // 高三位为2, [$4000, $6000): pAPU寄存器 扩展ROM区
-        if (address < 0x4020) {
-        }
+        if (address < 0x4020)
+            return sfc_read_cpu_address4020(address, famicom);
         else assert(!"NOT IMPL");
         return 0;
     case 3:
@@ -147,9 +152,7 @@ void sfc_write_cpu_address(uint16_t address, uint8_t data, sfc_famicom_t* famico
     case 2:
         // 高三位为2, [$4000, $6000): pAPU寄存器 扩展ROM区
         // 前0x20字节为APU, I / O寄存器
-        if (address < 0x4020) {
-
-        }
+        if (address < 0x4020) sfc_write_cpu_address4020(address, data, famicom);
         else assert(!"NOT IMPL");
         return;
     case 3:

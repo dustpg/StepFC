@@ -20,8 +20,8 @@
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>
-    <ProjectGuid>{7FCEC649-2E17-4051-8901-F85D5069CEFB}</ProjectGuid>
-    <RootNamespace>step2</RootNamespace>
+    <ProjectGuid>{E2EB5917-5FB3-4A50-ACD2-8A008254487F}</ProjectGuid>
+    <RootNamespace>step5</RootNamespace>
     <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -119,17 +119,22 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\common\d2d_draw.cpp" />
     <ClCompile Include="main.c" />
     <ClCompile Include="sfc_6502.c" />
+    <ClCompile Include="sfc_addr4020.c" />
     <ClCompile Include="sfc_cpu.c" />
     <ClCompile Include="sfc_famicom.c" />
     <ClCompile Include="sfc_mapper.c" />
+    <ClCompile Include="sfc_ppu.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\common\d2d_interface.h" />
     <ClInclude Include="sfc_6502.h" />
     <ClInclude Include="sfc_code.h" />
     <ClInclude Include="sfc_cpu.h" />
     <ClInclude Include="sfc_famicom.h" />
+    <ClInclude Include="sfc_ppu.h" />
     <ClInclude Include="sfc_rom.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

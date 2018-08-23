@@ -1,13 +1,16 @@
 ﻿#define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <Windows.h>
-#include <d3d11.h>
-#include <d3dcompiler.h>
-#include <DirectXMath.h>
 #include <d2d1_1.h>
+//#include <unknwn.h>
+#include <d3d11.h>
+//#include <d3dcompiler.h>
+//#include <DirectXMath.h>
 #include <cstdint>
 #include <cstring>
 #include <cmath>
+#include <algorithm>
+#include "d2d_interface.h"
 
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "dxguid.lib")
@@ -28,7 +31,7 @@ struct alignas(sizeof(float)*4) GlobalData {
 } g_data = {  };
 
 enum { WINDOW_WIDTH = 1280, WINDOW_HEIGHT = 720 };
-static const wchar_t WINDOW_TITLE[] = L"D3D11 Interop With D2D";
+static const wchar_t WINDOW_TITLE[] = L"D2D Draw";
 
 LRESULT CALLBACK ThisWndProc(HWND , UINT , WPARAM , LPARAM ) noexcept;
 void DoRender(uint32_t sync) noexcept;
@@ -46,9 +49,7 @@ inline void SafeRelease(Interface *&pInterfaceToRelease) {
 
 uint32_t g_bg_data[256 * 240];
 
-extern "C" void main_render(void* bgrx) noexcept;
-
-extern "C" int main_cpp() noexcept {
+extern "C" void main_cpp() noexcept {
     // DPIAware
     ::SetProcessDPIAware();
     // 注册窗口
@@ -79,7 +80,7 @@ extern "C" int main_cpp() noexcept {
         window_rect.left, window_rect.top, window_rect.right, window_rect.bottom,
         0, 0, ::GetModuleHandleW(nullptr) , nullptr
     );
-    if (!hwnd) return 1;
+    if (!hwnd) return;
     ::ShowWindow(hwnd, SW_NORMAL);
     ::UpdateWindow(hwnd);
     if (::InitD3D(hwnd)) {
@@ -94,10 +95,16 @@ extern "C" int main_cpp() noexcept {
         }
     }
     ::ClearD3D();
-    return 0;
+    return;
 }
 
-
+static const unsigned sc_key_map[16] = {
+    // A, B, Select, Start, Up, Down, Left, Right
+    'J', 'K', 'U', 'I', 'W', 'S', 'A', 'D',
+    // A, B, Select, Start, Up, Down, Left, Right
+    VK_NUMPAD2, VK_NUMPAD3, VK_NUMPAD5, VK_NUMPAD6, 
+    VK_UP, VK_DOWN, VK_LEFT, VK_RIGHT,
+};
 
 
 LRESULT CALLBACK ThisWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) noexcept {
@@ -108,6 +115,16 @@ LRESULT CALLBACK ThisWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
         return 0;
     case WM_DESTROY:
         ::PostQuitMessage(0);
+        return 0;
+    case WM_KEYDOWN:
+        if (!(lParam & LPARAM(1 << 30))) {
+        case WM_KEYUP:
+            const auto itr = std::find(std::begin(sc_key_map), std::end(sc_key_map), unsigned(wParam));
+            if (itr != std::end(sc_key_map)) {
+                const int index = itr - std::begin(sc_key_map);
+                ::user_input(index, msg == WM_KEYDOWN);
+            }
+        }
         return 0;
     }
     return ::DefWindowProcW(hwnd, msg, wParam, lParam);
@@ -122,7 +139,8 @@ void DoRender(uint32_t sync) noexcept {
         const auto ctx = g_data.d2d_context;
         ctx->BeginDraw();
         ctx->Clear(D2D1::ColorF(1.f, 1.f, 1.f, 1.f));
-        ctx->DrawBitmap(g_data.d2d_bg);
+        ctx->SetTransform(D2D1::Matrix3x2F::Scale({ 2.f, 2.f }));
+        ctx->DrawBitmap(g_data.d2d_bg, nullptr, 1.f, D2D1_INTERPOLATION_MODE_NEAREST_NEIGHBOR);
         const auto hr1 = ctx->EndDraw();
         const auto hr2 = g_data.swap_chain->Present(sync, 0);
     }

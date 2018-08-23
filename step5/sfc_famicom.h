@@ -16,6 +16,22 @@ typedef struct sfc_famicom sfc_famicom_t;
 /// </summary>
 enum { SFC_DISASSEMBLY_BUF_LEN2 = 48 };
 
+
+/// <summary>
+/// The SFC button index
+/// </summary>
+enum sfc_button_index { 
+    SFC_BUTTON_A = 0,
+    SFC_BUTTON_B,
+    SFC_BUTTON_SELECT,
+    SFC_BUTTON_START,
+    SFC_BUTTON_UP,
+    SFC_BUTTON_DOWN,
+    SFC_BUTTON_LEFT,
+    SFC_BUTTON_RIGHT,
+};
+
+
 // 指定地方反汇编
 void sfc_fc_disassembly(
     uint16_t address,
@@ -63,6 +79,14 @@ struct sfc_famicom {
     sfc_ppu_t           ppu;
     // ROM 信息
     sfc_rom_info_t      rom_info;
+    // 手柄序列状态#1
+    uint16_t            button_index_1;
+    // 手柄序列状态#2
+    uint16_t            button_index_2;
+    // 手柄序列状态
+    uint16_t            button_index_mask;
+    // 手柄按钮状态
+    uint8_t             button_states[16];
     // 程序内存仓库(Bank)/窗口(Window)
     uint8_t*            prg_banks[0x10000 >> 13];
     // 工作(work)/保存(save)内存

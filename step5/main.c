@@ -1,9 +1,11 @@
 ﻿#include "sfc_famicom.h"
-#define SFC_NO_INPUT
 #include "../common/d2d_interface.h"
 #include "sfc_cpu.h"
 #include <stdio.h>
 #include <math.h>
+#include <assert.h>
+
+void sfc_log_exec(void* arg, sfc_famicom_t* famicom);
 
 sfc_famicom_t* g_famicom = NULL;
 extern uint32_t sfc_stdalette[];
@@ -35,7 +37,7 @@ uint32_t get_pixel(unsigned x, unsigned y, const uint8_t* nt, const uint8_t* bg)
     const uint8_t low = ((p0 & mask) >> shift) | ((p1 & mask) >> shift << 1);
     // 计算所在属性表
     const unsigned aid = (x >> 5) + (y >> 5) * 8;
-    const uint8_t attr = nt[aid + (32*30)];
+    const uint8_t attr = nt[aid + (32 * 30)];
     // 获取属性表内位偏移
     const uint8_t aoffset = ((x & 0x10) >> 3) | ((y & 0x10) >> 2);
     // 计算高两位
@@ -53,8 +55,9 @@ uint32_t get_pixel(unsigned x, unsigned y, const uint8_t* nt, const uint8_t* bg)
 extern void main_render(void* bgrx) {
     uint32_t* data = bgrx;
 
-    for (int i = 0; i != 10000; ++i)
+    for (int i = 0; i != 10000; ++i) {
         sfc_cpu_execute_one(g_famicom);
+    }
 
     sfc_do_vblank(g_famicom);
 
@@ -81,11 +84,15 @@ extern void main_render(void* bgrx) {
 /// </summary>
 /// <returns></returns>
 int main() {
+    sfc_interface_t interfaces = { NULL };
+    interfaces.before_execute = sfc_log_exec;
+
     sfc_famicom_t famicom;
     g_famicom = &famicom;
-    sfc_famicom_init(&famicom, NULL, NULL);
+    if (sfc_famicom_init(&famicom, NULL, &interfaces)) return 1;
+
     printf(
-        "ROM: PRG-RPM: %d x 16kb   CHR-ROM %d x 8kb   Mapper: %03d\n", 
+        "ROM: PRG-RPM: %d x 16kb   CHR-ROM %d x 8kb   Mapper: %03d\n",
         (int)famicom.rom_info.count_prgrom16kb,
         (int)famicom.rom_info.count_chrrom_8kb,
         (int)famicom.rom_info.mapper_number
@@ -95,4 +102,34 @@ int main() {
 
     sfc_famicom_uninit(&famicom);
     return 0;
+}
+
+
+/// <summary>
+/// Users the input.
+/// </summary>
+/// <param name="index">The index.</param>
+/// <param name="data">The data.</param>
+void user_input(int index, unsigned char data) {
+    assert(index >= 0 && index < 16);
+    g_famicom->button_states[index] = data;
+}
+
+
+
+void sfc_log_exec(void* arg, sfc_famicom_t* famicom) {
+    //static int line = 0;
+    //line++;
+    //char buf[SFC_DISASSEMBLY_BUF_LEN2];
+    //const uint16_t pc = famicom->registers.program_counter;
+    //sfc_fc_disassembly(pc, famicom, buf);
+    //printf(
+    //    "%4d - %s   A:%02X X:%02X Y:%02X P:%02X SP:%02X\n",
+    //    line, buf,
+    //    (int)famicom->registers.accumulator,
+    //    (int)famicom->registers.x_index,
+    //    (int)famicom->registers.y_index,
+    //    (int)famicom->registers.status,
+    //    (int)famicom->registers.stack_pointer
+    //);
 }
