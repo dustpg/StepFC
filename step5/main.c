@@ -27,14 +27,17 @@ uint32_t get_pixel(unsigned x, unsigned y, const uint8_t* nt, const uint8_t* bg)
     const uint8_t* nowp0 = bg + name * 16;
     const uint8_t* nowp1 = nowp0 + 8;
     // Y坐标为平面内偏移
-    const int offset = y & 0x7;
-    const uint8_t p0 = nowp0[offset];
-    const uint8_t p1 = nowp1[offset];
+    const uint8_t p0 = nowp0[y & 0x7];
+    const uint8_t p1 = nowp1[y & 0x7];
     // X坐标为字节内偏移
     const uint8_t shift = (~x) & 0x7;
     const uint8_t mask = 1 << shift;
     // 计算低二位
     const uint8_t low = ((p0 & mask) >> shift) | ((p1 & mask) >> shift << 1);
+
+    if (name == 0xb5 && low == 0) {
+        int bk = 9;
+    }
     // 计算所在属性表
     const unsigned aid = (x >> 5) + (y >> 5) * 8;
     const uint8_t attr = nt[aid + (32 * 30)];
@@ -55,7 +58,7 @@ uint32_t get_pixel(unsigned x, unsigned y, const uint8_t* nt, const uint8_t* bg)
 extern void main_render(void* bgrx) {
     uint32_t* data = bgrx;
 
-    for (int i = 0; i != 10000; ++i) {
+    for (int i = 0; i != 5000; ++i) {
         sfc_cpu_execute_one(g_famicom);
     }
 
@@ -118,18 +121,19 @@ void user_input(int index, unsigned char data) {
 
 
 void sfc_log_exec(void* arg, sfc_famicom_t* famicom) {
-    //static int line = 0;
-    //line++;
-    //char buf[SFC_DISASSEMBLY_BUF_LEN2];
-    //const uint16_t pc = famicom->registers.program_counter;
-    //sfc_fc_disassembly(pc, famicom, buf);
-    //printf(
-    //    "%4d - %s   A:%02X X:%02X Y:%02X P:%02X SP:%02X\n",
-    //    line, buf,
-    //    (int)famicom->registers.accumulator,
-    //    (int)famicom->registers.x_index,
-    //    (int)famicom->registers.y_index,
-    //    (int)famicom->registers.status,
-    //    (int)famicom->registers.stack_pointer
-    //);
+    const uint16_t pc = famicom->registers.program_counter;
+    static int line = 0;  line++;
+    return;
+    //if (line < 230297) return;
+    char buf[SFC_DISASSEMBLY_BUF_LEN2];
+    sfc_fc_disassembly(pc, famicom, buf);
+    printf(
+        "%4d - %s   A:%02X X:%02X Y:%02X P:%02X SP:%02X\n",
+        line, buf,
+        (int)famicom->registers.accumulator,
+        (int)famicom->registers.x_index,
+        (int)famicom->registers.y_index,
+        (int)famicom->registers.status,
+        (int)famicom->registers.stack_pointer
+    );
 }

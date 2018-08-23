@@ -34,6 +34,8 @@ typedef struct {
     uint8_t         scroll[2];
     // 滚动偏移双写位置记录
     uint8_t         writex2;
+    // 显存读取缓冲值
+    uint8_t         pseudo;
     // 精灵调色板索引
     uint8_t         spindexes[0x20];
     // 精灵数据: 256B

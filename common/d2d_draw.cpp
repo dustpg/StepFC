@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <cstring>
 #include <cmath>
+#include <cassert>
 #include <algorithm>
 #include "d2d_interface.h"
 
@@ -32,6 +33,7 @@ struct alignas(sizeof(float)*4) GlobalData {
 
 enum { WINDOW_WIDTH = 1280, WINDOW_HEIGHT = 720 };
 static const wchar_t WINDOW_TITLE[] = L"D2D Draw";
+static bool doit = true;
 
 LRESULT CALLBACK ThisWndProc(HWND , UINT , WPARAM , LPARAM ) noexcept;
 void DoRender(uint32_t sync) noexcept;
@@ -116,6 +118,9 @@ LRESULT CALLBACK ThisWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
     case WM_DESTROY:
         ::PostQuitMessage(0);
         return 0;
+    case WM_RBUTTONDOWN:
+        doit = true;
+        return 0;
     case WM_KEYDOWN:
         if (!(lParam & LPARAM(1 << 30))) {
         case WM_KEYUP:
@@ -132,8 +137,12 @@ LRESULT CALLBACK ThisWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
 
 
 void DoRender(uint32_t sync) noexcept {
-    main_render(g_bg_data);
-    const auto hr0 = g_data.d2d_bg->CopyFromMemory(nullptr, g_bg_data, 256 * 4);
+    if (doit) {
+        //doit = false;
+        main_render(g_bg_data);
+        const auto hr0 = g_data.d2d_bg->CopyFromMemory(nullptr, g_bg_data, 256 * 4);
+        assert(SUCCEEDED(hr0));
+    }
     // D2D
     {
         const auto ctx = g_data.d2d_context;
@@ -142,7 +151,9 @@ void DoRender(uint32_t sync) noexcept {
         ctx->SetTransform(D2D1::Matrix3x2F::Scale({ 2.f, 2.f }));
         ctx->DrawBitmap(g_data.d2d_bg, nullptr, 1.f, D2D1_INTERPOLATION_MODE_NEAREST_NEIGHBOR);
         const auto hr1 = ctx->EndDraw();
+        assert(SUCCEEDED(hr1));
         const auto hr2 = g_data.swap_chain->Present(sync, 0);
+        assert(SUCCEEDED(hr2));
     }
 }
 

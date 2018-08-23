@@ -155,7 +155,7 @@ extern inline void sfc_vblank_flag_end(sfc_famicom_t* famicom) {
 /// <returns></returns>
 sfc_ecode sfc_load_default_rom(void* arg, sfc_rom_info_t* info) {
     assert(info->data_prgrom == NULL && "FREE FIRST");
-    FILE* const file = fopen("nestest.nes", "rb");
+    FILE* const file = fopen("debug/mario.nes", "rb");
     //FILE* const file = fopen("01-basics.nes", "rb");
     // ÎÄ±¾Î´ÕÒµ½
     if (!file) return SFC_ERROR_FILE_NOT_FOUND;

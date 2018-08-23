@@ -2,24 +2,52 @@
 #include <assert.h>
 #include <string.h>
 
-
 /// <summary>
-/// StepFC: 映射PPU地址空间到 模拟器自身空间
+/// StepFC: 读取PPU地址空间
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="data">The data.</param>
 /// <param name="ppu">The ppu.</param>
-uint8_t* sfc_get_ppu_address(uint16_t address, sfc_ppu_t* ppu) {
+uint8_t sfc_read_ppu_address(uint16_t address, sfc_ppu_t* ppu) {
     const uint16_t real_address = address & (uint16_t)0x3FFF;
     // 使用BANK读取
     if (real_address < (uint16_t)0x3F00) {
         const uint16_t index = real_address >> 10;
         const uint16_t offset = real_address & (uint16_t)0x3FF;
         assert(ppu->banks[index]);
-        return ppu->banks[index] + offset;
+        const uint8_t data = ppu->pseudo;
+        ppu->pseudo = ppu->banks[index][offset];
+        return data;
     }
     // 调色板索引
-    else return ppu->spindexes + (real_address & (uint16_t)0x1f);
+    else return ppu->pseudo = ppu->spindexes[real_address & (uint16_t)0x1f];
+}
+
+/// <summary>
+/// StepFC: 写入PPU地址空间
+/// </summary>
+/// <param name="address">The address.</param>
+/// <param name="data">The data.</param>
+/// <param name="ppu">The ppu.</param>
+void sfc_write_ppu_address(uint16_t address, uint8_t data, sfc_ppu_t* ppu) {
+    const uint16_t real_address = address & (uint16_t)0x3FFF;
+    // 使用BANK写入
+    if (real_address < (uint16_t)0x3F00) {
+        assert(real_address >= 0x2000);
+        const uint16_t index = real_address >> 10;
+        const uint16_t offset = real_address & (uint16_t)0x3FF;
+        assert(ppu->banks[index]);
+        ppu->banks[index][offset] = data;
+    }
+    // 调色板索引
+    else {
+        ppu->spindexes[real_address & (uint16_t)0x1f] = data;
+        // 镜像$3F00/$3F04/$3F08/$3F0C
+        ppu->spindexes[0x00] = ppu->spindexes[0x10];
+        ppu->spindexes[0x04] = ppu->spindexes[0x14];
+        ppu->spindexes[0x08] = ppu->spindexes[0x18];
+        ppu->spindexes[0x0C] = ppu->spindexes[0x1C];
+    }
 }
 
 
@@ -70,7 +98,7 @@ uint8_t sfc_read_ppu_register_via_cpu(uint16_t address, sfc_ppu_t* ppu) {
     case 7:
         // 0x2007: Data ($2007) <> read/write
         // PPU VRAM读写端口
-        data = *sfc_get_ppu_address(ppu->vramaddr, ppu);
+        data = sfc_read_ppu_address(ppu->vramaddr, ppu);
         ppu->vramaddr += (uint16_t)((ppu->ctrl & SFC_PPUFLAG_VINC32) ? 32 : 1);
         break;
     }
@@ -130,12 +158,15 @@ void sfc_write_ppu_register_via_cpu(uint16_t address, uint8_t data, sfc_ppu_t* p
         else {
             ppu->vramaddr = (ppu->vramaddr & (uint16_t)0x00FF) | ((uint16_t)data << 8);
         }
+        if (0x3f00 == ppu->vramaddr) {
+            int bk = 9;
+        }
         ++ppu->writex2;
         break;
     case 7:
         // 0x2007: Data ($2007) <> read/write
         // PPU VRAM数据端
-        *sfc_get_ppu_address(ppu->vramaddr, ppu) = data;
+        sfc_write_ppu_address(ppu->vramaddr, data, ppu);
         ppu->vramaddr += (uint16_t)((ppu->ctrl & SFC_PPUFLAG_VINC32) ? 32 : 1);
         break;
     }
