@@ -54,7 +54,7 @@ uint32_t get_pixel(unsigned x, unsigned y, const uint8_t* nt, const uint8_t* bg)
 extern void main_render(void* bgrx) {
     uint32_t* data = bgrx;
 
-    for (int i = 0; i != 5000; ++i) {
+    for (int i = 0; i != 1000; ++i) {
         sfc_cpu_execute_one(g_famicom);
     }
 

@@ -158,9 +158,6 @@ void sfc_write_ppu_register_via_cpu(uint16_t address, uint8_t data, sfc_ppu_t* p
         else {
             ppu->vramaddr = (ppu->vramaddr & (uint16_t)0x00FF) | ((uint16_t)data << 8);
         }
-        if (0x3f00 == ppu->vramaddr) {
-            int bk = 9;
-        }
         ++ppu->writex2;
         break;
     case 7:
