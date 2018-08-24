@@ -41,12 +41,16 @@ void sfc_write_ppu_address(uint16_t address, uint8_t data, sfc_ppu_t* ppu) {
     }
     // 调色板索引
     else {
-        ppu->spindexes[real_address & (uint16_t)0x1f] = data;
+        // 独立地址
+        if (real_address & (uint16_t)0x03) {
+            ppu->spindexes[real_address & (uint16_t)0x1f] = data;
+        }
         // 镜像$3F00/$3F04/$3F08/$3F0C
-        ppu->spindexes[0x00] = ppu->spindexes[0x10];
-        ppu->spindexes[0x04] = ppu->spindexes[0x14];
-        ppu->spindexes[0x08] = ppu->spindexes[0x18];
-        ppu->spindexes[0x0C] = ppu->spindexes[0x1C];
+        else {
+            const uint16_t offset = real_address & (uint16_t)0x0f;
+            ppu->spindexes[offset] = data;
+            ppu->spindexes[offset | (uint16_t)0x10] = data;
+        }
     }
 }
 

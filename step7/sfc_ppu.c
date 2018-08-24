@@ -33,7 +33,6 @@ void sfc_write_ppu_address(uint16_t address, uint8_t data, sfc_ppu_t* ppu) {
     const uint16_t real_address = address & (uint16_t)0x3FFF;
     // Ê¹ÓÃBANKĞ´Èë
     if (real_address < (uint16_t)0x3F00) {
-        assert(real_address >= 0x2000);
         const uint16_t index = real_address >> 10;
         const uint16_t offset = real_address & (uint16_t)0x3FF;
         assert(ppu->banks[index]);

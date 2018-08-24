@@ -1,5 +1,6 @@
 ﻿#include "sfc_famicom.h"
 #define SFC_NO_INPUT
+#define SFC_NO_SUBRENDER
 #include "../common/d2d_interface.h"
 #include "sfc_cpu.h"
 #include <stdio.h>

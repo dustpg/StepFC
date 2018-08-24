@@ -1,0 +1,63 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClInclude Include="..\common\d2d_interface.h">
+      <Filter>cpp</Filter>
+    </ClInclude>
+    <ClInclude Include="sfc_6502.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="sfc_code.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="sfc_cpu.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="sfc_famicom.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="sfc_ppu.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="sfc_rom.h">
+      <Filter>header</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\common\d2d_draw.cpp">
+      <Filter>cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="main.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="sfc_6502.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="sfc_addr4020.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="sfc_cpu.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="sfc_famicom.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="sfc_mapper.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="sfc_ppu.c">
+      <Filter>src</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="cpp">
+      <UniqueIdentifier>{f1001a13-9b73-41e0-93a1-a0f8f864993a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src">
+      <UniqueIdentifier>{295651db-294a-49b8-a0fb-5142d3dced9d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="header">
+      <UniqueIdentifier>{41d0f91b-965e-452c-9438-5956ce2b8e0b}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

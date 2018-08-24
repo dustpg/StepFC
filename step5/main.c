@@ -1,4 +1,5 @@
 ﻿#include "sfc_famicom.h"
+#define SFC_NO_SUBRENDER
 #include "../common/d2d_interface.h"
 #include "sfc_cpu.h"
 #include <stdio.h>
@@ -120,9 +121,6 @@ void user_input(int index, unsigned char data) {
 void sfc_log_exec(void* arg, sfc_famicom_t* famicom) {
     const uint16_t pc = famicom->registers.program_counter;
     static int line = 0;  line++;
-    if (pc == 0x80f0) {
-        int bk = 9;
-    }
     return;
     //if (line < 230297) return;
 

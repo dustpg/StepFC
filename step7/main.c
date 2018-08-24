@@ -190,11 +190,17 @@ extern int sub_render(void* bgrx) {
 extern void main_render(void* bgrx) {
     uint32_t* const data = bgrx;
 
+    g_famicom->ppu.status |= (uint8_t)SFC_PPUFLAG_Sp0Hit;
     for (int i = 0; i != 4000; ++i) {
         sfc_cpu_execute_one(g_famicom);
     }
 
     sfc_do_vblank(g_famicom);
+    g_famicom->ppu.status &= ~(uint8_t)SFC_PPUFLAG_Sp0Hit;
+    for (int i = 0; i != 4000; ++i) {
+        sfc_cpu_execute_one(g_famicom);
+    }
+
 
     // 生成调色板颜色
     {

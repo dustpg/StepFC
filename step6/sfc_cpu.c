@@ -143,9 +143,6 @@ void sfc_write_cpu_address(uint16_t address, uint8_t data, sfc_famicom_t* famico
     {
     case 0:
         // 高三位为0: [$0000, $2000): 系统主内存, 4次镜像
-        if (address == 0x09) {
-            int bk = 9;
-        }
         famicom->main_memory[address & (uint16_t)0x07ff] = data;
         return;
     case 1:
