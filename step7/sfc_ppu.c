@@ -79,6 +79,8 @@ uint8_t sfc_read_ppu_register_via_cpu(uint16_t address, sfc_ppu_t* ppu) {
         data = ppu->status;
         // ¶ÁÈ¡ºó»áÇå³ıVBlank×´Ì¬
         ppu->status &= ~(uint8_t)SFC_PPUFLAG_VBlank;
+        // wiki.nesdev.com/w/index.php/PPU_scrolling:  $2002 read
+        ppu->writex2 = 0;
         break;
     case 3:
         // 0x2003: OAM address port ($2003) > write
@@ -115,7 +117,6 @@ uint8_t sfc_read_ppu_register_via_cpu(uint16_t address, sfc_ppu_t* ppu) {
 /// <param name="address">The address.</param>
 /// <param name="data">The data.</param>
 /// <param name="ppu">The ppu.</param>
-/// <returns></returns>
 void sfc_write_ppu_register_via_cpu(uint16_t address, uint8_t data, sfc_ppu_t* ppu) {
     switch (address & (uint16_t)0x7)
     {
@@ -123,6 +124,7 @@ void sfc_write_ppu_register_via_cpu(uint16_t address, uint8_t data, sfc_ppu_t* p
         // PPU ¿ØÖÆ¼Ä´æÆ÷
         // 0x2000: Controller ($2000) > write
         ppu->ctrl = data;
+        ppu->nametable_select = data & 3;
         break;
     case 1:
         // PPU ÑÚÂë¼Ä´æÆ÷
@@ -156,6 +158,7 @@ void sfc_write_ppu_register_via_cpu(uint16_t address, uint8_t data, sfc_ppu_t* p
         // Ğ´Èë¸ß×Ö½Ú
         if (ppu->writex2 & 1) {
             ppu->vramaddr = (ppu->vramaddr & (uint16_t)0xFF00) | (uint16_t)data;
+            ppu->nametable_select = (ppu->vramaddr >> 10) & 3;
         }
         // Ğ´ÈëµÍ×Ö½Ú
         else {

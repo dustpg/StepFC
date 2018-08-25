@@ -6,6 +6,7 @@
 #include "sfc_code.h"
 #include "sfc_cpu.h"
 #include "sfc_ppu.h"
+#include "sfc_config.h"
 
 // typedef
 struct sfc_famicom;
@@ -69,12 +70,16 @@ typedef struct {
 struct sfc_famicom {
     // 参数
     void*               argument;
+    // 配置信息
+    sfc_config_t        config;
     // 扩展接口
     sfc_interface_t     interfaces;
     // Mapper接口
     sfc_mapper_t        mapper;
     // 寄存器
     sfc_cpu_register_t  registers;
+    // 周期计数
+    uint32_t            cycle_count;
     // PPU
     sfc_ppu_t           ppu;
     // ROM 信息
@@ -117,11 +122,3 @@ void sfc_famicom_uninit(sfc_famicom_t*);
 
 
 // ----------------------- 内部函数
-
-// 开始垂直空白标记
-extern inline void sfc_vblank_flag_start(sfc_famicom_t* famicom);
-// 结束垂直空白标记
-extern inline void sfc_vblank_flag_end(sfc_famicom_t* famicom);
-
-// 不可屏蔽中断 垂直空白
-void sfc_do_vblank(sfc_famicom_t* famicom);

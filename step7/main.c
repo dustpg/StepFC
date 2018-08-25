@@ -12,6 +12,8 @@ sfc_famicom_t* g_famicom = NULL;
 extern uint32_t sfc_stdalette[];
 uint32_t palette_data[16];
 
+extern void sfc_render_frame(sfc_famicom_t* famicom, uint8_t* buffer);
+
 /// <summary>
 /// 获取坐标像素
 /// </summary>
@@ -126,6 +128,7 @@ void expand_line_8_r(uint8_t p0, uint8_t p1, uint8_t high, uint32_t* output) {
 //double samples[SAMPLE_COUNT];
 
 extern int sub_render(void* bgrx) {
+    return 0;
     uint32_t* const data = bgrx;
     // 生成调色板颜色
     //memset(data, 0, 256 * 240 * 4);
@@ -190,16 +193,14 @@ extern int sub_render(void* bgrx) {
 extern void main_render(void* bgrx) {
     uint32_t* const data = bgrx;
 
-    g_famicom->ppu.status |= (uint8_t)SFC_PPUFLAG_Sp0Hit;
-    for (int i = 0; i != 4000; ++i) {
-        sfc_cpu_execute_one(g_famicom);
-    }
+    uint8_t buffer[256 * 256];
 
-    sfc_do_vblank(g_famicom);
-    g_famicom->ppu.status &= ~(uint8_t)SFC_PPUFLAG_Sp0Hit;
-    for (int i = 0; i != 4000; ++i) {
-        sfc_cpu_execute_one(g_famicom);
+    sfc_render_frame(g_famicom, buffer);
+
+    for (int i = 0; i != 256 * 240; ++i) {
+        data[i] = sfc_stdalette[buffer[i]];
     }
+#if 0
 
 
     // 生成调色板颜色
@@ -218,6 +219,7 @@ extern void main_render(void* bgrx) {
     for (unsigned i = 0; i != 256 * 240; ++i) {
         data[i] = get_pixel(i & 0xff, i >> 8, now, bgp);
     }
+#endif
 }
 
 /// <summary>

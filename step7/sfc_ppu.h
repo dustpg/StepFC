@@ -20,6 +20,8 @@ enum sfc_ppu_flag {
 typedef struct {
     // 内存地址库
     uint8_t*        banks[0x4000 / 0x0400];
+    // 名称表选择(PPUCTRL低2位, 以及渲染中VRAM指针AB位)
+    uint16_t        nametable_select;
     // VRAM 地址
     uint16_t        vramaddr;
     // 寄存器 PPUCTRL      @$2000

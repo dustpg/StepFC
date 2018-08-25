@@ -50,6 +50,8 @@ sfc_ecode sfc_famicom_init(
         sfc_funcptr_t* const func_des = (sfc_funcptr_t*)&famicom->interfaces;
         for (int i = 0; i != count; ++i) if (func_src[i]) func_des[i] = func_src[i];
     }
+    // 默认是NTSC制式
+    famicom->config = SFC_CONFIG_NTSC;
     // 一开始载入测试ROM
     return sfc_load_new_rom(famicom);
     return SFC_ERROR_OK;
@@ -127,22 +129,6 @@ sfc_ecode sfc_famicom_reset(sfc_famicom_t* famicom) {
     return SFC_ERROR_OK;
 }
 
-
-/// <summary>
-/// StepFC: 开始垂直空白标志
-/// </summary>
-/// <param name="famicom">The famicom.</param>
-extern inline void sfc_vblank_flag_start(sfc_famicom_t* famicom) {
-    famicom->ppu.status |= (uint8_t)SFC_PPUFLAG_VBlank;
-}
-
-/// <summary>
-/// StepFC: 结束垂直空白标志
-/// </summary>
-/// <param name="famicom">The famicom.</param>
-extern inline void sfc_vblank_flag_end(sfc_famicom_t* famicom) {
-    famicom->ppu.status &= ~(uint8_t)SFC_PPUFLAG_VBlank;
-}
 
 #include <stdio.h>
 #include <stdlib.h>

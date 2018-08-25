@@ -69,6 +69,8 @@ extern inline void sfc_write_cpu_address4020(uint16_t address, uint8_t data, sfc
     case 0x14:
         // 精灵RAM直接储存器访问
         memcpy(famicom->ppu.sprites, sfc_get_dma_address(data, famicom), 256);
+        famicom->cycle_count += 513;
+        famicom->cycle_count += famicom->cycle_count & 1;
         break;
     case 0x16:
         // 手柄端口

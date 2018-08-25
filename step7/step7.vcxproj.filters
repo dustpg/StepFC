@@ -22,6 +22,9 @@
     <ClInclude Include="sfc_rom.h">
       <Filter>header</Filter>
     </ClInclude>
+    <ClInclude Include="sfc_config.h">
+      <Filter>header</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\common\d2d_draw.cpp">
@@ -46,6 +49,12 @@
       <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="sfc_ppu.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="sfc_config.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="sfc_render.c">
       <Filter>src</Filter>
     </ClCompile>
   </ItemGroup>

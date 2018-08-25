@@ -3,6 +3,15 @@
 #include <assert.h>
 #include <string.h>
 
+
+extern inline uint8_t sfc_read_prgdata(uint16_t, const sfc_famicom_t*);
+
+#ifdef _MSC_VER
+#define SFC_FORCEINLINE __forceinline
+#else
+#define SFC_FORCEINLINE __attribute__((always_inline))
+#endif
+
 // 实用宏定义
 
 // 寄存器
@@ -50,6 +59,7 @@
 
 // 实用函数
 #define SFC_READ(a) sfc_read_cpu_address(a, famicom)
+#define SFC_READ_PC(a) sfc_read_prgdata(a, famicom)
 #define SFC_PUSH(a) (famicom->main_memory + 0x100)[SFC_SP--] = a;
 #define SFC_POP() (famicom->main_memory + 0x100)[++SFC_SP];
 #define SFC_WRITE(a, v) sfc_write_cpu_address(a, v, famicom)
@@ -58,7 +68,8 @@
 #define OP(n, a, o) \
 case 0x##n:\
 {           \
-    const uint16_t address = sfc_addressing_##a(famicom);\
+    cycle_add += (uint32_t)SFC_BAISC_CYCLE_##n;\
+    const uint16_t address = sfc_addressing_##a(famicom, &cycle_add);\
     sfc_operation_##o(address, famicom);\
     break;\
 }
@@ -66,146 +77,176 @@ case 0x##n:\
 
 // ---------------------------------- 寻址
 
-
+SFC_FORCEINLINE
 /// <summary>
 /// 寻址方式: 未知
 /// </summary>
 /// <param name="famicom">The famicom.</param>
+/// <param name="cycle">The cycle.</param>
 /// <returns></returns>
-static inline uint16_t sfc_addressing_UNK(sfc_famicom_t* famicom) {
+static inline uint16_t sfc_addressing_UNK(sfc_famicom_t* famicom, uint32_t* const cycle) {
     assert(!"UNKNOWN ADDRESSING MODE");
     return 0;
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// 寻址方式: 累加器
 /// </summary>
 /// <param name="famicom">The famicom.</param>
+/// <param name="cycle">The cycle.</param>
 /// <returns></returns>
-static inline uint16_t sfc_addressing_ACC(sfc_famicom_t* famicom) {
+static inline uint16_t sfc_addressing_ACC(sfc_famicom_t* famicom, uint32_t* const cycle) {
     return 0;
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// 寻址方式: 隐含寻址
 /// </summary>
 /// <param name="famicom">The famicom.</param>
+/// <param name="cycle">The cycle.</param>
 /// <returns></returns>
-static inline uint16_t sfc_addressing_IMP(sfc_famicom_t* famicom) {
+static inline uint16_t sfc_addressing_IMP(sfc_famicom_t* famicom, uint32_t* const cycle) {
     return 0;
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// 寻址方式: 立即寻址
 /// </summary>
 /// <param name="famicom">The famicom.</param>
+/// <param name="cycle">The cycle.</param>
 /// <returns></returns>
-static inline uint16_t sfc_addressing_IMM(sfc_famicom_t* famicom) {
+static inline uint16_t sfc_addressing_IMM(sfc_famicom_t* famicom, uint32_t* const cycle) {
     const uint16_t address = SFC_PC; 
     SFC_PC++;
     return address;
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// 寻址方式: 绝对寻址
 /// </summary>
 /// <param name="famicom">The famicom.</param>
+/// <param name="cycle">The cycle.</param>
 /// <returns></returns>
-static inline uint16_t sfc_addressing_ABS(sfc_famicom_t* famicom) {
-    const uint8_t address0 = SFC_READ(SFC_PC++);
-    const uint8_t address1 = SFC_READ(SFC_PC++);
+static inline uint16_t sfc_addressing_ABS(sfc_famicom_t* famicom, uint32_t* const cycle) {
+    const uint8_t address0 = SFC_READ_PC(SFC_PC++);
+    const uint8_t address1 = SFC_READ_PC(SFC_PC++);
     return (uint16_t)address0 | (uint16_t)((uint16_t)address1 << 8);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// 寻址方式: 绝对X变址
 /// </summary>
 /// <param name="famicom">The famicom.</param>
+/// <param name="cycle">The cycle.</param>
 /// <returns></returns>
-static inline uint16_t sfc_addressing_ABX(sfc_famicom_t* famicom) {
-    const uint16_t base = sfc_addressing_ABS(famicom);
-    return base + SFC_X;
+static inline uint16_t sfc_addressing_ABX(sfc_famicom_t* famicom, uint32_t* const cycle) {
+    const uint16_t base = sfc_addressing_ABS(famicom, cycle);
+    const uint16_t rvar = base + SFC_X;
+    *cycle += ((base ^ rvar) >> 8) & 1;
+    return rvar;
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// 寻址方式: 绝对Y变址
 /// </summary>
 /// <param name="famicom">The famicom.</param>
+/// <param name="cycle">The cycle.</param>
 /// <returns></returns>
-static inline uint16_t sfc_addressing_ABY(sfc_famicom_t* famicom) {
-    const uint16_t base = sfc_addressing_ABS(famicom);
-    return base + SFC_Y;
+static inline uint16_t sfc_addressing_ABY(sfc_famicom_t* famicom, uint32_t* const cycle) {
+    const uint16_t base = sfc_addressing_ABS(famicom, cycle);
+    const uint16_t rvar = base + SFC_Y;
+    *cycle += ((base ^ rvar) >> 8) & 1;
+    return rvar;
 }
 
-
+SFC_FORCEINLINE
 /// <summary>
 /// 寻址方式: 零页寻址
 /// </summary>
 /// <param name="famicom">The famicom.</param>
+/// <param name="cycle">The cycle.</param>
 /// <returns></returns>
-static inline uint16_t sfc_addressing_ZPG(sfc_famicom_t* famicom) {
-    const uint16_t address = SFC_READ(SFC_PC++);
+static inline uint16_t sfc_addressing_ZPG(sfc_famicom_t* famicom, uint32_t* const cycle) {
+    const uint16_t address = SFC_READ_PC(SFC_PC++);
     return address;
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// 寻址方式: 零页X变址
 /// </summary>
 /// <param name="famicom">The famicom.</param>
+/// <param name="cycle">The cycle.</param>
 /// <returns></returns>
-static inline uint16_t sfc_addressing_ZPX(sfc_famicom_t* famicom) {
-    const uint16_t base = sfc_addressing_ZPG(famicom);
+static inline uint16_t sfc_addressing_ZPX(sfc_famicom_t* famicom, uint32_t* const cycle) {
+    const uint16_t base = sfc_addressing_ZPG(famicom, cycle);
     const uint16_t index = base + SFC_X;
     return index & (uint16_t)0x00FF;
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// 寻址方式: 零页Y变址
 /// </summary>
 /// <param name="famicom">The famicom.</param>
+/// <param name="cycle">The cycle.</param>
 /// <returns></returns>
-static inline uint16_t sfc_addressing_ZPY(sfc_famicom_t* famicom) {
-    const uint16_t base = sfc_addressing_ZPG(famicom);
+static inline uint16_t sfc_addressing_ZPY(sfc_famicom_t* famicom, uint32_t* const cycle) {
+    const uint16_t base = sfc_addressing_ZPG(famicom, cycle);
     const uint16_t index = base + SFC_Y;
     return index & (uint16_t)0x00FF;
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// 寻址方式: 间接X变址
 /// </summary>
 /// <param name="famicom">The famicom.</param>
 /// <returns></returns>
-static inline uint16_t sfc_addressing_INX(sfc_famicom_t* famicom) {
-    uint8_t base = SFC_READ(SFC_PC++) + SFC_X;
+static inline uint16_t sfc_addressing_INX(sfc_famicom_t* famicom, uint32_t* const cycle) {
+    uint8_t base = SFC_READ_PC(SFC_PC++) + SFC_X;
     const uint8_t address0 = SFC_READ(base++);
     const uint8_t address1 = SFC_READ(base++);
     return (uint16_t)address0 | (uint16_t)((uint16_t)address1 << 8);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// 寻址方式: 间接Y变址
 /// </summary>
 /// <param name="famicom">The famicom.</param>
+/// <param name="cycle">The cycle.</param>
 /// <returns></returns>
-static inline uint16_t sfc_addressing_INY(sfc_famicom_t* famicom) {
-    uint8_t base = SFC_READ(SFC_PC++);
+static inline uint16_t sfc_addressing_INY(sfc_famicom_t* famicom, uint32_t* const cycle) {
+    uint8_t base = SFC_READ_PC(SFC_PC++);
     const uint8_t address0 = SFC_READ(base++);
     const uint8_t address1 = SFC_READ(base++);
     const uint16_t address 
         = (uint16_t)address0 
         | (uint16_t)((uint16_t)address1 << 8)
         ;
-    return address + SFC_Y;
+
+    const uint16_t rvar = address + SFC_Y;
+    *cycle += ((address ^ rvar) >> 8) & 1;
+    return rvar;
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// 寻址方式: 间接寻址
 /// </summary>
 /// <param name="famicom">The famicom.</param>
+/// <param name="cycle">The cycle.</param>
 /// <returns></returns>
-static inline uint16_t sfc_addressing_IND(sfc_famicom_t* famicom) {
+static inline uint16_t sfc_addressing_IND(sfc_famicom_t* famicom, uint32_t* const cycle) {
     // 读取地址
-    const uint16_t base1 = sfc_addressing_ABS(famicom);
+    const uint16_t base1 = sfc_addressing_ABS(famicom, cycle);
     // 刻意实现6502的BUG
     const uint16_t base2
         = (base1 & (uint16_t)0xFF00)
@@ -219,20 +260,26 @@ static inline uint16_t sfc_addressing_IND(sfc_famicom_t* famicom) {
     return address;
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// 寻址方式: 相对寻址
 /// </summary>
 /// <param name="famicom">The famicom.</param>
+/// <param name="cycle">The cycle.</param>
 /// <returns></returns>
-static inline uint16_t sfc_addressing_REL(sfc_famicom_t* famicom) {
-    const uint8_t data = SFC_READ(SFC_PC++);
+static inline uint16_t sfc_addressing_REL(sfc_famicom_t* famicom, uint32_t* const cycle) {
+    const uint16_t oldpc = SFC_PC;
+    const uint8_t data = SFC_READ_PC(SFC_PC++);
     const uint16_t address = SFC_PC + (int8_t)data;
+    ++(*cycle);
+    *cycle += ((oldpc ^ address) >> 8) & 1;
     return address;
 }
 
 
 // ---------------------------------- 指令
 
+SFC_FORCEINLINE
 /// <summary>
 /// UNK: Unknown
 /// </summary>
@@ -242,6 +289,7 @@ static inline void sfc_operation_UNK(uint16_t address, sfc_famicom_t* famicom) {
     assert(!"UNKNOWN INS");
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// SHY
 /// </summary>
@@ -251,6 +299,7 @@ static inline void sfc_operation_SHY(uint16_t address, sfc_famicom_t* famicom) {
     sfc_operation_UNK(address, famicom);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// SHX
 /// </summary>
@@ -260,6 +309,7 @@ static inline void sfc_operation_SHX(uint16_t address, sfc_famicom_t* famicom) {
     sfc_operation_UNK(address, famicom);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// TAS
 /// </summary>
@@ -269,6 +319,7 @@ static inline void sfc_operation_TAS(uint16_t address, sfc_famicom_t* famicom) {
     sfc_operation_UNK(address, famicom);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// AHX
 /// </summary>
@@ -278,6 +329,7 @@ static inline void sfc_operation_AHX(uint16_t address, sfc_famicom_t* famicom) {
     sfc_operation_UNK(address, famicom);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// XAA
 /// </summary>
@@ -287,6 +339,7 @@ static inline void sfc_operation_XAA(uint16_t address, sfc_famicom_t* famicom) {
     sfc_operation_UNK(address, famicom);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// LAS
 /// </summary>
@@ -296,6 +349,7 @@ static inline void sfc_operation_LAS(uint16_t address, sfc_famicom_t* famicom) {
     sfc_operation_UNK(address, famicom);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// SRE: Shift Right then "Exclusive-Or" - LSR + EOR
 /// </summary>
@@ -312,6 +366,7 @@ static inline void sfc_operation_SRE(uint16_t address, sfc_famicom_t* famicom) {
     CHECK_ZSFLAG(SFC_A);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// SLO - Shift Left then 'Or' - ASL + ORA
 /// </summary>
@@ -328,6 +383,7 @@ static inline void sfc_operation_SLO(uint16_t address, sfc_famicom_t* famicom) {
     CHECK_ZSFLAG(SFC_A);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// RRA: Rotate Right then Add with Carry - ROR + ADC
 /// </summary>
@@ -351,6 +407,7 @@ static inline void sfc_operation_RRA(uint16_t address, sfc_famicom_t* famicom) {
     CHECK_ZSFLAG(SFC_A);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// RLA: Rotate Left then 'And' - ROL + AND
 /// </summary>
@@ -369,6 +426,7 @@ static inline void sfc_operation_RLA(uint16_t address, sfc_famicom_t* famicom) {
     CHECK_ZSFLAG(SFC_A);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// ISB: Increment memory then Subtract with Carry - INC + SBC
 /// </summary>
@@ -389,6 +447,7 @@ static inline void sfc_operation_ISB(uint16_t address, sfc_famicom_t* famicom) {
     CHECK_ZSFLAG(SFC_A);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// ISC
 /// </summary>
@@ -398,6 +457,7 @@ static inline void sfc_operation_ISC(uint16_t address, sfc_famicom_t* famicom) {
     sfc_operation_UNK(address, famicom);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// DCP: Decrement memory then Compare with A - DEC + CMP
 /// </summary>
@@ -414,6 +474,7 @@ static inline void sfc_operation_DCP(uint16_t address, sfc_famicom_t* famicom) {
     CHECK_ZSFLAG((uint8_t)result16);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// SAX: Store A 'And' X - 
 /// </summary>
@@ -423,6 +484,7 @@ static inline void sfc_operation_SAX(uint16_t address, sfc_famicom_t* famicom) {
     SFC_WRITE(address, SFC_A & SFC_X);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// LAX: Load 'A' then Transfer X - LDA  + TAX
 /// </summary>
@@ -437,6 +499,7 @@ static inline void sfc_operation_LAX(uint16_t address, sfc_famicom_t* famicom) {
     CHECK_ZSFLAG(SFC_X);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// SBX
 /// </summary>
@@ -446,6 +509,7 @@ static inline void sfc_operation_SBX(uint16_t address, sfc_famicom_t* famicom) {
     sfc_operation_UNK(address, famicom);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// AXS
 /// </summary>
@@ -455,6 +519,7 @@ static inline void sfc_operation_AXS(uint16_t address, sfc_famicom_t* famicom) {
     sfc_operation_UNK(address, famicom);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// ARR
 /// </summary>
@@ -464,6 +529,7 @@ static inline void sfc_operation_ARR(uint16_t address, sfc_famicom_t* famicom) {
     sfc_operation_UNK(address, famicom);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// AAC
 /// </summary>
@@ -473,6 +539,7 @@ static inline void sfc_operation_AAC(uint16_t address, sfc_famicom_t* famicom) {
     sfc_operation_UNK(address, famicom);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// ANC
 /// </summary>
@@ -482,6 +549,7 @@ static inline void sfc_operation_ANC(uint16_t address, sfc_famicom_t* famicom) {
     sfc_operation_UNK(address, famicom);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// ASR
 /// </summary>
@@ -491,6 +559,7 @@ static inline void sfc_operation_ASR(uint16_t address, sfc_famicom_t* famicom) {
     sfc_operation_UNK(address, famicom);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// ALR
 /// </summary>
@@ -500,6 +569,7 @@ static inline void sfc_operation_ALR(uint16_t address, sfc_famicom_t* famicom) {
     sfc_operation_UNK(address, famicom);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// RTI: Return from I
 /// </summary>
@@ -519,6 +589,7 @@ static inline void sfc_operation_RTI(uint16_t address, sfc_famicom_t* famicom) {
         ;
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// BRK
 /// </summary>
@@ -528,6 +599,7 @@ static inline void sfc_operation_BRK(uint16_t address, sfc_famicom_t* famicom) {
     sfc_operation_UNK(address, famicom);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// NOP: No Operation
 /// </summary>
@@ -537,6 +609,7 @@ static inline void sfc_operation_NOP(uint16_t address, sfc_famicom_t* famicom) {
 
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// RTS: Return from Subroutine
 /// </summary>
@@ -552,6 +625,7 @@ static inline void sfc_operation_RTS(uint16_t address, sfc_famicom_t* famicom) {
     SFC_PC++;
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// JSR: Jump to Subroutine
 /// </summary>
@@ -564,6 +638,7 @@ static inline void sfc_operation_JSR(uint16_t address, sfc_famicom_t* famicom) {
     SFC_PC = address;
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// BVC: Branch if Overflow Clear
 /// </summary>
@@ -573,6 +648,7 @@ static inline void sfc_operation_BVC(uint16_t address, sfc_famicom_t* famicom) {
     if (!SFC_VF) SFC_PC = address;
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// BVC: Branch if Overflow Set
 /// </summary>
@@ -582,6 +658,7 @@ static inline void sfc_operation_BVS(uint16_t address, sfc_famicom_t* famicom) {
     if (SFC_VF) SFC_PC = address;
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// BPL: Branch if Plus
 /// </summary>
@@ -591,6 +668,7 @@ static inline void sfc_operation_BPL(uint16_t address, sfc_famicom_t* famicom) {
     if (!SFC_SF) SFC_PC = address;
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// BMI: Branch if Minus
 /// </summary>
@@ -600,6 +678,7 @@ static inline void sfc_operation_BMI(uint16_t address, sfc_famicom_t* famicom) {
     if (SFC_SF) SFC_PC = address;
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// BCC: Branch if Carry Clear
 /// </summary>
@@ -609,6 +688,7 @@ static inline void sfc_operation_BCC(uint16_t address, sfc_famicom_t* famicom) {
     if (!SFC_CF) SFC_PC = address;
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// BCS: Branch if Carry Set
 /// </summary>
@@ -618,6 +698,7 @@ static inline void sfc_operation_BCS(uint16_t address, sfc_famicom_t* famicom) {
     if (SFC_CF) SFC_PC = address;
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// BNE: Branch if Not Equal
 /// </summary>
@@ -627,6 +708,7 @@ static inline void sfc_operation_BNE(uint16_t address, sfc_famicom_t* famicom) {
     if (!SFC_ZF) SFC_PC = address;
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// BEQ: Branch if Equal
 /// </summary>
@@ -636,6 +718,7 @@ static inline void sfc_operation_BEQ(uint16_t address, sfc_famicom_t* famicom) {
     if (SFC_ZF) SFC_PC = address;
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// JMP
 /// </summary>
@@ -645,6 +728,7 @@ static inline void sfc_operation_JMP(uint16_t address, sfc_famicom_t* famicom) {
     SFC_PC = address;
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// PLP: Pull P
 /// </summary>
@@ -656,6 +740,7 @@ static inline void sfc_operation_PLP(uint16_t address, sfc_famicom_t* famicom) {
     SFC_BF_CL;
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// PHP: Push P
 /// </summary>
@@ -665,6 +750,7 @@ static inline void sfc_operation_PHP(uint16_t address, sfc_famicom_t* famicom) {
     SFC_PUSH(SFC_P | (uint8_t)(SFC_FLAG_R | SFC_FLAG_B));
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// PLA: Pull A
 /// </summary>
@@ -675,6 +761,7 @@ static inline void sfc_operation_PLA(uint16_t address, sfc_famicom_t* famicom) {
     CHECK_ZSFLAG(SFC_A);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// PHA: Push A
 /// </summary>
@@ -684,6 +771,7 @@ static inline void sfc_operation_PHA(uint16_t address, sfc_famicom_t* famicom) {
     SFC_PUSH(SFC_A);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// ROR A : Rotate Right for A
 /// </summary>
@@ -698,6 +786,7 @@ static inline void sfc_operation_RORA(uint16_t address, sfc_famicom_t* famicom) 
     CHECK_ZSFLAG(SFC_A);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// ROR: Rotate Right
 /// </summary>
@@ -713,6 +802,7 @@ static inline void sfc_operation_ROR(uint16_t address, sfc_famicom_t* famicom) {
     CHECK_ZSFLAG(result8);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// ROL: Rotate Left
 /// </summary>
@@ -728,6 +818,7 @@ static inline void sfc_operation_ROL(uint16_t address, sfc_famicom_t* famicom) {
     CHECK_ZSFLAG(result8);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// ROL A : Rotate Left for A
 /// </summary>
@@ -742,6 +833,7 @@ static inline void sfc_operation_ROLA(uint16_t address, sfc_famicom_t* famicom) 
     CHECK_ZSFLAG(SFC_A);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// LSR: Logical Shift Right
 /// </summary>
@@ -755,6 +847,7 @@ static inline void sfc_operation_LSR(uint16_t address, sfc_famicom_t* famicom) {
     CHECK_ZSFLAG(data);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// LSR A : Logical Shift Right for A
 /// </summary>
@@ -766,6 +859,7 @@ static inline void sfc_operation_LSRA(uint16_t address, sfc_famicom_t* famicom) 
     CHECK_ZSFLAG(SFC_A);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// ASL: Arithmetic Shift Left
 /// </summary>
@@ -779,6 +873,7 @@ static inline void sfc_operation_ASL(uint16_t address, sfc_famicom_t* famicom) {
     CHECK_ZSFLAG(data);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// ASL A : Arithmetic Shift Left for A
 /// </summary>
@@ -790,6 +885,7 @@ static inline void sfc_operation_ASLA(uint16_t address, sfc_famicom_t* famicom) 
     CHECK_ZSFLAG(SFC_A);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// BIT: Bit Test
 /// </summary>
@@ -802,6 +898,7 @@ static inline void sfc_operation_BIT(uint16_t address, sfc_famicom_t* famicom) {
     SFC_ZF_IF(!(SFC_A & value))
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// CPY: Compare memory with Y
 /// </summary>
@@ -813,6 +910,7 @@ static inline void sfc_operation_CPY(uint16_t address, sfc_famicom_t* famicom) {
     CHECK_ZSFLAG((uint8_t)result16);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// CPX
 /// </summary>
@@ -824,6 +922,7 @@ static inline void sfc_operation_CPX(uint16_t address, sfc_famicom_t* famicom) {
     CHECK_ZSFLAG((uint8_t)result16);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// CMP: Compare memory with A
 /// </summary>
@@ -835,6 +934,7 @@ static inline void sfc_operation_CMP(uint16_t address, sfc_famicom_t* famicom) {
     CHECK_ZSFLAG((uint8_t)result16);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// SEI: Set I
 /// </summary>
@@ -844,6 +944,7 @@ static inline void sfc_operation_SEI(uint16_t address, sfc_famicom_t* famicom) {
     SFC_IF_SE;
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// CLI - Clear I
 /// </summary>
@@ -853,6 +954,7 @@ static inline void sfc_operation_CLI(uint16_t address, sfc_famicom_t* famicom) {
     sfc_operation_UNK(address, famicom);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// CLV: Clear V
 /// </summary>
@@ -862,6 +964,7 @@ static inline void sfc_operation_CLV(uint16_t address, sfc_famicom_t* famicom) {
     SFC_VF_CL;
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// SED: Set D
 /// </summary>
@@ -871,6 +974,7 @@ static inline void sfc_operation_SED(uint16_t address, sfc_famicom_t* famicom) {
     SFC_DF_SE;
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// CLD: Clear D
 /// </summary>
@@ -880,6 +984,7 @@ static inline void sfc_operation_CLD(uint16_t address, sfc_famicom_t* famicom) {
     SFC_DF_CL;
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// SEC: Set Carry
 /// </summary>
@@ -889,6 +994,7 @@ static inline void sfc_operation_SEC(uint16_t address, sfc_famicom_t* famicom) {
     SFC_CF_SE;
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// CLC: Clear Carry
 /// </summary>
@@ -898,6 +1004,7 @@ static inline void sfc_operation_CLC(uint16_t address, sfc_famicom_t* famicom) {
     SFC_CF_CL;
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// EOR: "Exclusive-Or" memory with A
 /// </summary>
@@ -908,6 +1015,7 @@ static inline void sfc_operation_EOR(uint16_t address, sfc_famicom_t* famicom) {
     CHECK_ZSFLAG(SFC_A);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// ORA: 'Or' memory with A
 /// </summary>
@@ -918,6 +1026,7 @@ static inline void sfc_operation_ORA(uint16_t address, sfc_famicom_t* famicom) {
     CHECK_ZSFLAG(SFC_A);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// AND: 'And' memory with A
 /// </summary>
@@ -928,6 +1037,7 @@ static inline void sfc_operation_AND(uint16_t address, sfc_famicom_t* famicom) {
     CHECK_ZSFLAG(SFC_A);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// DEY: Decrement Y
 /// </summary>
@@ -938,6 +1048,7 @@ static inline void sfc_operation_DEY(uint16_t address, sfc_famicom_t* famicom) {
     CHECK_ZSFLAG(SFC_Y);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// INY:  Increment Y
 /// </summary>
@@ -948,6 +1059,7 @@ static inline void sfc_operation_INY(uint16_t address, sfc_famicom_t* famicom) {
     CHECK_ZSFLAG(SFC_Y);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// DEX: Decrement X
 /// </summary>
@@ -958,6 +1070,7 @@ static inline void sfc_operation_DEX(uint16_t address, sfc_famicom_t* famicom) {
     CHECK_ZSFLAG(SFC_X);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// INX
 /// </summary>
@@ -968,6 +1081,7 @@ static inline void sfc_operation_INX(uint16_t address, sfc_famicom_t* famicom) {
     CHECK_ZSFLAG(SFC_X);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// DEC: Decrement memory
 /// </summary>
@@ -980,6 +1094,7 @@ static inline void sfc_operation_DEC(uint16_t address, sfc_famicom_t* famicom) {
     CHECK_ZSFLAG(data);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// INC: Increment memory
 /// </summary>
@@ -992,6 +1107,7 @@ static inline void sfc_operation_INC(uint16_t address, sfc_famicom_t* famicom) {
     CHECK_ZSFLAG(data);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// SBC: Subtract with Carry
 /// </summary>
@@ -1007,6 +1123,7 @@ static inline void sfc_operation_SBC(uint16_t address, sfc_famicom_t* famicom) {
     CHECK_ZSFLAG(SFC_A);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// ADC: Add with Carry
 /// </summary>
@@ -1022,6 +1139,7 @@ static inline void sfc_operation_ADC(uint16_t address, sfc_famicom_t* famicom) {
     CHECK_ZSFLAG(SFC_A);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// TXS: Transfer X to SP
 /// </summary>
@@ -1031,6 +1149,7 @@ static inline void sfc_operation_TXS(uint16_t address, sfc_famicom_t* famicom) {
     SFC_SP = SFC_X;
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// TSX: Transfer SP to X
 /// </summary>
@@ -1041,6 +1160,7 @@ static inline void sfc_operation_TSX(uint16_t address, sfc_famicom_t* famicom) {
     CHECK_ZSFLAG(SFC_X);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// TYA: Transfer Y to A
 /// </summary>
@@ -1051,6 +1171,7 @@ static inline void sfc_operation_TYA(uint16_t address, sfc_famicom_t* famicom) {
     CHECK_ZSFLAG(SFC_A);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// TAY: Transfer A to Y
 /// </summary>
@@ -1061,6 +1182,7 @@ static inline void sfc_operation_TAY(uint16_t address, sfc_famicom_t* famicom) {
     CHECK_ZSFLAG(SFC_Y);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// TXA: Transfer X to A
 /// </summary>
@@ -1071,6 +1193,7 @@ static inline void sfc_operation_TXA(uint16_t address, sfc_famicom_t* famicom) {
     CHECK_ZSFLAG(SFC_A);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// TAX: Transfer A to X
 /// </summary>
@@ -1081,6 +1204,7 @@ static inline void sfc_operation_TAX(uint16_t address, sfc_famicom_t* famicom) {
     CHECK_ZSFLAG(SFC_X);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// STY: Store 'Y'
 /// </summary>
@@ -1090,6 +1214,7 @@ static inline void sfc_operation_STY(uint16_t address, sfc_famicom_t* famicom) {
     SFC_WRITE(address, SFC_Y);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// STX: Store X
 /// </summary>
@@ -1099,6 +1224,7 @@ static inline void sfc_operation_STX(uint16_t address, sfc_famicom_t* famicom) {
     SFC_WRITE(address, SFC_X);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// STA: Store 'A'
 /// </summary>
@@ -1108,6 +1234,7 @@ static inline void sfc_operation_STA(uint16_t address, sfc_famicom_t* famicom) {
     SFC_WRITE(address, SFC_A);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// LDY: Load 'Y'
 /// </summary>
@@ -1118,6 +1245,7 @@ static inline void sfc_operation_LDY(uint16_t address, sfc_famicom_t* famicom) {
     CHECK_ZSFLAG(SFC_Y);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// LDX: Load X
 /// </summary>
@@ -1128,6 +1256,7 @@ static inline void sfc_operation_LDX(uint16_t address, sfc_famicom_t* famicom) {
     CHECK_ZSFLAG(SFC_X);
 }
 
+SFC_FORCEINLINE
 /// <summary>
 /// LDA: Load A
 /// </summary>
@@ -1139,6 +1268,76 @@ static inline void sfc_operation_LDA(uint16_t address, sfc_famicom_t* famicom) {
 }
 
 
+// ---------------------------------- 指令周期数据
+
+enum sfc_basic_cycle_data {
+    SFC_BAISC_CYCLE_00 = 7, SFC_BAISC_CYCLE_01 = 6, SFC_BAISC_CYCLE_02 = 2, SFC_BAISC_CYCLE_03 = 8,
+    SFC_BAISC_CYCLE_04 = 3, SFC_BAISC_CYCLE_05 = 3, SFC_BAISC_CYCLE_06 = 5, SFC_BAISC_CYCLE_07 = 5,
+    SFC_BAISC_CYCLE_08 = 3, SFC_BAISC_CYCLE_09 = 2, SFC_BAISC_CYCLE_0A = 2, SFC_BAISC_CYCLE_0B = 2,
+    SFC_BAISC_CYCLE_0C = 4, SFC_BAISC_CYCLE_0D = 4, SFC_BAISC_CYCLE_0E = 6, SFC_BAISC_CYCLE_0F = 6,
+    SFC_BAISC_CYCLE_10 = 2, SFC_BAISC_CYCLE_11 = 5, SFC_BAISC_CYCLE_12 = 2, SFC_BAISC_CYCLE_13 = 8,
+    SFC_BAISC_CYCLE_14 = 4, SFC_BAISC_CYCLE_15 = 4, SFC_BAISC_CYCLE_16 = 6, SFC_BAISC_CYCLE_17 = 6,
+    SFC_BAISC_CYCLE_18 = 2, SFC_BAISC_CYCLE_19 = 4, SFC_BAISC_CYCLE_1A = 2, SFC_BAISC_CYCLE_1B = 7,
+    SFC_BAISC_CYCLE_1C = 4, SFC_BAISC_CYCLE_1D = 4, SFC_BAISC_CYCLE_1E = 7, SFC_BAISC_CYCLE_1F = 7,
+    SFC_BAISC_CYCLE_20 = 6, SFC_BAISC_CYCLE_21 = 6, SFC_BAISC_CYCLE_22 = 2, SFC_BAISC_CYCLE_23 = 8,
+    SFC_BAISC_CYCLE_24 = 3, SFC_BAISC_CYCLE_25 = 3, SFC_BAISC_CYCLE_26 = 5, SFC_BAISC_CYCLE_27 = 5,
+    SFC_BAISC_CYCLE_28 = 4, SFC_BAISC_CYCLE_29 = 2, SFC_BAISC_CYCLE_2A = 2, SFC_BAISC_CYCLE_2B = 2,
+    SFC_BAISC_CYCLE_2C = 4, SFC_BAISC_CYCLE_2D = 4, SFC_BAISC_CYCLE_2E = 6, SFC_BAISC_CYCLE_2F = 6,
+    SFC_BAISC_CYCLE_30 = 2, SFC_BAISC_CYCLE_31 = 5, SFC_BAISC_CYCLE_32 = 2, SFC_BAISC_CYCLE_33 = 8,
+    SFC_BAISC_CYCLE_34 = 4, SFC_BAISC_CYCLE_35 = 4, SFC_BAISC_CYCLE_36 = 6, SFC_BAISC_CYCLE_37 = 6,
+    SFC_BAISC_CYCLE_38 = 2, SFC_BAISC_CYCLE_39 = 4, SFC_BAISC_CYCLE_3A = 2, SFC_BAISC_CYCLE_3B = 7,
+    SFC_BAISC_CYCLE_3C = 4, SFC_BAISC_CYCLE_3D = 4, SFC_BAISC_CYCLE_3E = 7, SFC_BAISC_CYCLE_3F = 7,
+    SFC_BAISC_CYCLE_40 = 6, SFC_BAISC_CYCLE_41 = 6, SFC_BAISC_CYCLE_42 = 2, SFC_BAISC_CYCLE_43 = 8,
+    SFC_BAISC_CYCLE_44 = 3, SFC_BAISC_CYCLE_45 = 3, SFC_BAISC_CYCLE_46 = 5, SFC_BAISC_CYCLE_47 = 5,
+    SFC_BAISC_CYCLE_48 = 3, SFC_BAISC_CYCLE_49 = 2, SFC_BAISC_CYCLE_4A = 2, SFC_BAISC_CYCLE_4B = 2,
+    SFC_BAISC_CYCLE_4C = 3, SFC_BAISC_CYCLE_4D = 4, SFC_BAISC_CYCLE_4E = 6, SFC_BAISC_CYCLE_4F = 6,
+    SFC_BAISC_CYCLE_50 = 2, SFC_BAISC_CYCLE_51 = 5, SFC_BAISC_CYCLE_52 = 2, SFC_BAISC_CYCLE_53 = 8,
+    SFC_BAISC_CYCLE_54 = 4, SFC_BAISC_CYCLE_55 = 4, SFC_BAISC_CYCLE_56 = 6, SFC_BAISC_CYCLE_57 = 6,
+    SFC_BAISC_CYCLE_58 = 2, SFC_BAISC_CYCLE_59 = 4, SFC_BAISC_CYCLE_5A = 2, SFC_BAISC_CYCLE_5B = 7,
+    SFC_BAISC_CYCLE_5C = 4, SFC_BAISC_CYCLE_5D = 4, SFC_BAISC_CYCLE_5E = 7, SFC_BAISC_CYCLE_5F = 7,
+    SFC_BAISC_CYCLE_60 = 6, SFC_BAISC_CYCLE_61 = 6, SFC_BAISC_CYCLE_62 = 2, SFC_BAISC_CYCLE_63 = 8,
+    SFC_BAISC_CYCLE_64 = 3, SFC_BAISC_CYCLE_65 = 3, SFC_BAISC_CYCLE_66 = 5, SFC_BAISC_CYCLE_67 = 5,
+    SFC_BAISC_CYCLE_68 = 4, SFC_BAISC_CYCLE_69 = 2, SFC_BAISC_CYCLE_6A = 2, SFC_BAISC_CYCLE_6B = 2,
+    SFC_BAISC_CYCLE_6C = 5, SFC_BAISC_CYCLE_6D = 4, SFC_BAISC_CYCLE_6E = 6, SFC_BAISC_CYCLE_6F = 6,
+    SFC_BAISC_CYCLE_70 = 2, SFC_BAISC_CYCLE_71 = 5, SFC_BAISC_CYCLE_72 = 2, SFC_BAISC_CYCLE_73 = 8,
+    SFC_BAISC_CYCLE_74 = 4, SFC_BAISC_CYCLE_75 = 4, SFC_BAISC_CYCLE_76 = 6, SFC_BAISC_CYCLE_77 = 6,
+    SFC_BAISC_CYCLE_78 = 2, SFC_BAISC_CYCLE_79 = 4, SFC_BAISC_CYCLE_7A = 2, SFC_BAISC_CYCLE_7B = 7,
+    SFC_BAISC_CYCLE_7C = 4, SFC_BAISC_CYCLE_7D = 4, SFC_BAISC_CYCLE_7E = 7, SFC_BAISC_CYCLE_7F = 7,
+    SFC_BAISC_CYCLE_80 = 2, SFC_BAISC_CYCLE_81 = 6, SFC_BAISC_CYCLE_82 = 2, SFC_BAISC_CYCLE_83 = 6,
+    SFC_BAISC_CYCLE_84 = 3, SFC_BAISC_CYCLE_85 = 3, SFC_BAISC_CYCLE_86 = 3, SFC_BAISC_CYCLE_87 = 3,
+    SFC_BAISC_CYCLE_88 = 2, SFC_BAISC_CYCLE_89 = 2, SFC_BAISC_CYCLE_8A = 2, SFC_BAISC_CYCLE_8B = 2,
+    SFC_BAISC_CYCLE_8C = 4, SFC_BAISC_CYCLE_8D = 4, SFC_BAISC_CYCLE_8E = 4, SFC_BAISC_CYCLE_8F = 4,
+    SFC_BAISC_CYCLE_90 = 2, SFC_BAISC_CYCLE_91 = 6, SFC_BAISC_CYCLE_92 = 2, SFC_BAISC_CYCLE_93 = 6,
+    SFC_BAISC_CYCLE_94 = 4, SFC_BAISC_CYCLE_95 = 4, SFC_BAISC_CYCLE_96 = 4, SFC_BAISC_CYCLE_97 = 4,
+    SFC_BAISC_CYCLE_98 = 2, SFC_BAISC_CYCLE_99 = 5, SFC_BAISC_CYCLE_9A = 2, SFC_BAISC_CYCLE_9B = 5,
+    SFC_BAISC_CYCLE_9C = 5, SFC_BAISC_CYCLE_9D = 5, SFC_BAISC_CYCLE_9E = 5, SFC_BAISC_CYCLE_9F = 5,
+    SFC_BAISC_CYCLE_A0 = 2, SFC_BAISC_CYCLE_A1 = 6, SFC_BAISC_CYCLE_A2 = 2, SFC_BAISC_CYCLE_A3 = 6,
+    SFC_BAISC_CYCLE_A4 = 3, SFC_BAISC_CYCLE_A5 = 3, SFC_BAISC_CYCLE_A6 = 3, SFC_BAISC_CYCLE_A7 = 3,
+    SFC_BAISC_CYCLE_A8 = 2, SFC_BAISC_CYCLE_A9 = 2, SFC_BAISC_CYCLE_AA = 2, SFC_BAISC_CYCLE_AB = 2,
+    SFC_BAISC_CYCLE_AC = 4, SFC_BAISC_CYCLE_AD = 4, SFC_BAISC_CYCLE_AE = 4, SFC_BAISC_CYCLE_AF = 4,
+    SFC_BAISC_CYCLE_B0 = 2, SFC_BAISC_CYCLE_B1 = 5, SFC_BAISC_CYCLE_B2 = 2, SFC_BAISC_CYCLE_B3 = 5,
+    SFC_BAISC_CYCLE_B4 = 4, SFC_BAISC_CYCLE_B5 = 4, SFC_BAISC_CYCLE_B6 = 4, SFC_BAISC_CYCLE_B7 = 4,
+    SFC_BAISC_CYCLE_B8 = 2, SFC_BAISC_CYCLE_B9 = 4, SFC_BAISC_CYCLE_BA = 2, SFC_BAISC_CYCLE_BB = 4,
+    SFC_BAISC_CYCLE_BC = 4, SFC_BAISC_CYCLE_BD = 4, SFC_BAISC_CYCLE_BE = 4, SFC_BAISC_CYCLE_BF = 4,
+    SFC_BAISC_CYCLE_C0 = 2, SFC_BAISC_CYCLE_C1 = 6, SFC_BAISC_CYCLE_C2 = 2, SFC_BAISC_CYCLE_C3 = 8,
+    SFC_BAISC_CYCLE_C4 = 3, SFC_BAISC_CYCLE_C5 = 3, SFC_BAISC_CYCLE_C6 = 5, SFC_BAISC_CYCLE_C7 = 5,
+    SFC_BAISC_CYCLE_C8 = 2, SFC_BAISC_CYCLE_C9 = 2, SFC_BAISC_CYCLE_CA = 2, SFC_BAISC_CYCLE_CB = 2,
+    SFC_BAISC_CYCLE_CC = 4, SFC_BAISC_CYCLE_CD = 4, SFC_BAISC_CYCLE_CE = 6, SFC_BAISC_CYCLE_CF = 6,
+    SFC_BAISC_CYCLE_D0 = 2, SFC_BAISC_CYCLE_D1 = 5, SFC_BAISC_CYCLE_D2 = 2, SFC_BAISC_CYCLE_D3 = 8,
+    SFC_BAISC_CYCLE_D4 = 4, SFC_BAISC_CYCLE_D5 = 4, SFC_BAISC_CYCLE_D6 = 6, SFC_BAISC_CYCLE_D7 = 6,
+    SFC_BAISC_CYCLE_D8 = 2, SFC_BAISC_CYCLE_D9 = 4, SFC_BAISC_CYCLE_DA = 2, SFC_BAISC_CYCLE_DB = 7,
+    SFC_BAISC_CYCLE_DC = 4, SFC_BAISC_CYCLE_DD = 4, SFC_BAISC_CYCLE_DE = 7, SFC_BAISC_CYCLE_DF = 7,
+    SFC_BAISC_CYCLE_E0 = 2, SFC_BAISC_CYCLE_E1 = 6, SFC_BAISC_CYCLE_E2 = 2, SFC_BAISC_CYCLE_E3 = 8,
+    SFC_BAISC_CYCLE_E4 = 3, SFC_BAISC_CYCLE_E5 = 3, SFC_BAISC_CYCLE_E6 = 5, SFC_BAISC_CYCLE_E7 = 5,
+    SFC_BAISC_CYCLE_E8 = 2, SFC_BAISC_CYCLE_E9 = 2, SFC_BAISC_CYCLE_EA = 2, SFC_BAISC_CYCLE_EB = 2,
+    SFC_BAISC_CYCLE_EC = 4, SFC_BAISC_CYCLE_ED = 4, SFC_BAISC_CYCLE_EE = 6, SFC_BAISC_CYCLE_EF = 6,
+    SFC_BAISC_CYCLE_F0 = 2, SFC_BAISC_CYCLE_F1 = 5, SFC_BAISC_CYCLE_F2 = 2, SFC_BAISC_CYCLE_F3 = 8,
+    SFC_BAISC_CYCLE_F4 = 4, SFC_BAISC_CYCLE_F5 = 4, SFC_BAISC_CYCLE_F6 = 6, SFC_BAISC_CYCLE_F7 = 6,
+    SFC_BAISC_CYCLE_F8 = 2, SFC_BAISC_CYCLE_F9 = 4, SFC_BAISC_CYCLE_FA = 2, SFC_BAISC_CYCLE_FB = 7,
+    SFC_BAISC_CYCLE_FC = 4, SFC_BAISC_CYCLE_FD = 4, SFC_BAISC_CYCLE_FE = 7, SFC_BAISC_CYCLE_FF = 7,
+};
+
+
 // ---------------------------------- 执行
 
 
@@ -1148,7 +1347,8 @@ static inline void sfc_operation_LDA(uint16_t address, sfc_famicom_t* famicom) {
 /// <param name="famicom">The famicom.</param>
 void sfc_cpu_execute_one(sfc_famicom_t* famicom) {
     famicom->interfaces.before_execute(famicom->argument, famicom);
-    const uint8_t opcode = SFC_READ(SFC_PC++);
+    const uint8_t opcode = SFC_READ_PC(SFC_PC++);
+    uint32_t cycle_add = 0;
     switch (opcode)
     {
         OP(00,IMP, BRK) OP(01,INX, ORA) OP(02,UNK, UNK) OP(03,INX, SLO) OP(04,ZPG, NOP) OP(05,ZPG, ORA) OP(06,ZPG, ASL) OP(07,ZPG, SLO)
@@ -1184,6 +1384,7 @@ void sfc_cpu_execute_one(sfc_famicom_t* famicom) {
         OP(F0,REL, BEQ) OP(F1,INY, SBC) OP(F2,UNK, UNK) OP(F3,INY, ISB) OP(F4,ZPX, NOP) OP(F5,ZPX, SBC) OP(F6,ZPX, INC) OP(F7,ZPX, ISB)
         OP(F8,IMP, SED) OP(F9,ABY, SBC) OP(FA,IMP, NOP) OP(FB,ABY, ISB) OP(FC,ABX, NOP) OP(FD,ABX, SBC) OP(FE,ABX, INC) OP(FF,ABX, ISB)
     }
+    famicom->cycle_count += cycle_add;
 }
 
 /// <summary>
@@ -1201,6 +1402,8 @@ extern inline void sfc_operation_NMI(sfc_famicom_t* famicom) {
     const uint8_t pcl2 = sfc_read_cpu_address(SFC_VERCTOR_NMI + 0, famicom);
     const uint8_t pch2 = sfc_read_cpu_address(SFC_VERCTOR_NMI + 1, famicom);
     famicom->registers.program_counter = (uint16_t)pcl2 | (uint16_t)pch2 << 8;
+
+    famicom->cycle_count += 7;
 }
 
 /// <summary>
@@ -1209,286 +1412,298 @@ extern inline void sfc_operation_NMI(sfc_famicom_t* famicom) {
 struct sfc_opname {
     // 3字名称
     char        name[3];
-    // 寻址模式
-    uint8_t     mode;
+    // 寻址模式[低4位] | 指令长度[高4位]
+    uint8_t     mode_inslen;
 };
 
 /// <summary>
 /// 反汇编用数据
 /// </summary>
 static const struct sfc_opname s_opname_data[256] = {
-    { 'B', 'R', 'K', SFC_AM_IMP },
-    { 'O', 'R', 'A', SFC_AM_INX },
-    { 'S', 'T', 'P', SFC_AM_UNK },
-    { 'S', 'L', 'O', SFC_AM_INX },
-    { 'N', 'O', 'P', SFC_AM_ZPG },
-    { 'O', 'R', 'A', SFC_AM_ZPG },
-    { 'A', 'S', 'L', SFC_AM_ZPG },
-    { 'S', 'L', 'O', SFC_AM_ZPG },
-    { 'P', 'H', 'P', SFC_AM_IMP },
-    { 'O', 'R', 'A', SFC_AM_IMM },
-    { 'A', 'S', 'L', SFC_AM_ACC },
-    { 'A', 'N', 'C', SFC_AM_IMM },
-    { 'N', 'O', 'P', SFC_AM_ABS },
-    { 'O', 'R', 'A', SFC_AM_ABS },
-    { 'A', 'S', 'L', SFC_AM_ABS },
-    { 'S', 'L', 'O', SFC_AM_ABS },
-
-    { 'B', 'P', 'L', SFC_AM_REL },
-    { 'O', 'R', 'A', SFC_AM_INY },
-    { 'S', 'T', 'P', SFC_AM_UNK },
-    { 'S', 'L', 'O', SFC_AM_INY },
-    { 'N', 'O', 'P', SFC_AM_ZPX },
-    { 'O', 'R', 'A', SFC_AM_ZPX },
-    { 'A', 'S', 'L', SFC_AM_ZPX },
-    { 'S', 'L', 'O', SFC_AM_ZPX },
-    { 'C', 'L', 'C', SFC_AM_IMP },
-    { 'O', 'R', 'A', SFC_AM_ABY },
-    { 'N', 'O', 'P', SFC_AM_IMP },
-    { 'S', 'L', 'O', SFC_AM_ABY },
-    { 'N', 'O', 'P', SFC_AM_ABX },
-    { 'O', 'R', 'A', SFC_AM_ABX },
-    { 'A', 'S', 'L', SFC_AM_ABX },
-    { 'S', 'L', 'O', SFC_AM_ABX },
-
-    { 'J', 'S', 'R', SFC_AM_ABS },
-    { 'A', 'N', 'D', SFC_AM_INX },
-    { 'S', 'T', 'P', SFC_AM_UNK },
-    { 'R', 'L', 'A', SFC_AM_INX },
-    { 'B', 'I', 'T', SFC_AM_ZPG },
-    { 'A', 'N', 'D', SFC_AM_ZPG },
-    { 'R', 'O', 'L', SFC_AM_ZPG },
-    { 'R', 'L', 'A', SFC_AM_ZPG },
-    { 'P', 'L', 'P', SFC_AM_IMP },
-    { 'A', 'N', 'D', SFC_AM_IMM },
-    { 'R', 'O', 'L', SFC_AM_ACC },
-    { 'A', 'N', 'C', SFC_AM_IMM },
-    { 'B', 'I', 'T', SFC_AM_ABS },
-    { 'A', 'N', 'D', SFC_AM_ABS },
-    { 'R', 'O', 'L', SFC_AM_ABS },
-    { 'R', 'L', 'A', SFC_AM_ABS },
-
-    { 'B', 'M', 'I', SFC_AM_REL },
-    { 'A', 'N', 'D', SFC_AM_INY },
-    { 'S', 'T', 'P', SFC_AM_UNK },
-    { 'R', 'L', 'A', SFC_AM_INY },
-    { 'N', 'O', 'P', SFC_AM_ZPX },
-    { 'A', 'N', 'D', SFC_AM_ZPX },
-    { 'R', 'O', 'L', SFC_AM_ZPX },
-    { 'R', 'L', 'A', SFC_AM_ZPX },
-    { 'S', 'E', 'C', SFC_AM_IMP },
-    { 'A', 'N', 'D', SFC_AM_ABY },
-    { 'N', 'O', 'P', SFC_AM_IMP },
-    { 'R', 'L', 'A', SFC_AM_ABY },
-    { 'N', 'O', 'P', SFC_AM_ABX },
-    { 'A', 'N', 'D', SFC_AM_ABX },
-    { 'R', 'O', 'L', SFC_AM_ABX },
-    { 'R', 'L', 'A', SFC_AM_ABX },
-
-    { 'R', 'T', 'I', SFC_AM_IMP },
-    { 'E', 'O', 'R', SFC_AM_INX },
-    { 'S', 'T', 'P', SFC_AM_UNK },
-    { 'S', 'R', 'E', SFC_AM_INX },
-    { 'N', 'O', 'P', SFC_AM_ZPG },
-    { 'E', 'O', 'R', SFC_AM_ZPG },
-    { 'L', 'S', 'R', SFC_AM_ZPG },
-    { 'S', 'R', 'E', SFC_AM_ZPG },
-    { 'P', 'H', 'A', SFC_AM_IMP },
-    { 'E', 'O', 'R', SFC_AM_IMM },
-    { 'L', 'S', 'R', SFC_AM_ACC },
-    { 'A', 'S', 'R', SFC_AM_IMM },
-    { 'J', 'M', 'P', SFC_AM_ABS },
-    { 'E', 'O', 'R', SFC_AM_ABS },
-    { 'L', 'S', 'R', SFC_AM_ABS },
-    { 'S', 'R', 'E', SFC_AM_ABS },
-
-    { 'B', 'V', 'C', SFC_AM_REL },
-    { 'E', 'O', 'R', SFC_AM_INY },
-    { 'S', 'T', 'P', SFC_AM_UNK },
-    { 'S', 'R', 'E', SFC_AM_INY },
-    { 'N', 'O', 'P', SFC_AM_ZPX },
-    { 'E', 'O', 'R', SFC_AM_ZPX },
-    { 'L', 'S', 'R', SFC_AM_ZPX },
-    { 'S', 'R', 'E', SFC_AM_ZPX },
-    { 'C', 'L', 'I', SFC_AM_IMP },
-    { 'E', 'O', 'R', SFC_AM_ABY },
-    { 'N', 'O', 'P', SFC_AM_IMP },
-    { 'S', 'R', 'E', SFC_AM_ABY },
-    { 'N', 'O', 'P', SFC_AM_ABX },
-    { 'E', 'O', 'R', SFC_AM_ABX },
-    { 'L', 'S', 'R', SFC_AM_ABX },
-    { 'S', 'R', 'E', SFC_AM_ABX },
-
-    { 'R', 'T', 'S', SFC_AM_IMP },
-    { 'A', 'D', 'C', SFC_AM_INX },
-    { 'S', 'T', 'P', SFC_AM_UNK },
-    { 'R', 'R', 'A', SFC_AM_INX },
-    { 'N', 'O', 'P', SFC_AM_ZPG },
-    { 'A', 'D', 'C', SFC_AM_ZPG },
-    { 'R', 'O', 'R', SFC_AM_ZPG },
-    { 'R', 'R', 'A', SFC_AM_ZPG },
-    { 'P', 'L', 'A', SFC_AM_IMP },
-    { 'A', 'D', 'C', SFC_AM_IMM },
-    { 'R', 'O', 'R', SFC_AM_ACC },
-    { 'A', 'R', 'R', SFC_AM_IMM },
-    { 'J', 'M', 'P', SFC_AM_IND },
-    { 'A', 'D', 'C', SFC_AM_ABS },
-    { 'R', 'O', 'R', SFC_AM_ABS },
-    { 'R', 'R', 'A', SFC_AM_ABS },
-
-    { 'B', 'V', 'S', SFC_AM_REL },
-    { 'A', 'D', 'C', SFC_AM_INY },
-    { 'S', 'T', 'P', SFC_AM_UNK },
-    { 'R', 'R', 'A', SFC_AM_INY },
-    { 'N', 'O', 'P', SFC_AM_ZPX },
-    { 'A', 'D', 'C', SFC_AM_ZPX },
-    { 'R', 'O', 'R', SFC_AM_ZPX },
-    { 'R', 'R', 'A', SFC_AM_ZPX },
-    { 'S', 'E', 'I', SFC_AM_IMP },
-    { 'A', 'D', 'C', SFC_AM_ABY },
-    { 'N', 'O', 'P', SFC_AM_IMP },
-    { 'R', 'R', 'A', SFC_AM_ABY },
-    { 'N', 'O', 'P', SFC_AM_ABX },
-    { 'A', 'D', 'C', SFC_AM_ABX },
-    { 'R', 'O', 'R', SFC_AM_ABX },
-    { 'R', 'R', 'A', SFC_AM_ABX },
-
-    { 'N', 'O', 'P', SFC_AM_IMM },
-    { 'S', 'T', 'A', SFC_AM_INX },
-    { 'N', 'O', 'P', SFC_AM_IMM },
-    { 'S', 'A', 'X', SFC_AM_INX },
-    { 'S', 'T', 'Y', SFC_AM_ZPG },
-    { 'S', 'T', 'A', SFC_AM_ZPG },
-    { 'S', 'T', 'X', SFC_AM_ZPG },
-    { 'S', 'A', 'X', SFC_AM_ZPG },
-    { 'D', 'E', 'Y', SFC_AM_IMP },
-    { 'N', 'O', 'P', SFC_AM_IMM },
-    { 'T', 'A', 'X', SFC_AM_IMP },
-    { 'X', 'X', 'A', SFC_AM_IMM },
-    { 'S', 'T', 'Y', SFC_AM_ABS },
-    { 'S', 'T', 'A', SFC_AM_ABS },
-    { 'S', 'T', 'X', SFC_AM_ABS },
-    { 'S', 'A', 'X', SFC_AM_ABS },
-
-    { 'B', 'C', 'C', SFC_AM_REL },
-    { 'S', 'T', 'A', SFC_AM_INY },
-    { 'S', 'T', 'P', SFC_AM_UNK },
-    { 'A', 'H', 'X', SFC_AM_INY },
-    { 'S', 'T', 'Y', SFC_AM_ZPX },
-    { 'S', 'T', 'A', SFC_AM_ZPX },
-    { 'S', 'T', 'X', SFC_AM_ZPY },
-    { 'S', 'A', 'X', SFC_AM_ZPY },
-    { 'T', 'Y', 'A', SFC_AM_IMP },
-    { 'S', 'T', 'A', SFC_AM_ABY },
-    { 'T', 'X', 'S', SFC_AM_IMP },
-    { 'T', 'A', 'S', SFC_AM_ABY },
-    { 'S', 'H', 'Y', SFC_AM_ABX },
-    { 'S', 'T', 'A', SFC_AM_ABX },
-    { 'S', 'H', 'X', SFC_AM_ABY },
-    { 'A', 'H', 'X', SFC_AM_ABY },
-
-    { 'L', 'D', 'Y', SFC_AM_IMM },
-    { 'L', 'D', 'A', SFC_AM_INX },
-    { 'L', 'D', 'X', SFC_AM_IMM },
-    { 'L', 'A', 'X', SFC_AM_INX },
-    { 'L', 'D', 'Y', SFC_AM_ZPG },
-    { 'L', 'D', 'A', SFC_AM_ZPG },
-    { 'L', 'D', 'X', SFC_AM_ZPG },
-    { 'L', 'A', 'X', SFC_AM_ZPG },
-    { 'T', 'A', 'Y', SFC_AM_IMP },
-    { 'L', 'D', 'A', SFC_AM_IMM },
-    { 'T', 'A', 'X', SFC_AM_IMP },
-    { 'L', 'A', 'X', SFC_AM_IMM },
-    { 'L', 'D', 'Y', SFC_AM_ABS },
-    { 'L', 'D', 'A', SFC_AM_ABS },
-    { 'L', 'D', 'X', SFC_AM_ABS },
-    { 'L', 'A', 'X', SFC_AM_ABS },
-
-    { 'B', 'C', 'S', SFC_AM_REL },
-    { 'L', 'D', 'A', SFC_AM_INY },
-    { 'S', 'T', 'P', SFC_AM_UNK },
-    { 'L', 'A', 'X', SFC_AM_INY },
-    { 'L', 'D', 'Y', SFC_AM_ZPX },
-    { 'L', 'D', 'A', SFC_AM_ZPX },
-    { 'L', 'D', 'X', SFC_AM_ZPY },
-    { 'L', 'A', 'X', SFC_AM_ZPY },
-    { 'C', 'L', 'V', SFC_AM_IMP },
-    { 'L', 'D', 'A', SFC_AM_ABY },
-    { 'T', 'S', 'X', SFC_AM_IMP },
-    { 'L', 'A', 'S', SFC_AM_ABY },
-    { 'L', 'D', 'Y', SFC_AM_ABX },
-    { 'L', 'D', 'A', SFC_AM_ABX },
-    { 'L', 'D', 'X', SFC_AM_ABY },
-    { 'L', 'A', 'X', SFC_AM_ABY },
-
-    { 'C', 'P', 'Y', SFC_AM_IMM },
-    { 'C', 'M', 'P', SFC_AM_INX },
-    { 'N', 'O', 'P', SFC_AM_IMM },
-    { 'D', 'C', 'P', SFC_AM_INX },
-    { 'C', 'P', 'Y', SFC_AM_ZPG },
-    { 'C', 'M', 'P', SFC_AM_ZPG },
-    { 'D', 'E', 'C', SFC_AM_ZPG },
-    { 'D', 'C', 'P', SFC_AM_ZPG },
-    { 'I', 'N', 'Y', SFC_AM_IMP },
-    { 'C', 'M', 'P', SFC_AM_IMM },
-    { 'D', 'E', 'X', SFC_AM_IMP },
-    { 'A', 'X', 'S', SFC_AM_IMM },
-    { 'C', 'P', 'Y', SFC_AM_ABS },
-    { 'C', 'M', 'P', SFC_AM_ABS },
-    { 'D', 'E', 'C', SFC_AM_ABS },
-    { 'D', 'C', 'P', SFC_AM_ABS },
-
-    { 'B', 'N', 'E', SFC_AM_REL },
-    { 'C', 'M', 'P', SFC_AM_INY },
-    { 'S', 'T', 'P', SFC_AM_UNK },
-    { 'D', 'C', 'P', SFC_AM_INY },
-    { 'N', 'O', 'P', SFC_AM_ZPX },
-    { 'C', 'M', 'P', SFC_AM_ZPX },
-    { 'D', 'E', 'C', SFC_AM_ZPX },
-    { 'D', 'C', 'P', SFC_AM_ZPX },
-    { 'C', 'L', 'D', SFC_AM_IMP },
-    { 'C', 'M', 'P', SFC_AM_ABY },
-    { 'N', 'O', 'P', SFC_AM_IMP },
-    { 'D', 'C', 'P', SFC_AM_ABY },
-    { 'N', 'O', 'P', SFC_AM_ABX },
-    { 'C', 'M', 'P', SFC_AM_ABX },
-    { 'D', 'E', 'C', SFC_AM_ABX },
-    { 'D', 'C', 'P', SFC_AM_ABX },
-
-    { 'C', 'P', 'X', SFC_AM_IMM },
-    { 'S', 'B', 'C', SFC_AM_INX },
-    { 'N', 'O', 'P', SFC_AM_IMM },
-    { 'I', 'S', 'B', SFC_AM_INX },
-    { 'C', 'P', 'X', SFC_AM_ZPG },
-    { 'S', 'B', 'C', SFC_AM_ZPG },
-    { 'I', 'N', 'C', SFC_AM_ZPG },
-    { 'I', 'S', 'B', SFC_AM_ZPG },
-    { 'I', 'N', 'X', SFC_AM_IMP },
-    { 'S', 'B', 'C', SFC_AM_IMM },
-    { 'N', 'O', 'P', SFC_AM_IMP },
-    { 'S', 'B', 'C', SFC_AM_IMM },
-    { 'C', 'P', 'X', SFC_AM_ABS },
-    { 'S', 'B', 'C', SFC_AM_ABS },
-    { 'I', 'N', 'C', SFC_AM_ABS },
-    { 'I', 'S', 'B', SFC_AM_ABS },
-
-    { 'B', 'E', 'Q', SFC_AM_REL },
-    { 'S', 'B', 'C', SFC_AM_INY },
-    { 'S', 'T', 'P', SFC_AM_UNK },
-    { 'I', 'S', 'B', SFC_AM_INY },
-    { 'N', 'O', 'P', SFC_AM_ZPX },
-    { 'S', 'B', 'C', SFC_AM_ZPX },
-    { 'I', 'N', 'C', SFC_AM_ZPX },
-    { 'I', 'S', 'B', SFC_AM_ZPX },
-    { 'S', 'E', 'D', SFC_AM_IMP },
-    { 'S', 'B', 'C', SFC_AM_ABY },
-    { 'N', 'O', 'P', SFC_AM_IMP },
-    { 'I', 'S', 'B', SFC_AM_ABY },
-    { 'N', 'O', 'P', SFC_AM_ABX },
-    { 'S', 'B', 'C', SFC_AM_ABX },
-    { 'I', 'N', 'C', SFC_AM_ABX },
-    { 'I', 'S', 'B', SFC_AM_ABX },
+    // 0
+    { 'B', 'R', 'K', SFC_AM_IMP | 1 << 4 },
+    { 'O', 'R', 'A', SFC_AM_INX | 2 << 4 },
+    { 'S', 'T', 'P', SFC_AM_UNK | 1 << 4 },
+    { 'S', 'L', 'O', SFC_AM_INX | 2 << 4 },
+    { 'N', 'O', 'P', SFC_AM_ZPG | 2 << 4 },
+    { 'O', 'R', 'A', SFC_AM_ZPG | 2 << 4 },
+    { 'A', 'S', 'L', SFC_AM_ZPG | 2 << 4 },
+    { 'S', 'L', 'O', SFC_AM_ZPG | 2 << 4 },
+    { 'P', 'H', 'P', SFC_AM_IMP | 1 << 4 },
+    { 'O', 'R', 'A', SFC_AM_IMM | 2 << 4 },
+    { 'A', 'S', 'L', SFC_AM_ACC | 1 << 4 },
+    { 'A', 'N', 'C', SFC_AM_IMM | 2 << 4 },
+    { 'N', 'O', 'P', SFC_AM_ABS | 3 << 4 },
+    { 'O', 'R', 'A', SFC_AM_ABS | 3 << 4 },
+    { 'A', 'S', 'L', SFC_AM_ABS | 3 << 4 },
+    { 'S', 'L', 'O', SFC_AM_ABS | 3 << 4 },
+    // 1
+    { 'B', 'P', 'L', SFC_AM_REL | 2 << 4 },
+    { 'O', 'R', 'A', SFC_AM_INY | 2 << 4 },
+    { 'S', 'T', 'P', SFC_AM_UNK | 1 << 4 },
+    { 'S', 'L', 'O', SFC_AM_INY | 2 << 4 },
+    { 'N', 'O', 'P', SFC_AM_ZPX | 2 << 4 },
+    { 'O', 'R', 'A', SFC_AM_ZPX | 2 << 4 },
+    { 'A', 'S', 'L', SFC_AM_ZPX | 2 << 4 },
+    { 'S', 'L', 'O', SFC_AM_ZPX | 2 << 4 },
+    { 'C', 'L', 'C', SFC_AM_IMP | 1 << 4 },
+    { 'O', 'R', 'A', SFC_AM_ABY | 3 << 4 },
+    { 'N', 'O', 'P', SFC_AM_IMP | 1 << 4 },
+    { 'S', 'L', 'O', SFC_AM_ABY | 3 << 4 },
+    { 'N', 'O', 'P', SFC_AM_ABX | 3 << 4 },
+    { 'O', 'R', 'A', SFC_AM_ABX | 3 << 4 },
+    { 'A', 'S', 'L', SFC_AM_ABX | 3 << 4 },
+    { 'S', 'L', 'O', SFC_AM_ABX | 3 << 4 },
+    // 2
+    { 'J', 'S', 'R', SFC_AM_ABS | 3 << 4 },
+    { 'A', 'N', 'D', SFC_AM_INX | 2 << 4 },
+    { 'S', 'T', 'P', SFC_AM_UNK | 1 << 4 },
+    { 'R', 'L', 'A', SFC_AM_INX | 2 << 4 },
+    { 'B', 'I', 'T', SFC_AM_ZPG | 2 << 4 },
+    { 'A', 'N', 'D', SFC_AM_ZPG | 2 << 4 },
+    { 'R', 'O', 'L', SFC_AM_ZPG | 2 << 4 },
+    { 'R', 'L', 'A', SFC_AM_ZPG | 2 << 4 },
+    { 'P', 'L', 'P', SFC_AM_IMP | 1 << 4 },
+    { 'A', 'N', 'D', SFC_AM_IMM | 2 << 4 },
+    { 'R', 'O', 'L', SFC_AM_ACC | 1 << 4 },
+    { 'A', 'N', 'C', SFC_AM_IMM | 2 << 4 },
+    { 'B', 'I', 'T', SFC_AM_ABS | 3 << 4 },
+    { 'A', 'N', 'D', SFC_AM_ABS | 3 << 4 },
+    { 'R', 'O', 'L', SFC_AM_ABS | 3 << 4 },
+    { 'R', 'L', 'A', SFC_AM_ABS | 3 << 4 },
+    // 3
+    { 'B', 'M', 'I', SFC_AM_REL | 2 << 4 },
+    { 'A', 'N', 'D', SFC_AM_INY | 2 << 4 },
+    { 'S', 'T', 'P', SFC_AM_UNK | 1 << 4 },
+    { 'R', 'L', 'A', SFC_AM_INY | 2 << 4 },
+    { 'N', 'O', 'P', SFC_AM_ZPX | 2 << 4 },
+    { 'A', 'N', 'D', SFC_AM_ZPX | 2 << 4 },
+    { 'R', 'O', 'L', SFC_AM_ZPX | 2 << 4 },
+    { 'R', 'L', 'A', SFC_AM_ZPX | 2 << 4 },
+    { 'S', 'E', 'C', SFC_AM_IMP | 1 << 4 },
+    { 'A', 'N', 'D', SFC_AM_ABY | 3 << 4 },
+    { 'N', 'O', 'P', SFC_AM_IMP | 1 << 4 },
+    { 'R', 'L', 'A', SFC_AM_ABY | 3 << 4 },
+    { 'N', 'O', 'P', SFC_AM_ABX | 3 << 4 },
+    { 'A', 'N', 'D', SFC_AM_ABX | 3 << 4 },
+    { 'R', 'O', 'L', SFC_AM_ABX | 3 << 4 },
+    { 'R', 'L', 'A', SFC_AM_ABX | 3 << 4 },
+    // 4
+    { 'R', 'T', 'I', SFC_AM_IMP | 1 << 4 },
+    { 'E', 'O', 'R', SFC_AM_INX | 2 << 4 },
+    { 'S', 'T', 'P', SFC_AM_UNK | 1 << 4 },
+    { 'S', 'R', 'E', SFC_AM_INX | 2 << 4 },
+    { 'N', 'O', 'P', SFC_AM_ZPG | 2 << 4 },
+    { 'E', 'O', 'R', SFC_AM_ZPG | 2 << 4 },
+    { 'L', 'S', 'R', SFC_AM_ZPG | 2 << 4 },
+    { 'S', 'R', 'E', SFC_AM_ZPG | 2 << 4 },
+    { 'P', 'H', 'A', SFC_AM_IMP | 1 << 4 },
+    { 'E', 'O', 'R', SFC_AM_IMM | 2 << 4 },
+    { 'L', 'S', 'R', SFC_AM_ACC | 1 << 4 },
+    { 'A', 'S', 'R', SFC_AM_IMM | 2 << 4 },
+    { 'J', 'M', 'P', SFC_AM_ABS | 3 << 4 },
+    { 'E', 'O', 'R', SFC_AM_ABS | 3 << 4 },
+    { 'L', 'S', 'R', SFC_AM_ABS | 3 << 4 },
+    { 'S', 'R', 'E', SFC_AM_ABS | 3 << 4 },
+    // 5
+    { 'B', 'V', 'C', SFC_AM_REL | 2 << 4 },
+    { 'E', 'O', 'R', SFC_AM_INY | 2 << 4 },
+    { 'S', 'T', 'P', SFC_AM_UNK | 1 << 4 },
+    { 'S', 'R', 'E', SFC_AM_INY | 2 << 4 },
+    { 'N', 'O', 'P', SFC_AM_ZPX | 2 << 4 },
+    { 'E', 'O', 'R', SFC_AM_ZPX | 2 << 4 },
+    { 'L', 'S', 'R', SFC_AM_ZPX | 2 << 4 },
+    { 'S', 'R', 'E', SFC_AM_ZPX | 2 << 4 },
+    { 'C', 'L', 'I', SFC_AM_IMP | 1 << 4 },
+    { 'E', 'O', 'R', SFC_AM_ABY | 3 << 4 },
+    { 'N', 'O', 'P', SFC_AM_IMP | 1 << 4 },
+    { 'S', 'R', 'E', SFC_AM_ABY | 3 << 4 },
+    { 'N', 'O', 'P', SFC_AM_ABX | 3 << 4 },
+    { 'E', 'O', 'R', SFC_AM_ABX | 3 << 4 },
+    { 'L', 'S', 'R', SFC_AM_ABX | 3 << 4 },
+    { 'S', 'R', 'E', SFC_AM_ABX | 3 << 4 },
+    // 6
+    { 'R', 'T', 'S', SFC_AM_IMP | 1 << 4 },
+    { 'A', 'D', 'C', SFC_AM_INX | 2 << 4 },
+    { 'S', 'T', 'P', SFC_AM_UNK | 1 << 4 },
+    { 'R', 'R', 'A', SFC_AM_INX | 2 << 4 },
+    { 'N', 'O', 'P', SFC_AM_ZPG | 2 << 4 },
+    { 'A', 'D', 'C', SFC_AM_ZPG | 2 << 4 },
+    { 'R', 'O', 'R', SFC_AM_ZPG | 2 << 4 },
+    { 'R', 'R', 'A', SFC_AM_ZPG | 2 << 4 },
+    { 'P', 'L', 'A', SFC_AM_IMP | 1 << 4 },
+    { 'A', 'D', 'C', SFC_AM_IMM | 2 << 4 },
+    { 'R', 'O', 'R', SFC_AM_ACC | 1 << 4 },
+    { 'A', 'R', 'R', SFC_AM_IMM | 2 << 4 },
+    { 'J', 'M', 'P', SFC_AM_IND | 3 << 4 },
+    { 'A', 'D', 'C', SFC_AM_ABS | 3 << 4 },
+    { 'R', 'O', 'R', SFC_AM_ABS | 3 << 4 },
+    { 'R', 'R', 'A', SFC_AM_ABS | 3 << 4 },
+    // 7
+    { 'B', 'V', 'S', SFC_AM_REL | 2 << 4 },
+    { 'A', 'D', 'C', SFC_AM_INY | 2 << 4 },
+    { 'S', 'T', 'P', SFC_AM_UNK | 1 << 4 },
+    { 'R', 'R', 'A', SFC_AM_INY | 2 << 4 },
+    { 'N', 'O', 'P', SFC_AM_ZPX | 2 << 4 },
+    { 'A', 'D', 'C', SFC_AM_ZPX | 2 << 4 },
+    { 'R', 'O', 'R', SFC_AM_ZPX | 2 << 4 },
+    { 'R', 'R', 'A', SFC_AM_ZPX | 2 << 4 },
+    { 'S', 'E', 'I', SFC_AM_IMP | 1 << 4 },
+    { 'A', 'D', 'C', SFC_AM_ABY | 3 << 4 },
+    { 'N', 'O', 'P', SFC_AM_IMP | 1 << 4 },
+    { 'R', 'R', 'A', SFC_AM_ABY | 3 << 4 },
+    { 'N', 'O', 'P', SFC_AM_ABX | 3 << 4 },
+    { 'A', 'D', 'C', SFC_AM_ABX | 3 << 4 },
+    { 'R', 'O', 'R', SFC_AM_ABX | 3 << 4 },
+    { 'R', 'R', 'A', SFC_AM_ABX | 3 << 4 },
+    // 8
+    { 'N', 'O', 'P', SFC_AM_IMM | 2 << 4 },
+    { 'S', 'T', 'A', SFC_AM_INX | 2 << 4 },
+    { 'N', 'O', 'P', SFC_AM_IMM | 2 << 4 },
+    { 'S', 'A', 'X', SFC_AM_INX | 2 << 4 },
+    { 'S', 'T', 'Y', SFC_AM_ZPG | 2 << 4 },
+    { 'S', 'T', 'A', SFC_AM_ZPG | 2 << 4 },
+    { 'S', 'T', 'X', SFC_AM_ZPG | 2 << 4 },
+    { 'S', 'A', 'X', SFC_AM_ZPG | 2 << 4 },
+    { 'D', 'E', 'Y', SFC_AM_IMP | 1 << 4 },
+    { 'N', 'O', 'P', SFC_AM_IMM | 2 << 4 },
+    { 'T', 'A', 'X', SFC_AM_IMP | 1 << 4 },
+    { 'X', 'X', 'A', SFC_AM_IMM | 2 << 4 },
+    { 'S', 'T', 'Y', SFC_AM_ABS | 3 << 4 },
+    { 'S', 'T', 'A', SFC_AM_ABS | 3 << 4 },
+    { 'S', 'T', 'X', SFC_AM_ABS | 3 << 4 },
+    { 'S', 'A', 'X', SFC_AM_ABS | 3 << 4 },
+    // 9
+    { 'B', 'C', 'C', SFC_AM_REL | 2 << 4 },
+    { 'S', 'T', 'A', SFC_AM_INY | 2 << 4 },
+    { 'S', 'T', 'P', SFC_AM_UNK | 1 << 4 },
+    { 'A', 'H', 'X', SFC_AM_INY | 2 << 4 },
+    { 'S', 'T', 'Y', SFC_AM_ZPX | 2 << 4 },
+    { 'S', 'T', 'A', SFC_AM_ZPX | 2 << 4 },
+    { 'S', 'T', 'X', SFC_AM_ZPY | 2 << 4 },
+    { 'S', 'A', 'X', SFC_AM_ZPY | 2 << 4 },
+    { 'T', 'Y', 'A', SFC_AM_IMP | 1 << 4 },
+    { 'S', 'T', 'A', SFC_AM_ABY | 3 << 4 },
+    { 'T', 'X', 'S', SFC_AM_IMP | 1 << 4 },
+    { 'T', 'A', 'S', SFC_AM_ABY | 3 << 4 },
+    { 'S', 'H', 'Y', SFC_AM_ABX | 3 << 4 },
+    { 'S', 'T', 'A', SFC_AM_ABX | 3 << 4 },
+    { 'S', 'H', 'X', SFC_AM_ABY | 3 << 4 },
+    { 'A', 'H', 'X', SFC_AM_ABY | 3 << 4 },
+    // A
+    { 'L', 'D', 'Y', SFC_AM_IMM | 2 << 4 },
+    { 'L', 'D', 'A', SFC_AM_INX | 2 << 4 },
+    { 'L', 'D', 'X', SFC_AM_IMM | 2 << 4 },
+    { 'L', 'A', 'X', SFC_AM_INX | 2 << 4 },
+    { 'L', 'D', 'Y', SFC_AM_ZPG | 2 << 4 },
+    { 'L', 'D', 'A', SFC_AM_ZPG | 2 << 4 },
+    { 'L', 'D', 'X', SFC_AM_ZPG | 2 << 4 },
+    { 'L', 'A', 'X', SFC_AM_ZPG | 2 << 4 },
+    { 'T', 'A', 'Y', SFC_AM_IMP | 1 << 4 },
+    { 'L', 'D', 'A', SFC_AM_IMM | 2 << 4 },
+    { 'T', 'A', 'X', SFC_AM_IMP | 1 << 4 },
+    { 'L', 'A', 'X', SFC_AM_IMM | 2 << 4 },
+    { 'L', 'D', 'Y', SFC_AM_ABS | 3 << 4 },
+    { 'L', 'D', 'A', SFC_AM_ABS | 3 << 4 },
+    { 'L', 'D', 'X', SFC_AM_ABS | 3 << 4 },
+    { 'L', 'A', 'X', SFC_AM_ABS | 3 << 4 },
+    // B
+    { 'B', 'C', 'S', SFC_AM_REL | 2 << 4 },
+    { 'L', 'D', 'A', SFC_AM_INY | 2 << 4 },
+    { 'S', 'T', 'P', SFC_AM_UNK | 1 << 4 },
+    { 'L', 'A', 'X', SFC_AM_INY | 2 << 4 },
+    { 'L', 'D', 'Y', SFC_AM_ZPX | 2 << 4 },
+    { 'L', 'D', 'A', SFC_AM_ZPX | 2 << 4 },
+    { 'L', 'D', 'X', SFC_AM_ZPY | 2 << 4 },
+    { 'L', 'A', 'X', SFC_AM_ZPY | 2 << 4 },
+    { 'C', 'L', 'V', SFC_AM_IMP | 1 << 4 },
+    { 'L', 'D', 'A', SFC_AM_ABY | 3 << 4 },
+    { 'T', 'S', 'X', SFC_AM_IMP | 1 << 4 },
+    { 'L', 'A', 'S', SFC_AM_ABY | 3 << 4 },
+    { 'L', 'D', 'Y', SFC_AM_ABX | 3 << 4 },
+    { 'L', 'D', 'A', SFC_AM_ABX | 3 << 4 },
+    { 'L', 'D', 'X', SFC_AM_ABY | 3 << 4 },
+    { 'L', 'A', 'X', SFC_AM_ABY | 3 << 4 },
+    // C
+    { 'C', 'P', 'Y', SFC_AM_IMM | 2 << 4 },
+    { 'C', 'M', 'P', SFC_AM_INX | 2 << 4 },
+    { 'N', 'O', 'P', SFC_AM_IMM | 2 << 4 },
+    { 'D', 'C', 'P', SFC_AM_INX | 2 << 4 },
+    { 'C', 'P', 'Y', SFC_AM_ZPG | 2 << 4 },
+    { 'C', 'M', 'P', SFC_AM_ZPG | 2 << 4 },
+    { 'D', 'E', 'C', SFC_AM_ZPG | 2 << 4 },
+    { 'D', 'C', 'P', SFC_AM_ZPG | 2 << 4 },
+    { 'I', 'N', 'Y', SFC_AM_IMP | 1 << 4 },
+    { 'C', 'M', 'P', SFC_AM_IMM | 2 << 4 },
+    { 'D', 'E', 'X', SFC_AM_IMP | 1 << 4 },
+    { 'A', 'X', 'S', SFC_AM_IMM | 2 << 4 },
+    { 'C', 'P', 'Y', SFC_AM_ABS | 3 << 4 },
+    { 'C', 'M', 'P', SFC_AM_ABS | 3 << 4 },
+    { 'D', 'E', 'C', SFC_AM_ABS | 3 << 4 },
+    { 'D', 'C', 'P', SFC_AM_ABS | 3 << 4 },
+    // D
+    { 'B', 'N', 'E', SFC_AM_REL | 2 << 4 },
+    { 'C', 'M', 'P', SFC_AM_INY | 2 << 4 },
+    { 'S', 'T', 'P', SFC_AM_UNK | 1 << 4 },
+    { 'D', 'C', 'P', SFC_AM_INY | 2 << 4 },
+    { 'N', 'O', 'P', SFC_AM_ZPX | 2 << 4 },
+    { 'C', 'M', 'P', SFC_AM_ZPX | 2 << 4 },
+    { 'D', 'E', 'C', SFC_AM_ZPX | 2 << 4 },
+    { 'D', 'C', 'P', SFC_AM_ZPX | 2 << 4 },
+    { 'C', 'L', 'D', SFC_AM_IMP | 1 << 4 },
+    { 'C', 'M', 'P', SFC_AM_ABY | 3 << 4 },
+    { 'N', 'O', 'P', SFC_AM_IMP | 1 << 4 },
+    { 'D', 'C', 'P', SFC_AM_ABY | 3 << 4 },
+    { 'N', 'O', 'P', SFC_AM_ABX | 3 << 4 },
+    { 'C', 'M', 'P', SFC_AM_ABX | 3 << 4 },
+    { 'D', 'E', 'C', SFC_AM_ABX | 3 << 4 },
+    { 'D', 'C', 'P', SFC_AM_ABX | 3 << 4 },
+    // E
+    { 'C', 'P', 'X', SFC_AM_IMM | 2 << 4 },
+    { 'S', 'B', 'C', SFC_AM_INX | 2 << 4 },
+    { 'N', 'O', 'P', SFC_AM_IMM | 2 << 4 },
+    { 'I', 'S', 'B', SFC_AM_INX | 2 << 4 },
+    { 'C', 'P', 'X', SFC_AM_ZPG | 2 << 4 },
+    { 'S', 'B', 'C', SFC_AM_ZPG | 2 << 4 },
+    { 'I', 'N', 'C', SFC_AM_ZPG | 2 << 4 },
+    { 'I', 'S', 'B', SFC_AM_ZPG | 2 << 4 },
+    { 'I', 'N', 'X', SFC_AM_IMP | 1 << 4 },
+    { 'S', 'B', 'C', SFC_AM_IMM | 2 << 4 },
+    { 'N', 'O', 'P', SFC_AM_IMP | 1 << 4 },
+    { 'S', 'B', 'C', SFC_AM_IMM | 2 << 4 },
+    { 'C', 'P', 'X', SFC_AM_ABS | 3 << 4 },
+    { 'S', 'B', 'C', SFC_AM_ABS | 3 << 4 },
+    { 'I', 'N', 'C', SFC_AM_ABS | 3 << 4 },
+    { 'I', 'S', 'B', SFC_AM_ABS | 3 << 4 },
+    // F
+    { 'B', 'E', 'Q', SFC_AM_REL | 2 << 4 },
+    { 'S', 'B', 'C', SFC_AM_INY | 2 << 4 },
+    { 'S', 'T', 'P', SFC_AM_UNK | 1 << 4 },
+    { 'I', 'S', 'B', SFC_AM_INY | 2 << 4 },
+    { 'N', 'O', 'P', SFC_AM_ZPX | 2 << 4 },
+    { 'S', 'B', 'C', SFC_AM_ZPX | 2 << 4 },
+    { 'I', 'N', 'C', SFC_AM_ZPX | 2 << 4 },
+    { 'I', 'S', 'B', SFC_AM_ZPX | 2 << 4 },
+    { 'S', 'E', 'D', SFC_AM_IMP | 1 << 4 },
+    { 'S', 'B', 'C', SFC_AM_ABY | 3 << 4 },
+    { 'N', 'O', 'P', SFC_AM_IMP | 1 << 4 },
+    { 'I', 'S', 'B', SFC_AM_ABY | 3 << 4 },
+    { 'N', 'O', 'P', SFC_AM_ABX | 3 << 4 },
+    { 'S', 'B', 'C', SFC_AM_ABX | 3 << 4 },
+    { 'I', 'N', 'C', SFC_AM_ABX | 3 << 4 },
+    { 'I', 'S', 'B', SFC_AM_ABX | 3 << 4 },
 };
+
+
+/// <summary>
+/// StepFC: 获取指令长度
+/// </summary>
+/// <param name="opcode">The opcode.</param>
+/// <returns></returns>
+extern inline uint8_t sfc_get_inslen(uint8_t opcode) {
+    return s_opname_data[opcode].mode_inslen >> 4;
+}
+
 
 /// <summary>
 /// 十六进制字符数据
@@ -1545,7 +1760,8 @@ void sfc_6502_disassembly(sfc_6502_code_t code, char buf[SFC_DISASSEMBLY_BUF_LEN
     buf[NAME_FIRSH + 1] = opname.name[1];
     buf[NAME_FIRSH + 2] = opname.name[2];
     // 查看寻址模式
-    switch (opname.mode)
+    const enum sfc_6502_addressing_mode addrmode = opname.mode_inslen & 0x0f;
+    switch (addrmode)
     {
     case SFC_AM_UNK:
         sfc_fallthrough;
@@ -1574,9 +1790,9 @@ void sfc_6502_disassembly(sfc_6502_code_t code, char buf[SFC_DISASSEMBLY_BUF_LEN
         buf[ADDR_FIRSH] = '$';
         sfc_btoh(buf + ADDR_FIRSH + 1, code.a2);
         sfc_btoh(buf + ADDR_FIRSH + 3, code.a1);
-        if (opname.mode == SFC_AM_ABS) break;
+        if (addrmode == SFC_AM_ABS) break;
         buf[ADDR_FIRSH + 5] = ',';
-        buf[ADDR_FIRSH + 7] = opname.mode == SFC_AM_ABX ? 'X' : 'Y';
+        buf[ADDR_FIRSH + 7] = addrmode == SFC_AM_ABX ? 'X' : 'Y';
         break;
     case SFC_AM_ZPG:
         // XXX $AB
@@ -1589,9 +1805,9 @@ void sfc_6502_disassembly(sfc_6502_code_t code, char buf[SFC_DISASSEMBLY_BUF_LEN
         // REAL
         buf[ADDR_FIRSH] = '$';
         sfc_btoh(buf + ADDR_FIRSH + 1, code.a1);
-        if (opname.mode == SFC_AM_ZPG) break;
+        if (addrmode == SFC_AM_ZPG) break;
         buf[ADDR_FIRSH + 3] = ',';
-        buf[ADDR_FIRSH + 5] = opname.mode == SFC_AM_ABX ? 'X' : 'Y';
+        buf[ADDR_FIRSH + 5] = addrmode == SFC_AM_ABX ? 'X' : 'Y';
         break;
     case SFC_AM_INX:
         // XXX ($AB, X)
@@ -1623,9 +1839,11 @@ void sfc_6502_disassembly(sfc_6502_code_t code, char buf[SFC_DISASSEMBLY_BUF_LEN
         // XXX $AB(-085)
         // XXX $ABCD
         buf[ADDR_FIRSH + 0] = '$';
+
         //const uint16_t target = base + int8_t(data.a1);
         //sfc_btoh(buf + ADDR_FIRSH + 1, uint8_t(target >> 8));
         //sfc_btoh(buf + ADDR_FIRSH + 3, uint8_t(target & 0xFF));
+
         sfc_btoh(buf + ADDR_FIRSH + 1, code.a1);
         buf[ADDR_FIRSH + 3] = '(';
         sfc_btod(buf + ADDR_FIRSH + 4, code.a1);

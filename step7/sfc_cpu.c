@@ -4,22 +4,23 @@
 #include <assert.h>
 #include <string.h>
 
-// NMI - 不可屏蔽中断
-extern inline void sfc_operation_NMI(sfc_famicom_t* famicom);
-
-/// <summary>
-/// SFCs the do vblank.
-/// </summary>
-/// <param name="famicom">The famicom.</param>
-void sfc_do_vblank(sfc_famicom_t* famicom) {
-    sfc_vblank_flag_start(famicom);
-    if (famicom->ppu.ctrl & (uint8_t)SFC_PPUFLAG_NMIGen) {
-        sfc_operation_NMI(famicom);
-    }
-}
 
 // BYTE -> HEX
 extern inline void sfc_btoh(char o[], uint8_t b);
+// get opcode ins-len
+extern inline uint8_t sfc_get_inslen(uint8_t);
+
+/// <summary>
+/// StepFC: 读取PRG数据
+/// </summary>
+/// <param name="address">The address.</param>
+/// <param name="famicom">The famicom.</param>
+/// <returns></returns>
+extern inline uint8_t sfc_read_prgdata(uint16_t address, const sfc_famicom_t* famicom) {
+    assert((address & (uint16_t)0x8000) == (uint16_t)0x8000);
+    const uint16_t prgaddr = address | (uint16_t)0x8000;
+    return famicom->prg_banks[prgaddr >> 13][prgaddr & (uint16_t)0x1fff];
+}
 
 /// <summary>
 /// StepFC: 指定地方反汇编
@@ -28,10 +29,6 @@ extern inline void sfc_btoh(char o[], uint8_t b);
 /// <param name="famicom">The famicom.</param>
 /// <param name="buf">The buf.</param>
 void sfc_fc_disassembly(uint16_t address, const sfc_famicom_t* famicom, char buf[]) {
-    // TODO: 根据操作码读取对应字节
-    //if (address & (uint16_t)0x8000) {
-
-    //}
     enum {
         OFFSET_M = SFC_DISASSEMBLY_BUF_LEN2 - SFC_DISASSEMBLY_BUF_LEN,
         OFFSET = 8
@@ -44,10 +41,15 @@ void sfc_fc_disassembly(uint16_t address, const sfc_famicom_t* famicom, char buf
 
     sfc_6502_code_t code;
     code.data = 0;
-    // 暴力(NoMo)读取3字节
-    code.op = sfc_read_cpu_address(address, famicom);
-    code.a1 = sfc_read_cpu_address(address + 1, famicom);
-    code.a2 = sfc_read_cpu_address(address + 2, famicom);
+    code.op = sfc_read_prgdata(address, famicom);
+    // 获取指令长度
+    switch (sfc_get_inslen(code.op))
+    {
+    case 3:
+        code.a2 = sfc_read_prgdata(address + 2, famicom);
+    case 2:
+        code.a1 = sfc_read_prgdata(address + 1, famicom);
+    }
     // 反汇编
     sfc_6502_disassembly(code, buf + OFFSET);
 }
