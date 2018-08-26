@@ -17,7 +17,12 @@ static uint8_t s_sfc_palette_data[32];
 /// <param name="nt">The nt.</param>
 /// <param name="bg">The bg.</param>
 /// <returns></returns>
-static inline uint8_t sfc_bg_get_pixel(uint8_t x, uint8_t y, const uint8_t* nt, const uint8_t* bg) {
+static inline uint8_t sfc_bg_get_pixel(
+    uint8_t x, 
+    uint8_t y, 
+    uint8_t* background,
+    const uint8_t* nt, 
+    const uint8_t* bg) {
     // TODO: 优化为按图块作业
 
     // 获取所在名称表
@@ -32,6 +37,8 @@ static inline uint8_t sfc_bg_get_pixel(uint8_t x, uint8_t y, const uint8_t* nt, 
     // X坐标为字节内偏移
     const uint8_t shift = (~x) & 0x7;
     const uint8_t mask = 1 << shift;
+    // 背景检测
+    *background = ((p0 & mask) >> shift) | ((p1 & mask) >> shift);
     // 计算低二位
     const uint8_t low = ((p0 & mask) >> shift) | ((p1 & mask) >> shift << 1);
     // 计算所在属性表
@@ -51,8 +58,15 @@ static inline uint8_t sfc_bg_get_pixel(uint8_t x, uint8_t y, const uint8_t* nt, 
 /// </summary>
 /// <param name="famicom">The famicom.</param>
 /// <param name="line">The line.</param>
+/// <param name="spp">The SPP.</param>
 /// <param name="buffer">The buffer.</param>
-static void sfc_render_background_scanline(sfc_famicom_t* famicom, uint16_t line, uint8_t* buffer) {
+static inline void sfc_render_background_scanline(
+    sfc_famicom_t* famicom, 
+    uint16_t line,
+    const uint8_t* spp,
+    uint8_t* buffer) {
+    uint64_t backgorund_hittest_aligned[(256 + 8)/8];
+    uint8_t* const backgorund_hittest = backgorund_hittest_aligned;
     // 计算当前偏移量
     const uint16_t scrollx = famicom->ppu.scroll[0] + ((famicom->ppu.nametable_select & 1) << 8);
     const uint16_t scrolly = famicom->ppu.scroll[1];
@@ -74,7 +88,38 @@ static void sfc_render_background_scanline(sfc_famicom_t* famicom, uint16_t line
         const uint16_t realx = scrollx + i;
         const uint16_t realy = scrolly + line;
         const uint8_t* nt = table[(realx >> 8) & 1];
-        buffer[i] = sfc_bg_get_pixel((uint8_t)realx, (uint8_t)realy, nt, pattern);
+        buffer[i] = sfc_bg_get_pixel(
+            (uint8_t)realx, 
+            (uint8_t)realy, 
+            backgorund_hittest + i,
+            nt,
+            pattern
+        );
+    }
+    // 基于行的精灵0命中测试
+
+    if (famicom->ppu.status & (uint8_t)SFC_PPUFLAG_Sp0Hit)
+        return;
+    // 精灵#0的数据
+    //famicom->ppu.sprites[1];
+    const uint8_t  yyyyy = famicom->ppu.sprites[0] + 1;
+    if (yyyyy <= line && yyyyy + 8 > line ) {
+        // 避免越界
+        backgorund_hittest_aligned[32] = 0;
+        // X = 255时 不做检测
+        backgorund_hittest[255] = 0;
+
+        const uint8_t  xxxxx = famicom->ppu.sprites[3];
+        uint8_t hittest = 0;
+        for (uint16_t i = xxxxx; i != xxxxx + 8; ++i) {
+            hittest <<= 1;
+            hittest |= backgorund_hittest[i];
+        }
+        const uint8_t* nowp0 = spp + famicom->ppu.sprites[1] * 16;
+        const uint8_t* nowp1 = nowp0 + 8;
+        const uint8_t sphit = nowp0[line - yyyyy] | nowp1[line - yyyyy];
+        if (sphit & hittest)
+            famicom->ppu.status |= (uint8_t)SFC_PPUFLAG_Sp0Hit;
     }
 }
 
@@ -163,8 +208,11 @@ void sfc_render_frame(sfc_famicom_t* famicom, uint8_t* buffer) {
     uint8_t* const data = buffer;
     //const uint16_t visible_line = famicom->config.visible_scanline;
     const uint16_t vblank_line = famicom->config.vblank_scanline;
-    const uint32_t per_scanline = famicom->config.cpu_cycle_per_scanline;
+    const uint32_t per_scanline = famicom->config.master_cycle_per_scanline;
     uint32_t end_cycle_count = 0;
+
+    // 精灵使用的图样板
+    const uint8_t* spp = famicom->ppu.banks[famicom->ppu.ctrl & SFC_PPUFLAG_SpTabl ? 4 : 0];
 
 
     // 预渲染
@@ -172,17 +220,15 @@ void sfc_render_frame(sfc_famicom_t* famicom, uint8_t* buffer) {
     // 渲染
     for (uint16_t i = 0; i != (uint16_t)SCAN_LINE_COUNT; ++i) {
         end_cycle_count += per_scanline;
-        const uint32_t end_cycle_count_this_round = end_cycle_count;
-        uint32_t* const count = &famicom->cycle_count;
+        const uint32_t end_cycle_count_this_round = end_cycle_count / MASTER_CYCLE_PER_CPU;
+        uint32_t* const count = &famicom->cpu_cycle_count;
         // 执行CPU
         for (; *count < end_cycle_count_this_round;)
             sfc_cpu_execute_one(famicom);
         // 渲染背景
-        sfc_render_background_scanline(famicom, i, buffer);
+        sfc_render_background_scanline(famicom, i, spp, buffer);
         buffer += 256;
         // 执行HBlank
-        if (i == 31) 
-            famicom->ppu.status |= (uint8_t)SFC_PPUFLAG_Sp0Hit;
     }
     // 后渲染
 
@@ -197,18 +243,28 @@ void sfc_render_frame(sfc_famicom_t* famicom, uint8_t* buffer) {
     // 执行
     for (uint16_t i = 0; i != vblank_line; ++i) {
         end_cycle_count += per_scanline;
-        const uint32_t end_cycle_count_this_round = end_cycle_count;
-        uint32_t* const count = &famicom->cycle_count;
+        const uint32_t end_cycle_count_this_round = end_cycle_count / MASTER_CYCLE_PER_CPU;
+        uint32_t* const count = &famicom->cpu_cycle_count;
         for (; *count < end_cycle_count_this_round;)
             sfc_cpu_execute_one(famicom);
     }
     // 结束
     famicom->ppu.status = 0;
-    
+
+    // 预渲染
+    {
+        end_cycle_count += per_scanline * 2;
+        const uint32_t end_cycle_count_this_round = end_cycle_count / MASTER_CYCLE_PER_CPU;
+        uint32_t* const count = &famicom->cpu_cycle_count;
+        for (; *count < end_cycle_count_this_round;)
+            sfc_cpu_execute_one(famicom);
+    }
+
     // 清除计数器
-    famicom->cycle_count -= end_cycle_count;
-    // 必须是偶数
-    assert((end_cycle_count & 1) == 0);
+    const uint32_t ran = end_cycle_count / MASTER_CYCLE_PER_CPU;
+    famicom->cpu_cycle_count -= ran;
+    // TODO: 必须是偶数, 如何保证?
+    //assert((ran & 1) == 0);
 
 
 
@@ -222,8 +278,6 @@ void sfc_render_frame(sfc_famicom_t* famicom, uint8_t* buffer) {
         s_sfc_palette_data[4 * 2] = s_sfc_palette_data[0];
         s_sfc_palette_data[4 * 3] = s_sfc_palette_data[0];
     }
-    // 精灵
-    const uint8_t* spp = famicom->ppu.banks[famicom->ppu.ctrl & SFC_PPUFLAG_SpTabl ? 4 : 0];
 
     //LARGE_INTEGER t0, t1;
     //QueryPerformanceCounter(&t0);

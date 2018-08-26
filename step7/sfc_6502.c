@@ -7,7 +7,11 @@
 extern inline uint8_t sfc_read_prgdata(uint16_t, const sfc_famicom_t*);
 
 #ifdef _MSC_VER
+#ifdef _DEBUG
+#define SFC_FORCEINLINE 
+#else
 #define SFC_FORCEINLINE __forceinline
+#endif
 #else
 #define SFC_FORCEINLINE __attribute__((always_inline))
 #endif
@@ -59,6 +63,7 @@ extern inline uint8_t sfc_read_prgdata(uint16_t, const sfc_famicom_t*);
 
 // 实用函数
 #define SFC_READ(a) sfc_read_cpu_address(a, famicom)
+//#define SFC_READ_PC(a) sfc_read_cpu_address(a, famicom)
 #define SFC_READ_PC(a) sfc_read_prgdata(a, famicom)
 #define SFC_PUSH(a) (famicom->main_memory + 0x100)[SFC_SP--] = a;
 #define SFC_POP() (famicom->main_memory + 0x100)[++SFC_SP];
@@ -297,16 +302,20 @@ SFC_FORCEINLINE
 /// <param name="famicom">The famicom.</param>
 static inline void sfc_operation_SHY(uint16_t address, sfc_famicom_t* famicom) {
     sfc_operation_UNK(address, famicom);
+    //const uint8_t result = SFC_Y & (uint8_t)(((uint8_t)address >> 8) + 1);
+    //SFC_WRITE(address, result);
 }
 
 SFC_FORCEINLINE
 /// <summary>
-/// SHX
+/// SHX: Store (X & (ADDR_HI + 1))
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
 static inline void sfc_operation_SHX(uint16_t address, sfc_famicom_t* famicom) {
     sfc_operation_UNK(address, famicom);
+    //const uint8_t result = SFC_X & (uint8_t)(((uint8_t)address >> 8) + 1);
+    //SFC_WRITE(address, result);
 }
 
 SFC_FORCEINLINE
@@ -516,7 +525,11 @@ SFC_FORCEINLINE
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
 static inline void sfc_operation_AXS(uint16_t address, sfc_famicom_t* famicom) {
-    sfc_operation_UNK(address, famicom);
+    // AXS 操作地址是立即数
+    const uint16_t tmp = (SFC_A & SFC_X) - SFC_READ_PC(address);
+    SFC_X = (uint8_t)tmp;
+    CHECK_ZSFLAG(SFC_X);
+    SFC_CF_IF((tmp & 0x8000)== 0);
 }
 
 SFC_FORCEINLINE
@@ -526,7 +539,13 @@ SFC_FORCEINLINE
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
 static inline void sfc_operation_ARR(uint16_t address, sfc_famicom_t* famicom) {
-    sfc_operation_UNK(address, famicom);
+    // ARR 指令 是立即数
+    SFC_A &= SFC_READ_PC(address);
+    SFC_CF;
+    SFC_A = (SFC_A >> 1) | (SFC_CF << 7);
+    CHECK_ZSFLAG(SFC_A);
+    SFC_CF_IF((SFC_A >> 6) & 1);
+    SFC_VF_IF(((SFC_A >> 5) ^ (SFC_A >> 6)) & 1);
 }
 
 SFC_FORCEINLINE
@@ -546,7 +565,10 @@ SFC_FORCEINLINE
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
 static inline void sfc_operation_ANC(uint16_t address, sfc_famicom_t* famicom) {
-    sfc_operation_UNK(address, famicom);
+    // ANC两个指令都是立即数
+    SFC_A &= SFC_READ_PC(address);
+    CHECK_ZSFLAG(SFC_A);
+    SFC_CF_IF(SFC_SF);
 }
 
 SFC_FORCEINLINE
@@ -556,7 +578,11 @@ SFC_FORCEINLINE
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
 static inline void sfc_operation_ASR(uint16_t address, sfc_famicom_t* famicom) {
-    sfc_operation_UNK(address, famicom);
+    // ASR 指令是立即数
+    SFC_A &= SFC_READ_PC(address);
+    SFC_CF_IF(SFC_A & 1);
+    SFC_A >>= 1;
+    CHECK_ZSFLAG(SFC_A);
 }
 
 SFC_FORCEINLINE
@@ -596,7 +622,16 @@ SFC_FORCEINLINE
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
 static inline void sfc_operation_BRK(uint16_t address, sfc_famicom_t* famicom) {
-    sfc_operation_UNK(address, famicom);
+    const uint16_t pcp1 = SFC_PC + 1;
+    const uint8_t pch = (uint8_t)((pcp1) >> 8);
+    const uint8_t pcl = (uint8_t)pcp1;
+    SFC_PUSH(pch);
+    SFC_PUSH(pcl);
+    SFC_PUSH(SFC_P | (uint8_t)(SFC_FLAG_R) | (uint8_t)(SFC_FLAG_B));
+    SFC_IF_SE;
+    const uint8_t pcl2 = SFC_READ_PC(SFC_VERCTOR_BRK + 0);
+    const uint8_t pch2 = SFC_READ_PC(SFC_VERCTOR_BRK + 1);
+    famicom->registers.program_counter = (uint16_t)pcl2 | (uint16_t)pch2 << 8;
 }
 
 SFC_FORCEINLINE
@@ -951,7 +986,7 @@ SFC_FORCEINLINE
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
 static inline void sfc_operation_CLI(uint16_t address, sfc_famicom_t* famicom) {
-    sfc_operation_UNK(address, famicom);
+    SFC_IF_CL;
 }
 
 SFC_FORCEINLINE
@@ -1384,7 +1419,7 @@ void sfc_cpu_execute_one(sfc_famicom_t* famicom) {
         OP(F0,REL, BEQ) OP(F1,INY, SBC) OP(F2,UNK, UNK) OP(F3,INY, ISB) OP(F4,ZPX, NOP) OP(F5,ZPX, SBC) OP(F6,ZPX, INC) OP(F7,ZPX, ISB)
         OP(F8,IMP, SED) OP(F9,ABY, SBC) OP(FA,IMP, NOP) OP(FB,ABY, ISB) OP(FC,ABX, NOP) OP(FD,ABX, SBC) OP(FE,ABX, INC) OP(FF,ABX, ISB)
     }
-    famicom->cycle_count += cycle_add;
+    famicom->cpu_cycle_count += cycle_add;
 }
 
 /// <summary>
@@ -1399,11 +1434,11 @@ extern inline void sfc_operation_NMI(sfc_famicom_t* famicom) {
     SFC_PUSH(pcl);
     SFC_PUSH(SFC_P | (uint8_t)(SFC_FLAG_R));
     SFC_IF_SE;
-    const uint8_t pcl2 = sfc_read_cpu_address(SFC_VERCTOR_NMI + 0, famicom);
-    const uint8_t pch2 = sfc_read_cpu_address(SFC_VERCTOR_NMI + 1, famicom);
+    const uint8_t pcl2 = SFC_READ_PC(SFC_VERCTOR_NMI + 0);
+    const uint8_t pch2 = SFC_READ_PC(SFC_VERCTOR_NMI + 1);
     famicom->registers.program_counter = (uint16_t)pcl2 | (uint16_t)pch2 << 8;
 
-    famicom->cycle_count += 7;
+    famicom->cpu_cycle_count += 7;
 }
 
 /// <summary>

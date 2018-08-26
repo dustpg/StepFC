@@ -59,7 +59,8 @@ typedef struct {
 enum sfc_cpu_vector {
     SFC_VERCTOR_NMI     = 0xFFFA,   // 不可屏蔽中断
     SFC_VERCTOR_RESET   = 0xFFFC,   // 重置CP指针地址
-    SFC_VERCTOR_IRQBRK  = 0xFFFE,   // 中断重定向
+    SFC_VERCTOR_BRK     = 0xFFFE,   // 中断重定向
+    SFC_VERCTOR_IRQ     = 0xFFFE,   // 中断重定向
 };
 
 // read cpu address

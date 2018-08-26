@@ -78,8 +78,8 @@ struct sfc_famicom {
     sfc_mapper_t        mapper;
     // 寄存器
     sfc_cpu_register_t  registers;
-    // 周期计数
-    uint32_t            cycle_count;
+    // CPU 周期计数
+    uint32_t            cpu_cycle_count;
     // PPU
     sfc_ppu_t           ppu;
     // ROM 信息

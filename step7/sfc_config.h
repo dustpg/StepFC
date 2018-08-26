@@ -5,18 +5,22 @@
 #include <stdint.h>
 
 
+enum sfc_config_constant {
+    MASTER_CYCLE_PER_CPU = 12
+};
+
 /// <summary>
 /// StepFC: 配置信息
 /// </summary>
 typedef struct {
     // 屏幕刷新率
     uint16_t        refresh_rate;
-    // 每条扫描线CPU执行周期
-    uint16_t        cpu_cycle_per_scanline;
-    // 每条扫描线渲染CPU执行周期
-    uint16_t        cpu_cycle_per_drawline;
-    // 每条扫描线水平空白CPU执行周期
-    uint16_t        cpu_cycle_per_hblank;
+    // 每条扫描线周期 Master-Clock 
+    uint16_t        master_cycle_per_scanline;
+    // 每条扫描线渲染周期 Master-Clock 
+    uint16_t        master_cycle_per_drawline;
+    // 每条扫描线水平空白周期 Master-Clock 
+    uint16_t        master_cycle_per_hblank;
     // 可见扫描线
     uint16_t        visible_scanline;
     // 垂直空白扫描线

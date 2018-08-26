@@ -17,8 +17,8 @@ extern inline uint8_t sfc_get_inslen(uint8_t);
 /// <param name="famicom">The famicom.</param>
 /// <returns></returns>
 extern inline uint8_t sfc_read_prgdata(uint16_t address, const sfc_famicom_t* famicom) {
-    assert((address & (uint16_t)0x8000) == (uint16_t)0x8000);
-    const uint16_t prgaddr = address | (uint16_t)0x8000;
+    assert(((address & (uint16_t)0x8000) == (uint16_t)0x8000) || (address>>13) == 0);
+    const uint16_t prgaddr = address;
     return famicom->prg_banks[prgaddr >> 13][prgaddr & (uint16_t)0x1fff];
 }
 

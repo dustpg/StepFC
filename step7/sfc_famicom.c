@@ -141,8 +141,8 @@ sfc_ecode sfc_famicom_reset(sfc_famicom_t* famicom) {
 /// <returns></returns>
 sfc_ecode sfc_load_default_rom(void* arg, sfc_rom_info_t* info) {
     assert(info->data_prgrom == NULL && "FREE FIRST");
-    FILE* const file = fopen("color_test.nes", "rb");
-    //FILE* const file = fopen("01.basics.nes", "rb");
+    //FILE* const file = fopen("color_test.nes", "rb");
+    FILE* const file = fopen("vbl_clear_time.nes", "rb");
     // ÎÄ±¾Î´ÕÒµ½
     if (!file) return SFC_ERROR_FILE_NOT_FOUND;
     sfc_ecode code = SFC_ERROR_ILLEGAL_FILE;

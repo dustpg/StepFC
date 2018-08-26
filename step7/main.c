@@ -196,6 +196,7 @@ extern void main_render(void* bgrx) {
     uint8_t buffer[256 * 256];
 
     sfc_render_frame(g_famicom, buffer);
+    //sfc_render_frame(g_famicom, buffer);
 
     for (int i = 0; i != 256 * 240; ++i) {
         data[i] = sfc_stdalette[buffer[i]];

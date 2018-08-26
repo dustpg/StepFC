@@ -20,7 +20,16 @@ uint8_t sfc_read_ppu_address(uint16_t address, sfc_ppu_t* ppu) {
         return data;
     }
     // 调色板索引
-    else return ppu->pseudo = ppu->spindexes[real_address & (uint16_t)0x1f];
+    else {
+        // 更新处于调色板"下方"的伪缓存值
+        const uint16_t underneath = real_address - 0x1000;
+        const uint16_t index = real_address >> 10;
+        const uint16_t offset = real_address & (uint16_t)0x3FF;
+        assert(ppu->banks[index]);
+        ppu->pseudo = ppu->banks[index][offset];
+        // 读取调色板能返回即时值
+        return ppu->spindexes[real_address & (uint16_t)0x1f];
+    }
 }
 
 /// <summary>
@@ -90,7 +99,10 @@ uint8_t sfc_read_ppu_register_via_cpu(uint16_t address, sfc_ppu_t* ppu) {
     case 4:
         // 0x2004: OAM data ($2004) <> read/write
         // 读写寄存器
-        data = ppu->sprites[ppu->oamaddr++];
+
+        // - [???] Address should not increment on $2004 read 
+        //data = ppu->sprites[ppu->oamaddr++];
+        data = ppu->sprites[ppu->oamaddr];
         break;
     case 5:
         // 0x2005: Scroll ($2005) >> write x2

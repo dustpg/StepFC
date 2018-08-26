@@ -6,7 +6,7 @@
 /// </summary>
 const sfc_config_t SFC_CONFIG_NTSC = {
     60,
-    1364,
+    1366,
     1024,
     340,
     240,
