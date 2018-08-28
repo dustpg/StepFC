@@ -79,7 +79,7 @@ uint8_t sfc_read_ppu_register_via_cpu(uint16_t address, sfc_ppu_t* ppu) {
         // Ö»¶Á×´Ì¬¼Ä´æÆ÷
         data = ppu->status;
         // ¶ÁÈ¡ºó»áÇå³ýVBlank×´Ì¬
-        ppu->status &= ~(uint8_t)SFC_PPUFLAG_VBlank;
+        ppu->status &= ~(uint8_t)SFC_PPU2002_VBlank;
         break;
     case 3:
         // 0x2003: OAM address port ($2003) > write
@@ -103,7 +103,7 @@ uint8_t sfc_read_ppu_register_via_cpu(uint16_t address, sfc_ppu_t* ppu) {
         // 0x2007: Data ($2007) <> read/write
         // PPU VRAM¶ÁÐ´¶Ë¿Ú
         data = sfc_read_ppu_address(ppu->vramaddr, ppu);
-        ppu->vramaddr += (uint16_t)((ppu->ctrl & SFC_PPUFLAG_VINC32) ? 32 : 1);
+        ppu->vramaddr += (uint16_t)((ppu->ctrl & SFC_PPU2000_VINC32) ? 32 : 1);
         break;
     }
     return data;
@@ -168,7 +168,7 @@ void sfc_write_ppu_register_via_cpu(uint16_t address, uint8_t data, sfc_ppu_t* p
         // 0x2007: Data ($2007) <> read/write
         // PPU VRAMÊý¾Ý¶Ë
         sfc_write_ppu_address(ppu->vramaddr, data, ppu);
-        ppu->vramaddr += (uint16_t)((ppu->ctrl & SFC_PPUFLAG_VINC32) ? 32 : 1);
+        ppu->vramaddr += (uint16_t)((ppu->ctrl & SFC_PPU2000_VINC32) ? 32 : 1);
         break;
     }
 }

@@ -12,7 +12,7 @@ sfc_famicom_t* g_famicom = NULL;
 extern uint32_t sfc_stdalette[];
 uint32_t palette_data[16];
 
-extern void sfc_render_frame(sfc_famicom_t* famicom, uint8_t* buffer);
+extern void sfc_render_frame_easy(sfc_famicom_t* famicom, uint8_t* buffer);
 
 /// <summary>
 /// 获取坐标像素
@@ -145,7 +145,7 @@ extern int sub_render(void* bgrx) {
 
     // 精灵
     const uint8_t* spp = g_famicom->ppu.banks[
-        g_famicom->ppu.ctrl & SFC_PPUFLAG_SpTabl ? 4 : 0];
+        g_famicom->ppu.ctrl & SFC_PPU2000_SpTabl ? 4 : 0];
 
     //LARGE_INTEGER t0, t1;
     //QueryPerformanceCounter(&t0);
@@ -195,7 +195,7 @@ extern void main_render(void* bgrx) {
 
     uint8_t buffer[256 * 256];
 
-    sfc_render_frame(g_famicom, buffer);
+    sfc_render_frame_easy(g_famicom, buffer);
     //sfc_render_frame(g_famicom, buffer);
 
     for (int i = 0; i != 256 * 240; ++i) {
@@ -216,7 +216,7 @@ extern void main_render(void* bgrx) {
     // 背景
     const uint8_t* now = g_famicom->ppu.banks[8];
     const uint8_t* bgp = g_famicom->ppu.banks[
-        g_famicom->ppu.ctrl & SFC_PPUFLAG_BgTabl ? 4 : 0];
+        g_famicom->ppu.ctrl & SFC_PPU2000_BgTabl ? 4 : 0];
     for (unsigned i = 0; i != 256 * 240; ++i) {
         data[i] = get_pixel(i & 0xff, i >> 8, now, bgp);
     }

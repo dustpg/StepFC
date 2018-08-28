@@ -71,7 +71,7 @@ extern void main_render(void* bgrx) {
     // 背景
     const uint8_t* now = g_famicom->ppu.banks[8];
     const uint8_t* bgp = g_famicom->ppu.banks[
-        g_famicom->ppu.ctrl & SFC_PPUFLAG_BgTabl ? 4 : 0];
+        g_famicom->ppu.ctrl & SFC_PPU2000_BgTabl ? 4 : 0];
     for (unsigned i = 0; i != 256 * 240; ++i) {
         data[i] = get_pixel(i & 0xff, i >> 8, now, bgp);
     }

@@ -133,7 +133,7 @@ sfc_ecode sfc_famicom_reset(sfc_famicom_t* famicom) {
 /// </summary>
 /// <param name="famicom">The famicom.</param>
 extern inline void sfc_vblank_flag_start(sfc_famicom_t* famicom) {
-    famicom->ppu.status |= (uint8_t)SFC_PPUFLAG_VBlank;
+    famicom->ppu.status |= (uint8_t)SFC_PPU2002_VBlank;
 }
 
 /// <summary>
@@ -141,7 +141,7 @@ extern inline void sfc_vblank_flag_start(sfc_famicom_t* famicom) {
 /// </summary>
 /// <param name="famicom">The famicom.</param>
 extern inline void sfc_vblank_flag_end(sfc_famicom_t* famicom) {
-    famicom->ppu.status &= ~(uint8_t)SFC_PPUFLAG_VBlank;
+    famicom->ppu.status &= ~(uint8_t)SFC_PPU2002_VBlank;
 }
 
 #include <stdio.h>

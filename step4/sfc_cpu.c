@@ -13,7 +13,7 @@ extern inline void sfc_operation_NMI(sfc_famicom_t* famicom);
 /// <param name="famicom">The famicom.</param>
 void sfc_do_vblank(sfc_famicom_t* famicom) {
     sfc_vblank_flag_start(famicom);
-    if (famicom->ppu.ctrl & (uint8_t)SFC_PPUFLAG_NMIGen) {
+    if (famicom->ppu.ctrl & (uint8_t)SFC_PPU2000_NMIGen) {
         sfc_operation_NMI(famicom);
     }
 }

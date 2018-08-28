@@ -75,7 +75,7 @@ case 0x##n:\
 {           \
     cycle_add += (uint32_t)SFC_BAISC_CYCLE_##n;\
     const uint16_t address = sfc_addressing_##a(famicom, &cycle_add);\
-    sfc_operation_##o(address, famicom);\
+    sfc_operation_##o(address, famicom, &cycle_add);\
     break;\
 }
 
@@ -158,6 +158,20 @@ static inline uint16_t sfc_addressing_ABX(sfc_famicom_t* famicom, uint32_t* cons
 
 SFC_FORCEINLINE
 /// <summary>
+/// 寻址方式: 绝对X变址 - 没有额外的一周期检测
+/// </summary>
+/// <param name="famicom">The famicom.</param>
+/// <param name="cycle">The cycle.</param>
+/// <returns></returns>
+static inline uint16_t sfc_addressing_abx(sfc_famicom_t* famicom, uint32_t* const cycle) {
+    const uint16_t base = sfc_addressing_ABS(famicom, cycle);
+    const uint16_t rvar = base + SFC_X;
+    return rvar;
+}
+
+
+SFC_FORCEINLINE
+/// <summary>
 /// 寻址方式: 绝对Y变址
 /// </summary>
 /// <param name="famicom">The famicom.</param>
@@ -167,6 +181,19 @@ static inline uint16_t sfc_addressing_ABY(sfc_famicom_t* famicom, uint32_t* cons
     const uint16_t base = sfc_addressing_ABS(famicom, cycle);
     const uint16_t rvar = base + SFC_Y;
     *cycle += ((base ^ rvar) >> 8) & 1;
+    return rvar;
+}
+
+SFC_FORCEINLINE
+/// <summary>
+/// 寻址方式: 绝对Y变址 - 没有额外一周期检测
+/// </summary>
+/// <param name="famicom">The famicom.</param>
+/// <param name="cycle">The cycle.</param>
+/// <returns></returns>
+static inline uint16_t sfc_addressing_aby(sfc_famicom_t* famicom, uint32_t* const cycle) {
+    const uint16_t base = sfc_addressing_ABS(famicom, cycle);
+    const uint16_t rvar = base + SFC_Y;
     return rvar;
 }
 
@@ -244,6 +271,26 @@ static inline uint16_t sfc_addressing_INY(sfc_famicom_t* famicom, uint32_t* cons
 
 SFC_FORCEINLINE
 /// <summary>
+/// 寻址方式: 间接Y变址 - 没有额外一周期检测
+/// </summary>
+/// <param name="famicom">The famicom.</param>
+/// <param name="cycle">The cycle.</param>
+/// <returns></returns>
+static inline uint16_t sfc_addressing_iny(sfc_famicom_t* famicom, uint32_t* const cycle) {
+    uint8_t base = SFC_READ_PC(SFC_PC++);
+    const uint8_t address0 = SFC_READ(base++);
+    const uint8_t address1 = SFC_READ(base++);
+    const uint16_t address
+        = (uint16_t)address0
+        | (uint16_t)((uint16_t)address1 << 8)
+        ;
+
+    const uint16_t rvar = address + SFC_Y;
+    return rvar;
+}
+
+SFC_FORCEINLINE
+/// <summary>
 /// 寻址方式: 间接寻址
 /// </summary>
 /// <param name="famicom">The famicom.</param>
@@ -276,8 +323,6 @@ static inline uint16_t sfc_addressing_REL(sfc_famicom_t* famicom, uint32_t* cons
     const uint16_t oldpc = SFC_PC;
     const uint8_t data = SFC_READ_PC(SFC_PC++);
     const uint16_t address = SFC_PC + (int8_t)data;
-    ++(*cycle);
-    *cycle += ((oldpc ^ address) >> 8) & 1;
     return address;
 }
 
@@ -290,7 +335,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_UNK(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_UNK(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     assert(!"UNKNOWN INS");
 }
 
@@ -300,8 +345,8 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_SHY(uint16_t address, sfc_famicom_t* famicom) {
-    sfc_operation_UNK(address, famicom);
+static inline void sfc_operation_SHY(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
+    sfc_operation_UNK(address, famicom, cycle);
     //const uint8_t result = SFC_Y & (uint8_t)(((uint8_t)address >> 8) + 1);
     //SFC_WRITE(address, result);
 }
@@ -312,8 +357,8 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_SHX(uint16_t address, sfc_famicom_t* famicom) {
-    sfc_operation_UNK(address, famicom);
+static inline void sfc_operation_SHX(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
+    sfc_operation_UNK(address, famicom, cycle);
     //const uint8_t result = SFC_X & (uint8_t)(((uint8_t)address >> 8) + 1);
     //SFC_WRITE(address, result);
 }
@@ -324,8 +369,8 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_TAS(uint16_t address, sfc_famicom_t* famicom) {
-    sfc_operation_UNK(address, famicom);
+static inline void sfc_operation_TAS(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
+    sfc_operation_UNK(address, famicom, cycle);
 }
 
 SFC_FORCEINLINE
@@ -334,8 +379,8 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_AHX(uint16_t address, sfc_famicom_t* famicom) {
-    sfc_operation_UNK(address, famicom);
+static inline void sfc_operation_AHX(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
+    sfc_operation_UNK(address, famicom, cycle);
 }
 
 SFC_FORCEINLINE
@@ -344,8 +389,8 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_XAA(uint16_t address, sfc_famicom_t* famicom) {
-    sfc_operation_UNK(address, famicom);
+static inline void sfc_operation_XAA(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
+    sfc_operation_UNK(address, famicom, cycle);
 }
 
 SFC_FORCEINLINE
@@ -354,8 +399,8 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_LAS(uint16_t address, sfc_famicom_t* famicom) {
-    sfc_operation_UNK(address, famicom);
+static inline void sfc_operation_LAS(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
+    sfc_operation_UNK(address, famicom, cycle);
 }
 
 SFC_FORCEINLINE
@@ -364,7 +409,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_SRE(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_SRE(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     // LSR
     uint8_t data = SFC_READ(address);
     SFC_CF_IF(data & 1);
@@ -381,7 +426,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_SLO(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_SLO(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     // ASL
     uint8_t data = SFC_READ(address);
     SFC_CF_IF(data & (uint8_t)0x80);
@@ -398,7 +443,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_RRA(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_RRA(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     // ROR
     uint16_t result16_ror = SFC_READ(address);
     result16_ror |= ((uint16_t)SFC_CF) << (8 - SFC_INDEX_C);
@@ -422,7 +467,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_RLA(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_RLA(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     // ROL
     uint16_t result16 = SFC_READ(address);
     result16 <<= 1;
@@ -441,7 +486,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_ISB(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_ISB(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     // INC
     uint8_t data = SFC_READ(address);
     ++data;
@@ -462,8 +507,8 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_ISC(uint16_t address, sfc_famicom_t* famicom) {
-    sfc_operation_UNK(address, famicom);
+static inline void sfc_operation_ISC(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
+    sfc_operation_UNK(address, famicom, cycle);
 }
 
 SFC_FORCEINLINE
@@ -472,7 +517,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_DCP(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_DCP(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     // DEC
     uint8_t data = SFC_READ(address);
     --data;
@@ -489,7 +534,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_SAX(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_SAX(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     SFC_WRITE(address, SFC_A & SFC_X);
 }
 
@@ -502,7 +547,7 @@ SFC_FORCEINLINE
 /// </remarks>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_LAX(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_LAX(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     SFC_A = SFC_READ(address);
     SFC_X = SFC_A;
     CHECK_ZSFLAG(SFC_X);
@@ -514,8 +559,8 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_SBX(uint16_t address, sfc_famicom_t* famicom) {
-    sfc_operation_UNK(address, famicom);
+static inline void sfc_operation_SBX(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
+    sfc_operation_UNK(address, famicom, cycle);
 }
 
 SFC_FORCEINLINE
@@ -524,7 +569,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_AXS(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_AXS(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     // AXS 操作地址是立即数
     const uint16_t tmp = (SFC_A & SFC_X) - SFC_READ_PC(address);
     SFC_X = (uint8_t)tmp;
@@ -538,7 +583,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_ARR(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_ARR(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     // ARR 指令 是立即数
     SFC_A &= SFC_READ_PC(address);
     SFC_CF;
@@ -554,8 +599,8 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_AAC(uint16_t address, sfc_famicom_t* famicom) {
-    sfc_operation_UNK(address, famicom);
+static inline void sfc_operation_AAC(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
+    sfc_operation_UNK(address, famicom, cycle);
 }
 
 SFC_FORCEINLINE
@@ -564,7 +609,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_ANC(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_ANC(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     // ANC两个指令都是立即数
     SFC_A &= SFC_READ_PC(address);
     CHECK_ZSFLAG(SFC_A);
@@ -577,7 +622,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_ASR(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_ASR(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     // ASR 指令是立即数
     SFC_A &= SFC_READ_PC(address);
     SFC_CF_IF(SFC_A & 1);
@@ -591,8 +636,8 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_ALR(uint16_t address, sfc_famicom_t* famicom) {
-    sfc_operation_UNK(address, famicom);
+static inline void sfc_operation_ALR(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
+    sfc_operation_UNK(address, famicom, cycle);
 }
 
 SFC_FORCEINLINE
@@ -601,7 +646,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_RTI(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_RTI(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     // P
     SFC_P = SFC_POP();
     SFC_RF_SE;
@@ -621,7 +666,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_BRK(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_BRK(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     const uint16_t pcp1 = SFC_PC + 1;
     const uint8_t pch = (uint8_t)((pcp1) >> 8);
     const uint8_t pcl = (uint8_t)pcp1;
@@ -640,7 +685,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_NOP(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_NOP(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
 
 }
 
@@ -650,7 +695,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_RTS(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_RTS(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     const uint8_t pcl = SFC_POP();
     const uint8_t pch = SFC_POP();
     SFC_PC
@@ -666,7 +711,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_JSR(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_JSR(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     const uint16_t pc1 = SFC_PC - 1;
     SFC_PUSH((uint8_t)(pc1 >> 8));
     SFC_PUSH((uint8_t)(pc1));
@@ -675,12 +720,26 @@ static inline void sfc_operation_JSR(uint16_t address, sfc_famicom_t* famicom) {
 
 SFC_FORCEINLINE
 /// <summary>
+/// StepFC: 执行分支跳转
+/// </summary>
+/// <param name="address">The address.</param>
+/// <param name="famicom">The famicom.</param>
+/// <param name="cycle">The cycle.</param>
+static inline void sfc_branch(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
+    const uint16_t saved = SFC_PC;
+    SFC_PC = address;
+    ++(*cycle);
+    *cycle += (address ^ saved) >> 8 & 1;
+}
+
+SFC_FORCEINLINE
+/// <summary>
 /// BVC: Branch if Overflow Clear
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_BVC(uint16_t address, sfc_famicom_t* famicom) {
-    if (!SFC_VF) SFC_PC = address;
+static inline void sfc_operation_BVC(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
+    if (!SFC_VF) sfc_branch(address, famicom, cycle);
 }
 
 SFC_FORCEINLINE
@@ -689,8 +748,8 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_BVS(uint16_t address, sfc_famicom_t* famicom) {
-    if (SFC_VF) SFC_PC = address;
+static inline void sfc_operation_BVS(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
+    if (SFC_VF) sfc_branch(address, famicom, cycle);
 }
 
 SFC_FORCEINLINE
@@ -699,8 +758,8 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_BPL(uint16_t address, sfc_famicom_t* famicom) {
-    if (!SFC_SF) SFC_PC = address;
+static inline void sfc_operation_BPL(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
+    if (!SFC_SF) sfc_branch(address, famicom, cycle);
 }
 
 SFC_FORCEINLINE
@@ -709,8 +768,8 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_BMI(uint16_t address, sfc_famicom_t* famicom) {
-    if (SFC_SF) SFC_PC = address;
+static inline void sfc_operation_BMI(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
+    if (SFC_SF) sfc_branch(address, famicom, cycle);
 }
 
 SFC_FORCEINLINE
@@ -719,8 +778,8 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_BCC(uint16_t address, sfc_famicom_t* famicom) {
-    if (!SFC_CF) SFC_PC = address;
+static inline void sfc_operation_BCC(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
+    if (!SFC_CF) sfc_branch(address, famicom, cycle);
 }
 
 SFC_FORCEINLINE
@@ -729,8 +788,8 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_BCS(uint16_t address, sfc_famicom_t* famicom) {
-    if (SFC_CF) SFC_PC = address;
+static inline void sfc_operation_BCS(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
+    if (SFC_CF) sfc_branch(address, famicom, cycle);
 }
 
 SFC_FORCEINLINE
@@ -739,8 +798,8 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_BNE(uint16_t address, sfc_famicom_t* famicom) {
-    if (!SFC_ZF) SFC_PC = address;
+static inline void sfc_operation_BNE(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
+    if (!SFC_ZF) sfc_branch(address, famicom, cycle);
 }
 
 SFC_FORCEINLINE
@@ -749,8 +808,8 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_BEQ(uint16_t address, sfc_famicom_t* famicom) {
-    if (SFC_ZF) SFC_PC = address;
+static inline void sfc_operation_BEQ(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
+    if (SFC_ZF) sfc_branch(address, famicom, cycle);
 }
 
 SFC_FORCEINLINE
@@ -759,7 +818,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_JMP(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_JMP(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     SFC_PC = address;
 }
 
@@ -769,7 +828,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_PLP(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_PLP(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     SFC_P = SFC_POP();
     SFC_RF_SE;
     SFC_BF_CL;
@@ -781,7 +840,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_PHP(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_PHP(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     SFC_PUSH(SFC_P | (uint8_t)(SFC_FLAG_R | SFC_FLAG_B));
 }
 
@@ -791,7 +850,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_PLA(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_PLA(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     SFC_A = SFC_POP();
     CHECK_ZSFLAG(SFC_A);
 }
@@ -802,7 +861,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_PHA(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_PHA(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     SFC_PUSH(SFC_A);
 }
 
@@ -812,7 +871,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_RORA(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_RORA(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     uint16_t result16 = SFC_A;
     result16 |= ((uint16_t)SFC_CF) << (8 - SFC_INDEX_C);
     SFC_CF_IF(result16 & 1);
@@ -827,7 +886,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_ROR(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_ROR(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     uint16_t result16 = SFC_READ(address);
     result16 |= ((uint16_t)SFC_CF) << (8 - SFC_INDEX_C);
     SFC_CF_IF(result16 & 1);
@@ -843,7 +902,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_ROL(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_ROL(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     uint16_t result16 = SFC_READ(address);
     result16 <<= 1;
     result16 |= ((uint16_t)SFC_CF) >> (SFC_INDEX_C);
@@ -859,7 +918,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_ROLA(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_ROLA(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     uint16_t result16 = SFC_A;
     result16 <<= 1;
     result16 |= ((uint16_t)SFC_CF) >> (SFC_INDEX_C);
@@ -874,7 +933,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_LSR(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_LSR(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     uint8_t data = SFC_READ(address);
     SFC_CF_IF(data & 1);
     data >>= 1;
@@ -888,7 +947,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_LSRA(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_LSRA(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     SFC_CF_IF(SFC_A & 1);
     SFC_A >>= 1;
     CHECK_ZSFLAG(SFC_A);
@@ -900,7 +959,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_ASL(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_ASL(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     uint8_t data = SFC_READ(address);
     SFC_CF_IF(data & (uint8_t)0x80);
     data <<= 1;
@@ -914,7 +973,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_ASLA(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_ASLA(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     SFC_CF_IF(SFC_A & (uint8_t)0x80);
     SFC_A <<= 1;
     CHECK_ZSFLAG(SFC_A);
@@ -926,7 +985,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_BIT(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_BIT(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     const uint8_t value = SFC_READ(address);
     SFC_VF_IF(value & (uint8_t)(1 << 6));
     SFC_SF_IF(value & (uint8_t)(1 << 7));
@@ -939,7 +998,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_CPY(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_CPY(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     const uint16_t result16 = (uint16_t)SFC_Y - (uint16_t)SFC_READ(address);
     SFC_CF_IF(!(result16 & (uint16_t)0x8000));
     CHECK_ZSFLAG((uint8_t)result16);
@@ -951,7 +1010,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_CPX(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_CPX(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     const uint16_t result16 = (uint16_t)SFC_X - (uint16_t)SFC_READ(address);
     SFC_CF_IF(!(result16 & (uint16_t)0x8000));
     CHECK_ZSFLAG((uint8_t)result16);
@@ -963,7 +1022,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_CMP(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_CMP(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     const uint16_t result16 = (uint16_t)SFC_A - (uint16_t)SFC_READ(address);
     SFC_CF_IF(!(result16 & (uint16_t)0x8000));
     CHECK_ZSFLAG((uint8_t)result16);
@@ -975,7 +1034,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_SEI(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_SEI(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     SFC_IF_SE;
 }
 
@@ -985,7 +1044,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_CLI(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_CLI(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     SFC_IF_CL;
 }
 
@@ -995,7 +1054,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_CLV(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_CLV(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     SFC_VF_CL;
 }
 
@@ -1005,7 +1064,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_SED(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_SED(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     SFC_DF_SE;
 }
 
@@ -1015,7 +1074,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_CLD(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_CLD(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     SFC_DF_CL;
 }
 
@@ -1025,7 +1084,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_SEC(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_SEC(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     SFC_CF_SE;
 }
 
@@ -1035,7 +1094,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_CLC(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_CLC(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     SFC_CF_CL;
 }
 
@@ -1045,7 +1104,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_EOR(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_EOR(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     SFC_A ^= SFC_READ(address);
     CHECK_ZSFLAG(SFC_A);
 }
@@ -1056,7 +1115,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_ORA(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_ORA(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     SFC_A |= SFC_READ(address);
     CHECK_ZSFLAG(SFC_A);
 }
@@ -1067,7 +1126,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_AND(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_AND(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     SFC_A &= SFC_READ(address);
     CHECK_ZSFLAG(SFC_A);
 }
@@ -1078,7 +1137,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_DEY(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_DEY(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     SFC_Y--;
     CHECK_ZSFLAG(SFC_Y);
 }
@@ -1089,7 +1148,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_INY(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_INY(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     SFC_Y++;
     CHECK_ZSFLAG(SFC_Y);
 }
@@ -1100,7 +1159,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_DEX(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_DEX(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     SFC_X--;
     CHECK_ZSFLAG(SFC_X);
 }
@@ -1111,7 +1170,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_INX(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_INX(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     SFC_X++;
     CHECK_ZSFLAG(SFC_X);
 }
@@ -1122,7 +1181,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_DEC(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_DEC(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     uint8_t data = SFC_READ(address);
     --data;
     SFC_WRITE(address, data);
@@ -1135,7 +1194,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_INC(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_INC(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     uint8_t data = SFC_READ(address);
     ++data;
     SFC_WRITE(address, data);
@@ -1148,7 +1207,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_SBC(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_SBC(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     const uint8_t src = SFC_READ(address);
     const uint16_t result16 = (uint16_t)SFC_A - (uint16_t)src - (SFC_CF ? 0 : 1);
     SFC_CF_IF(!(result16 >> 8));
@@ -1164,7 +1223,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_ADC(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_ADC(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     const uint8_t src = SFC_READ(address);
     const uint16_t result16 = (uint16_t)SFC_A + (uint16_t)src + (SFC_CF ? 1 : 0);
     SFC_CF_IF(result16 >> 8);
@@ -1180,7 +1239,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_TXS(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_TXS(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     SFC_SP = SFC_X;
 }
 
@@ -1190,7 +1249,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_TSX(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_TSX(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     SFC_X = SFC_SP;
     CHECK_ZSFLAG(SFC_X);
 }
@@ -1201,7 +1260,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_TYA(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_TYA(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     SFC_A = SFC_Y;
     CHECK_ZSFLAG(SFC_A);
 }
@@ -1212,7 +1271,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_TAY(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_TAY(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     SFC_Y = SFC_A;
     CHECK_ZSFLAG(SFC_Y);
 }
@@ -1223,7 +1282,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_TXA(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_TXA(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     SFC_A = SFC_X;
     CHECK_ZSFLAG(SFC_A);
 }
@@ -1234,7 +1293,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_TAX(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_TAX(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     SFC_X = SFC_A;
     CHECK_ZSFLAG(SFC_X);
 }
@@ -1245,7 +1304,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_STY(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_STY(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     SFC_WRITE(address, SFC_Y);
 }
 
@@ -1255,7 +1314,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_STX(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_STX(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     SFC_WRITE(address, SFC_X);
 }
 
@@ -1265,7 +1324,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_STA(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_STA(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     SFC_WRITE(address, SFC_A);
 }
 
@@ -1275,7 +1334,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_LDY(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_LDY(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     SFC_Y = SFC_READ(address);
     CHECK_ZSFLAG(SFC_Y);
 }
@@ -1286,7 +1345,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_LDX(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_LDX(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     SFC_X = SFC_READ(address);
     CHECK_ZSFLAG(SFC_X);
 }
@@ -1297,7 +1356,7 @@ SFC_FORCEINLINE
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_operation_LDA(uint16_t address, sfc_famicom_t* famicom) {
+static inline void sfc_operation_LDA(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     SFC_A = SFC_READ(address);
     CHECK_ZSFLAG(SFC_A);
 }
@@ -1389,23 +1448,23 @@ void sfc_cpu_execute_one(sfc_famicom_t* famicom) {
         OP(00,IMP, BRK) OP(01,INX, ORA) OP(02,UNK, UNK) OP(03,INX, SLO) OP(04,ZPG, NOP) OP(05,ZPG, ORA) OP(06,ZPG, ASL) OP(07,ZPG, SLO)
         OP(08,IMP, PHP) OP(09,IMM, ORA) OP(0A,IMP,ASLA) OP(0B,IMM, ANC) OP(0C,ABS, NOP) OP(0D,ABS, ORA) OP(0E,ABS, ASL) OP(0F,ABS, SLO)
         OP(10,REL, BPL) OP(11,INY, ORA) OP(12,UNK, UNK) OP(13,INY, SLO) OP(14,ZPX, NOP) OP(15,ZPX, ORA) OP(16,ZPX, ASL) OP(17,ZPX, SLO)
-        OP(18,IMP, CLC) OP(19,ABY, ORA) OP(1A,IMP, NOP) OP(1B,ABY, SLO) OP(1C,ABX, NOP) OP(1D,ABX, ORA) OP(1E,ABX, ASL) OP(1F,ABX, SLO)
+        OP(18,IMP, CLC) OP(19,ABY, ORA) OP(1A,IMP, NOP) OP(1B,ABY, SLO) OP(1C,ABX, NOP) OP(1D,ABX, ORA) OP(1E,abx, ASL) OP(1F,ABX, SLO)
         OP(20,ABS, JSR) OP(21,INX, AND) OP(22,UNK, UNK) OP(23,INX, RLA) OP(24,ZPG, BIT) OP(25,ZPG, AND) OP(26,ZPG, ROL) OP(27,ZPG, RLA)
         OP(28,IMP, PLP) OP(29,IMM, AND) OP(2A,IMP,ROLA) OP(2B,IMM, ANC) OP(2C,ABS, BIT) OP(2D,ABS, AND) OP(2E,ABS, ROL) OP(2F,ABS, RLA)
         OP(30,REL, BMI) OP(31,INY, AND) OP(32,UNK, UNK) OP(33,INY, RLA) OP(34,ZPX, NOP) OP(35,ZPX, AND) OP(36,ZPX, ROL) OP(37,ZPX, RLA)
-        OP(38,IMP, SEC) OP(39,ABY, AND) OP(3A,IMP, NOP) OP(3B,ABY, RLA) OP(3C,ABX, NOP) OP(3D,ABX, AND) OP(3E,ABX, ROL) OP(3F,ABX, RLA)
+        OP(38,IMP, SEC) OP(39,ABY, AND) OP(3A,IMP, NOP) OP(3B,ABY, RLA) OP(3C,ABX, NOP) OP(3D,ABX, AND) OP(3E,abx, ROL) OP(3F,ABX, RLA)
         OP(40,IMP, RTI) OP(41,INX, EOR) OP(42,UNK, UNK) OP(43,INX, SRE) OP(44,ZPG, NOP) OP(45,ZPG, EOR) OP(46,ZPG, LSR) OP(47,ZPG, SRE)
         OP(48,IMP, PHA) OP(49,IMM, EOR) OP(4A,IMP,LSRA) OP(4B,IMM, ASR) OP(4C,ABS, JMP) OP(4D,ABS, EOR) OP(4E,ABS, LSR) OP(4F,ABS, SRE)
         OP(50,REL, BVC) OP(51,INY, EOR) OP(52,UNK, UNK) OP(53,INY, SRE) OP(54,ZPX, NOP) OP(55,ZPX, EOR) OP(56,ZPX, LSR) OP(57,ZPX, SRE)
-        OP(58,IMP, CLI) OP(59,ABY, EOR) OP(5A,IMP, NOP) OP(5B,ABY, SRE) OP(5C,ABX, NOP) OP(5D,ABX, EOR) OP(5E,ABX, LSR) OP(5F,ABX, SRE)
+        OP(58,IMP, CLI) OP(59,ABY, EOR) OP(5A,IMP, NOP) OP(5B,ABY, SRE) OP(5C,ABX, NOP) OP(5D,ABX, EOR) OP(5E,abx, LSR) OP(5F,ABX, SRE)
         OP(60,IMP, RTS) OP(61,INX, ADC) OP(62,UNK, UNK) OP(63,INX, RRA) OP(64,ZPG, NOP) OP(65,ZPG, ADC) OP(66,ZPG, ROR) OP(67,ZPG, RRA)
         OP(68,IMP, PLA) OP(69,IMM, ADC) OP(6A,IMP,RORA) OP(6B,IMM, ARR) OP(6C,IND, JMP) OP(6D,ABS, ADC) OP(6E,ABS, ROR) OP(6F,ABS, RRA)
         OP(70,REL, BVS) OP(71,INY, ADC) OP(72,UNK, UNK) OP(73,INY, RRA) OP(74,ZPX, NOP) OP(75,ZPX, ADC) OP(76,ZPX, ROR) OP(77,ZPX, RRA)
-        OP(78,IMP, SEI) OP(79,ABY, ADC) OP(7A,IMP, NOP) OP(7B,ABY, RRA) OP(7C,ABX, NOP) OP(7D,ABX, ADC) OP(7E,ABX, ROR) OP(7F,ABX, RRA)
+        OP(78,IMP, SEI) OP(79,ABY, ADC) OP(7A,IMP, NOP) OP(7B,ABY, RRA) OP(7C,ABX, NOP) OP(7D,ABX, ADC) OP(7E,abx, ROR) OP(7F,ABX, RRA)
         OP(80,IMM, NOP) OP(81,INX, STA) OP(82,IMM, NOP) OP(83,INX, SAX) OP(84,ZPG, STY) OP(85,ZPG, STA) OP(86,ZPG, STX) OP(87,ZPG, SAX)
         OP(88,IMP, DEY) OP(89,IMM, NOP) OP(8A,IMP, TXA) OP(8B,IMM, XAA) OP(8C,ABS, STY) OP(8D,ABS, STA) OP(8E,ABS, STX) OP(8F,ABS, SAX)
-        OP(90,REL, BCC) OP(91,INY, STA) OP(92,UNK, UNK) OP(93,INY, AHX) OP(94,ZPX, STY) OP(95,ZPX, STA) OP(96,ZPY, STX) OP(97,ZPY, SAX)
-        OP(98,IMP, TYA) OP(99,ABY, STA) OP(9A,IMP, TXS) OP(9B,ABY, TAS) OP(9C,ABX, SHY) OP(9D,ABX, STA) OP(9E,ABY, SHX) OP(9F,ABY, AHX)
+        OP(90,REL, BCC) OP(91,iny, STA) OP(92,UNK, UNK) OP(93,INY, AHX) OP(94,ZPX, STY) OP(95,ZPX, STA) OP(96,ZPY, STX) OP(97,ZPY, SAX)
+        OP(98,IMP, TYA) OP(99,aby, STA) OP(9A,IMP, TXS) OP(9B,ABY, TAS) OP(9C,ABX, SHY) OP(9D,abx, STA) OP(9E,ABY, SHX) OP(9F,ABY, AHX)
         OP(A0,IMM, LDY) OP(A1,INX, LDA) OP(A2,IMM, LDX) OP(A3,INX, LAX) OP(A4,ZPG, LDY) OP(A5,ZPG, LDA) OP(A6,ZPG, LDX) OP(A7,ZPG, LAX)
         OP(A8,IMP, TAY) OP(A9,IMM, LDA) OP(AA,IMP, TAX) OP(AB,IMM, LAX) OP(AC,ABS, LDY) OP(AD,ABS, LDA) OP(AE,ABS, LDX) OP(AF,ABS, LAX)
         OP(B0,REL, BCS) OP(B1,INY, LDA) OP(B2,UNK, UNK) OP(B3,INY, LAX) OP(B4,ZPX, LDY) OP(B5,ZPX, LDA) OP(B6,ZPY, LDX) OP(B7,ZPY, LAX)
@@ -1413,11 +1472,11 @@ void sfc_cpu_execute_one(sfc_famicom_t* famicom) {
         OP(C0,IMM, CPY) OP(C1,INX, CMP) OP(C2,IMM, NOP) OP(C3,INX, DCP) OP(C4,ZPG, CPY) OP(C5,ZPG, CMP) OP(C6,ZPG, DEC) OP(C7,ZPG, DCP)
         OP(C8,IMP, INY) OP(C9,IMM, CMP) OP(CA,IMP, DEX) OP(CB,IMM, AXS) OP(CC,ABS, CPY) OP(CD,ABS, CMP) OP(CE,ABS, DEC) OP(CF,ABS, DCP)
         OP(D0,REL, BNE) OP(D1,INY, CMP) OP(D2,UNK, UNK) OP(D3,INY, DCP) OP(D4,ZPX, NOP) OP(D5,ZPX, CMP) OP(D6,ZPX, DEC) OP(D7,ZPX, DCP)
-        OP(D8,IMP, CLD) OP(D9,ABY, CMP) OP(DA,IMP, NOP) OP(DB,ABY, DCP) OP(DC,ABX, NOP) OP(DD,ABX, CMP) OP(DE,ABX, DEC) OP(DF,ABX, DCP)
+        OP(D8,IMP, CLD) OP(D9,ABY, CMP) OP(DA,IMP, NOP) OP(DB,ABY, DCP) OP(DC,ABX, NOP) OP(DD,ABX, CMP) OP(DE,abx, DEC) OP(DF,ABX, DCP)
         OP(E0,IMM, CPX) OP(E1,INX, SBC) OP(E2,IMM, NOP) OP(E3,INX, ISB) OP(E4,ZPG, CPX) OP(E5,ZPG, SBC) OP(E6,ZPG, INC) OP(E7,ZPG, ISB)
         OP(E8,IMP, INX) OP(E9,IMM, SBC) OP(EA,IMP, NOP) OP(EB,IMM, SBC) OP(EC,ABS, CPX) OP(ED,ABS, SBC) OP(EE,ABS, INC) OP(EF,ABS, ISB)
         OP(F0,REL, BEQ) OP(F1,INY, SBC) OP(F2,UNK, UNK) OP(F3,INY, ISB) OP(F4,ZPX, NOP) OP(F5,ZPX, SBC) OP(F6,ZPX, INC) OP(F7,ZPX, ISB)
-        OP(F8,IMP, SED) OP(F9,ABY, SBC) OP(FA,IMP, NOP) OP(FB,ABY, ISB) OP(FC,ABX, NOP) OP(FD,ABX, SBC) OP(FE,ABX, INC) OP(FF,ABX, ISB)
+        OP(F8,IMP, SED) OP(F9,ABY, SBC) OP(FA,IMP, NOP) OP(FB,ABY, ISB) OP(FC,ABX, NOP) OP(FD,ABX, SBC) OP(FE,abx, INC) OP(FF,ABX, ISB)
     }
     famicom->cpu_cycle_count += cycle_add;
 }
@@ -1427,7 +1486,7 @@ void sfc_cpu_execute_one(sfc_famicom_t* famicom) {
 /// </summary>
 /// <param name="famicom">The famicom.</param>
 /// <returns></returns>
-extern inline void sfc_operation_NMI(sfc_famicom_t* famicom) {
+extern inline void sfc_operation_NMI(sfc_famicom_t* famicom, uint32_t* const cycle) {
     const uint8_t pch = (uint8_t)((SFC_PC) >> 8);
     const uint8_t pcl = (uint8_t)SFC_PC;
     SFC_PUSH(pch);

@@ -87,7 +87,7 @@ uint8_t sfc_read_ppu_register_via_cpu(uint16_t address, sfc_ppu_t* ppu) {
         // 只读状态寄存器
         data = ppu->status;
         // 读取后会清除VBlank状态
-        ppu->status &= ~(uint8_t)SFC_PPUFLAG_VBlank;
+        ppu->status &= ~(uint8_t)SFC_PPU2002_VBlank;
         // wiki.nesdev.com/w/index.php/PPU_scrolling:  $2002 read
         ppu->writex2 = 0;
         break;
@@ -116,7 +116,7 @@ uint8_t sfc_read_ppu_register_via_cpu(uint16_t address, sfc_ppu_t* ppu) {
         // 0x2007: Data ($2007) <> read/write
         // PPU VRAM读写端口
         data = sfc_read_ppu_address(ppu->vramaddr, ppu);
-        ppu->vramaddr += (uint16_t)((ppu->ctrl & SFC_PPUFLAG_VINC32) ? 32 : 1);
+        ppu->vramaddr += (uint16_t)((ppu->ctrl & SFC_PPU2000_VINC32) ? 32 : 1);
         break;
     }
     return data;
@@ -169,8 +169,14 @@ void sfc_write_ppu_register_via_cpu(uint16_t address, uint8_t data, sfc_ppu_t* p
         // PPU 地址寄存器 - 双写
         // 写入高字节
         if (ppu->writex2 & 1) {
-            ppu->vramaddr = (ppu->vramaddr & (uint16_t)0xFF00) | (uint16_t)data;
-            ppu->nametable_select = (ppu->vramaddr >> 10) & 3;
+            const uint16_t tmp = (ppu->vramaddr & (uint16_t)0xFF00) | (uint16_t)data;
+            ppu->vramaddr = tmp;
+            // A-B 位
+            ppu->nametable_select = (tmp >> 10) & 3;
+            // 0-4位
+            ppu->scroll[0] = (ppu->scroll[0] & (uint8_t)7) | ((uint8_t)tmp & (uint8_t)0x1f) << 3;
+            // 5-9 C-E 位
+            ppu->scroll[1] = ((tmp & (uint16_t)0x3e0) >> 2) | ((tmp & (uint16_t)0x7000) >> 12);
         }
         // 写入低字节
         else {
@@ -182,7 +188,7 @@ void sfc_write_ppu_register_via_cpu(uint16_t address, uint8_t data, sfc_ppu_t* p
         // 0x2007: Data ($2007) <> read/write
         // PPU VRAM数据端
         sfc_write_ppu_address(ppu->vramaddr, data, ppu);
-        ppu->vramaddr += (uint16_t)((ppu->ctrl & SFC_PPUFLAG_VINC32) ? 32 : 1);
+        ppu->vramaddr += (uint16_t)((ppu->ctrl & SFC_PPU2000_VINC32) ? 32 : 1);
         break;
     }
 }
