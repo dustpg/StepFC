@@ -32,6 +32,15 @@ enum sfc_button_index {
     SFC_BUTTON_RIGHT,
 };
 
+/// <summary>
+/// 
+/// </summary>
+enum sfc_constant {
+    SFC_WIDTH = 256,
+    SFC_HEIGHT = 240,
+    SFC_SPRITE_COUNT = 64,
+};
+
 
 // 指定地方反汇编
 void sfc_fc_disassembly(

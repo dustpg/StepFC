@@ -27,9 +27,93 @@ static inline uint8_t sfc_pack_bool8_into_byte(const uint8_t array[8]) {
     uint8_t hittest = 0;
     for (uint16_t i = 0; i != 8; ++i) {
         hittest <<= 1;
-        hittest |= array[i];
+        hittest |= array[i] & 1;
     }
     return hittest;
+}
+
+/// <summary>
+/// SFCs the expand backgorund 8.
+/// </summary>
+/// <param name="p0">The p0.</param>
+/// <param name="p1">The p1.</param>
+/// <param name="high">The high.</param>
+/// <param name="output">The output.</param>
+static inline void sfc_expand_backgorund_8(
+    uint8_t p0, 
+    uint8_t p1, 
+    uint8_t high, 
+    uint8_t* output) {
+#if 0
+FMT = <<-EOF
+    // %d - D%d
+    {
+        const uint8_t low%da = p0 & (uint8_t)0x%02x;
+        const uint8_t low%db = p1 & (uint8_t)0x%02x;
+        output[%d] = high | low%da >> %d | low%db >> %d | low%da >> %d | low%db >> %d ;
+    }
+EOF
+
+def op(i)
+  print FMT % [
+    i, 7 - i,
+    i, 1 << (7-i),
+    i, 1 << (7-i),
+    i, i, 6 - i, i, 5 - i,
+    i, 7 - i, i, 7 - i,
+  ]
+end
+
+8.times { |i| op i }
+#endif
+    // 0 - D7
+    {
+        const uint8_t low0a = p0 & (uint8_t)0x80;
+        const uint8_t low0b = p1 & (uint8_t)0x80;
+        output[0] = high | low0a >> 6 | low0b >> 5 | low0a >> 7 | low0b >> 7;
+    }
+    // 1 - D6
+    {
+        const uint8_t low1a = p0 & (uint8_t)0x40;
+        const uint8_t low1b = p1 & (uint8_t)0x40;
+        output[1] = high | low1a >> 5 | low1b >> 4 | low1a >> 6 | low1b >> 6;
+    }
+    // 2 - D5
+    {
+        const uint8_t low2a = p0 & (uint8_t)0x20;
+        const uint8_t low2b = p1 & (uint8_t)0x20;
+        output[2] = high | low2a >> 4 | low2b >> 3 | low2a >> 5 | low2b >> 5;
+    }
+    // 3 - D4
+    {
+        const uint8_t low3a = p0 & (uint8_t)0x10;
+        const uint8_t low3b = p1 & (uint8_t)0x10;
+        output[3] = high | low3a >> 3 | low3b >> 2 | low3a >> 4 | low3b >> 4;
+    }
+    // 4 - D3
+    {
+        const uint8_t low4a = p0 & (uint8_t)0x08;
+        const uint8_t low4b = p1 & (uint8_t)0x08;
+        output[4] = high | low4a >> 2 | low4b >> 1 | low4a >> 3 | low4b >> 3;
+    }
+    // 5 - D2
+    {
+        const uint8_t low5a = p0 & (uint8_t)0x04;
+        const uint8_t low5b = p1 & (uint8_t)0x04;
+        output[5] = high | low5a >> 1 | low5b >> 0 | low5a >> 2 | low5b >> 2;
+    }
+    // 6 - D1
+    {
+        const uint8_t low6a = p0 & (uint8_t)0x02;
+        const uint8_t low6b = p1 & (uint8_t)0x02;
+        output[6] = high | low6a >> 0 | low6b << 1 | low6a >> 1 | low6b >> 1;
+    }
+    // 7 - D0
+    {
+        const uint8_t low7a = p0 & (uint8_t)0x01;
+        const uint8_t low7b = p1 & (uint8_t)0x01;
+        output[7] = high | low7a << 1 | low7b << 2 | low7a >> 0 | low7b >> 0;
+    }
 }
 #else
 #include <tmmintrin.h>
@@ -40,12 +124,86 @@ static inline uint8_t sfc_pack_bool8_into_byte(const uint8_t array[8]) {
 /// <param name="array">The array.</param>
 /// <returns></returns>
 static inline uint8_t sfc_pack_bool8_into_byte(const uint8_t array[8]) {
+    // 载入一个允许不对齐的低64(高64位置0)位数据
     __m128i values = _mm_loadl_epi64((__m128i*)array);
+    // 创建序列
     __m128i order = _mm_set_epi8(-1, -1, -1, -1, -1, -1, -1, -1, 0, 1, 2, 3, 4, 5, 6, 7);
+    // 根据已有序列将数据重组
     values = _mm_shuffle_epi8(values, order);
-    const int result = _mm_movemask_epi8(_mm_slli_epi32(values, 7));
-    return (uint8_t)result;
+    // 将每个32(64也行)位整型左移7位(作为每个8位整型的符号位)
+    // 然后将8位整型符号位打包成16位整数
+    return (uint8_t)_mm_movemask_epi8(_mm_slli_epi32(values, 7));
+
 }
+
+/// <summary>
+/// StepFC: 使用4比特查找对应的32位整型
+/// <remarks>
+/// 使用8比特的话会使用256 * 8 = 2kb空间, 缓存不友好
+/// </remarks>
+/// </summary>
+SFC_ALIGNAS(32) static const uint32_t sfc_u32_bit_lut[16] = {
+    0x00000000, // 0000
+    0x01000000, // 0001
+    0x00010000, // 0010
+    0x01010000, // 0011
+
+    0x00000100, // 0100
+    0x01000100, // 0101
+    0x00010100, // 0110
+    0x01010100, // 0111
+
+    0x00000001, // 1000
+    0x01000001, // 1001
+    0x00010001, // 1010
+    0x01010001, // 1011
+
+    0x00000101, // 1100
+    0x01000101, // 1101
+    0x00010101, // 1110
+    0x01010101, // 1111
+};
+
+/// <summary>
+/// Creates the 128 mask.
+/// </summary>
+/// <param name="a">a.</param>
+/// <param name="b">The b.</param>
+/// <returns></returns>
+static inline __m128i sfc_create_128_mask(uint8_t a, uint8_t b) {
+    return _mm_set_epi32(
+        sfc_u32_bit_lut[a & 0xF],
+        sfc_u32_bit_lut[a >> 4],
+        sfc_u32_bit_lut[b & 0xF],
+        sfc_u32_bit_lut[b >> 4]
+        );
+}
+
+/// <summary>
+/// SFCs the expand backgorund 16.
+/// </summary>
+/// <param name="p0">The p0.</param>
+/// <param name="p1">The p1.</param>
+/// <param name="high">The high.</param>
+/// <param name="output">The output.</param>
+static inline void sfc_expand_backgorund_16(
+    uint8_t p0,
+    uint8_t p1,
+    uint8_t p2,
+    uint8_t p3,
+    uint8_t high,
+    uint8_t* output) {
+    const __m128i value1 = sfc_create_128_mask(p2, p0);
+    const __m128i value2 = sfc_create_128_mask(p3, p1);
+
+    __m128i value = _mm_or_si128(value1, value2);
+    value = _mm_or_si128(value, _mm_slli_epi32(value1, 1));
+    value = _mm_or_si128(value, _mm_slli_epi32(value2, 2));
+    value = _mm_or_si128(value, _mm_set1_epi8(high));
+
+    (*(__m128i*)output) = value;
+}
+
 #endif
 
 /// <summary>
@@ -70,52 +228,29 @@ static const unsigned char BitReverseTable256[] = {
   0x0F, 0x8F, 0x4F, 0xCF, 0x2F, 0xAF, 0x6F, 0xEF, 0x1F, 0x9F, 0x5F, 0xDF, 0x3F, 0xBF, 0x7F, 0xFF
 };
 
-/// <summary>
-/// The palette data
-/// </summary>
-static uint8_t s_sfc_palette_data[32];
 
 /// <summary>
-/// 获取坐标像素
+/// StepFC: 简易模式渲染背景 - 以16像素为单位
 /// </summary>
-/// <param name="x">The x.</param>
-/// <param name="y">The y.</param>
-/// <param name="nt">The nt.</param>
-/// <param name="bg">The bg.</param>
-/// <returns></returns>
-static inline uint8_t sfc_bg_get_pixel(
-    uint8_t x, 
-    uint8_t y, 
-    uint8_t* background,
-    const uint8_t* nt, 
-    const uint8_t* bg) {
-    // TODO: 优化为按图块作业
-
-    // 获取所在名称表
-    const unsigned id = (x >> 3) + (y >> 3) * 32;
-    const uint32_t name = nt[id];
-    // 查找对应图样表
-    const uint8_t* nowp0 = bg + name * 16;
-    const uint8_t* nowp1 = nowp0 + 8;
-    // Y坐标为平面内偏移
-    const uint8_t p0 = nowp0[y & 0x7];
-    const uint8_t p1 = nowp1[y & 0x7];
-    // X坐标为字节内偏移
-    const uint8_t shift = (~x) & 0x7;
-    const uint8_t mask = 1 << shift;
-    // 背景检测
-    *background = ((p0 & mask) >> shift) | ((p1 & mask) >> shift);
-    // 计算低二位
-    const uint8_t low = ((p0 & mask) >> shift) | ((p1 & mask) >> shift << 1);
-    // 计算所在属性表
-    const unsigned aid = (x >> 5) + (y >> 5) * 8;
-    const uint8_t attr = nt[aid + (32 * 30)];
-    // 获取属性表内位偏移
-    const uint8_t aoffset = ((x & 0x10) >> 3) | ((y & 0x10) >> 2);
-    // 计算高两位
-    const uint8_t high = (attr & (3 << aoffset)) >> aoffset << 2;
-    // 合并作为颜色
-    return s_sfc_palette_data[high | low];
+/// <param name="high">The high.</param>
+/// <param name="plane_left">The plane left.</param>
+/// <param name="plane_right">The plane right.</param>
+/// <param name="aligned_palette">The aligned palette.</param>
+static inline void sfc_render_background_pixel16(
+    uint8_t high,
+    const uint8_t* plane_left,
+    const uint8_t* plane_right,
+    uint8_t* aligned_palette) {
+    const uint8_t plane0 = plane_left[0];
+    const uint8_t plane1 = plane_left[8];
+    const uint8_t plane2 = plane_right[0];
+    const uint8_t plane3 = plane_right[8];
+#ifdef SFC_NO_SSE
+    sfc_expand_backgorund_8(plane0, plane1, high, aligned_palette + 0);
+    sfc_expand_backgorund_8(plane2, plane3, high, aligned_palette + 8);
+#else
+    sfc_expand_backgorund_16(plane0, plane1, plane2, plane3, high, aligned_palette);
+#endif
 }
 
 
@@ -129,50 +264,53 @@ static inline uint8_t sfc_bg_get_pixel(
 static inline void sfc_render_background_scanline(
     sfc_famicom_t* famicom, 
     uint16_t line,
-    const uint8_t sp0[240+(16)],
+    const uint8_t sp0[SFC_HEIGHT +(16)],
     uint8_t* buffer) {
-    uint8_t backgorund_hittest[256 + 16];
-
+    // 取消背景显示
+    if (!(famicom->ppu.mask & (uint8_t)SFC_PPU2001_Back)) return;
+    
     // 计算当前偏移量
     const uint16_t scrollx = famicom->ppu.scroll[0] + 
         ((famicom->ppu.nametable_select & 1) << 8);
-    const uint16_t scrolly = famicom->ppu.scroll[1];
-    // TODO: s_sfc_palette_data 静态数据
 
-    // 在扫描期间写入调色板数据是合法的
-    for (int i = 0; i != 16; ++i) {
-        s_sfc_palette_data[i] = famicom->ppu.spindexes[i];
-    }
-    s_sfc_palette_data[4 * 1] = s_sfc_palette_data[0];
-    s_sfc_palette_data[4 * 2] = s_sfc_palette_data[0];
-    s_sfc_palette_data[4 * 3] = s_sfc_palette_data[0];
+    const uint16_t scrolly = famicom->ppu.scroll[1];
     // 计算背景所使用的图样表
     const uint8_t* const pattern = famicom->ppu.banks[famicom->ppu.ctrl & SFC_PPU2000_BgTabl ? 4 : 0];
-    // 检测垂直偏移量确定使用图案表的前一半[8-9]还是后一半[10-11]
+    // TODO: 检测垂直偏移量确定使用图案表的前一半[8-9]还是后一半[10-11]
 
-    // 目前假定使用前一半
+    // FIXME: 目前假定使用前一半
     const uint8_t* const * const table = famicom->ppu.banks + 8;
 
-
-    //// 以16像素为单位扫描该行
-    //SFC_ALIGNAS(16) uint8_t aligned_buffer[256 + 16];
-    //// 因为保险起见扫描17次
-    //for (int i = 0; i != 17; ++i) {
-
-    //}
-
-    // 扫描该行像素
-    for (uint16_t i = 0; i != (uint16_t)0x100; ++i) {
-        const uint16_t realx = scrollx + i;
-        const uint16_t realy = scrolly + line;
-        const uint8_t* nt = table[(realx >> 8) & 1];
-        buffer[i] = sfc_bg_get_pixel(
-            (uint8_t)realx, 
-            (uint8_t)realy, 
-            backgorund_hittest + i,
-            nt,
-            pattern
-        );
+    // 以16像素为单位扫描该行
+    SFC_ALIGNAS(16) uint8_t aligned_buffer[SFC_WIDTH + 16 + 16];
+    {
+        const uint8_t realy = scrolly + line;
+        // 保险起见扫描16+1次
+        for (uint16_t i = 0; i != 17; ++i) {
+            const uint16_t realx = scrollx + (i << 4);
+            const uint8_t* nt = table[(realx >> 8) & 1];
+            const uint8_t xunit = (realx & (uint16_t)0xF0) >> 4;
+            // 获取32为单位的调色板索引字节
+            const uint8_t attr = (nt + 32 * 30)[(realy >> 5 << 3) | (xunit >> 1)];
+            // 获取属性表内位偏移
+            const uint8_t aoffset = ((uint8_t)(xunit & 1) << 1) | ((realy & 0x10) >> 2);
+            // 计算高两位
+            const uint8_t high = (attr & (3 << aoffset)) >> aoffset << 3;
+            // 计算图样表位置
+            const uint8_t* too_young = nt + ((uint16_t)xunit << 1) + (uint16_t)(realy >> 3 << 5);
+            const uint8_t too_young0 = too_young[0];
+            const uint8_t too_young1 = too_young[1];
+            // 渲染16个像素
+            sfc_render_background_pixel16(
+                high,
+                pattern + too_young0 * 16 + (realy & 7),
+                pattern + too_young1 * 16 + (realy & 7),
+                aligned_buffer + (i << 4)
+            );
+        }
+        // 将数据复制过去
+        const uint8_t* const unaligned_buffer = aligned_buffer + (scrollx & 0x0f);
+        memcpy(buffer, unaligned_buffer, SFC_WIDTH);
     }
     // 基于行的精灵0命中测试
 
@@ -182,9 +320,11 @@ static inline void sfc_render_background_scanline(
     const uint8_t hittest_data = sp0[line];
     if (!hittest_data) return;
     // 精灵#0的数据
-    memset(backgorund_hittest + 256, 0, 16);
+    uint8_t* const unaligned_buffer = aligned_buffer + (scrollx & 0x0f);
+    memset(unaligned_buffer + SFC_WIDTH, 0, 16);
+
     const uint8_t  xxxxx = famicom->ppu.sprites[3];
-    const uint8_t hittest = sfc_pack_bool8_into_byte(backgorund_hittest + xxxxx);
+    const uint8_t hittest = sfc_pack_bool8_into_byte(unaligned_buffer + xxxxx);
     if (hittest_data & hittest)
         famicom->ppu.status |= (uint8_t)SFC_PPU2002_Sp0Hit;
 }
@@ -199,9 +339,9 @@ static inline void sfc_render_background_scanline(
 static inline void sfc_sprite0_hittest(
     sfc_famicom_t* famicom, 
     const uint8_t* spp,
-    uint8_t buffer[256]) {
+    uint8_t buffer[SFC_WIDTH]) {
     // 先清空
-    memset(buffer, 0, 256);
+    memset(buffer, 0, SFC_WIDTH);
     // 关闭渲染
     enum { BOTH_BS = SFC_PPU2001_Back | SFC_PPU2001_Sprite };
     if ((famicom->ppu.mask & (uint8_t)BOTH_BS) != (uint8_t)BOTH_BS) return;
@@ -246,101 +386,147 @@ static inline void sfc_sprite0_hittest(
 static inline uint16_t sfc_sprite_overflow_test(sfc_famicom_t* famicom) {
     // 完全关闭渲染
     enum { BOTH_BS = SFC_PPU2001_Back | SFC_PPU2001_Sprite };
-    if (!(famicom->ppu.mask & (uint8_t)BOTH_BS)) return 256; 
+    if (!(famicom->ppu.mask & (uint8_t)BOTH_BS)) return SFC_HEIGHT;
     // 正式处理
-    uint8_t buffer[256 + 16];
-    memset(buffer, 0, 256);
+    uint8_t buffer[SFC_WIDTH + 16];
+    memset(buffer, 0, SFC_WIDTH);
     // 8 x 16
     const int height = famicom->ppu.ctrl & SFC_PPU2000_Sp8x16 ? 16 : 8;
-    for (int i = 0; i != 64; ++i) {
+    for (int i = 0; i != SFC_SPRITE_COUNT; ++i) {
         const uint8_t y = famicom->ppu.sprites[i * 4];
         for (int i = 0; i != height; ++i) buffer[y + i]++;
     }
     uint16_t line ;
-    for (line = 0; line != 240; ++line) if (buffer[line] > 8) break;
+    for (line = 0; line != SFC_HEIGHT; ++line) if (buffer[line] > 8) break;
     return line;
 }
 
 
-static inline
-void expand_line_8(uint8_t p0, uint8_t p1, uint8_t high, uint8_t* output) {
-    // 0 - D7
-    const uint8_t low0 = ((p0 & (uint8_t)0x80) >> 7) | ((p1 & (uint8_t)0x80) >> 6);
-    s_sfc_palette_data[high] = output[0];
-    output[0] = s_sfc_palette_data[high | low0];
-    // 1 - D6
-    const uint8_t low1 = ((p0 & (uint8_t)0x40) >> 6) | ((p1 & (uint8_t)0x40) >> 5);
-    s_sfc_palette_data[high] = output[1];
-    output[1] = s_sfc_palette_data[high | low1];
-    // 2 - D5
-    const uint8_t low2 = ((p0 & (uint8_t)0x20) >> 5) | ((p1 & (uint8_t)0x20) >> 4);
-    s_sfc_palette_data[high] = output[2];
-    output[2] = s_sfc_palette_data[high | low2];
-    // 3 - D4
-    const uint8_t low3 = ((p0 & (uint8_t)0x10) >> 4) | ((p1 & (uint8_t)0x10) >> 3);
-    s_sfc_palette_data[high] = output[3];
-    output[3] = s_sfc_palette_data[high | low3];
-    // 4 - D3
-    const uint8_t low4 = ((p0 & (uint8_t)0x08) >> 3) | ((p1 & (uint8_t)0x08) >> 2);
-    s_sfc_palette_data[high] = output[4];
-    output[4] = s_sfc_palette_data[high | low4];
-    // 5 - D2
-    const uint8_t low5 = ((p0 & (uint8_t)0x04) >> 2) | ((p1 & (uint8_t)0x04) >> 1);
-    s_sfc_palette_data[high] = output[5];
-    output[5] = s_sfc_palette_data[high | low5];
-    // 6 - D1
-    const uint8_t low6 = ((p0 & (uint8_t)0x02) >> 1) | ((p1 & (uint8_t)0x02) >> 0);
-    s_sfc_palette_data[high] = output[6];
-    output[6] = s_sfc_palette_data[high | low6];
-    // 7 - D0
-    const uint8_t low7 = ((p0 & (uint8_t)0x01) >> 0) | ((p1 & (uint8_t)0x01) << 1);
-    s_sfc_palette_data[high] = output[7];
-    output[7] = s_sfc_palette_data[high | low7];
+
+/// <summary>
+/// SFCs the render sprites.
+/// </summary>
+/// <param name="famicom">The famicom.</param>
+/// <param name="buffer">The buffer.</param>
+static inline void sfc_render_sprites(sfc_famicom_t* famicom, uint8_t* buffer) {
+    // TODO: 8x16
+    // 精灵用图样
+    const uint8_t* spp = famicom->ppu.banks[famicom->ppu.ctrl & SFC_PPU2000_SpTabl ? 4 : 0];
+    // 遍历所有精灵
+    for (int i = 0; i != SFC_SPRITE_COUNT; ++i) {
+        const uint8_t* const base = famicom->ppu.sprites + i * 4;
+        const uint8_t yyyy = base[0];
+        if (yyyy >= (uint8_t)0xEF) continue;
+        const uint8_t iiii = base[1];
+        const uint8_t aaaa = base[2];
+        const uint8_t xxxx = base[3];
+        // 水平翻转
+        // P -> 优先级 1: 真-背景则渲染精灵 否则渲染 背景
+        /*
+           P:   0 + 0 -> 0    FF00
+                0 + 1 -> S    00FF
+                1 + 0 -> B    FF00
+                1 + 1 -> B    FF00
+
+           NP:  0 + 0 -> 0    FF00
+                0 + 1 -> S    00FF
+                1 + 0 -> B    FF00
+                1 + 1 -> S    00FF
+
+        */
+        // 
+
+        // H -> 水平翻转
+        // V -> 垂直
+        int bk = 9;
+    }
 }
 
-
-static inline
-void expand_line_8_r(uint8_t p0, uint8_t p1, uint8_t high, uint8_t* output) {
-    // 7 - D7
-    const uint8_t low0 = ((p0 & (uint8_t)0x80) >> 7) | ((p1 & (uint8_t)0x80) >> 6);
-    s_sfc_palette_data[high] = output[7];
-    output[7] = s_sfc_palette_data[high | low0];
-    // 6 - D6
-    const uint8_t low1 = ((p0 & (uint8_t)0x40) >> 6) | ((p1 & (uint8_t)0x40) >> 5);
-    s_sfc_palette_data[high] = output[6];
-    output[6] = s_sfc_palette_data[high | low1];
-    // 5 - D5
-    const uint8_t low2 = ((p0 & (uint8_t)0x20) >> 5) | ((p1 & (uint8_t)0x20) >> 4);
-    s_sfc_palette_data[high] = output[5];
-    output[5] = s_sfc_palette_data[high | low2];
-    // 4 - D4
-    const uint8_t low3 = ((p0 & (uint8_t)0x10) >> 4) | ((p1 & (uint8_t)0x10) >> 3);
-    s_sfc_palette_data[high] = output[4];
-    output[4] = s_sfc_palette_data[high | low3];
-    // 3 - D3
-    const uint8_t low4 = ((p0 & (uint8_t)0x08) >> 3) | ((p1 & (uint8_t)0x08) >> 2);
-    s_sfc_palette_data[high] = output[3];
-    output[3] = s_sfc_palette_data[high | low4];
-    // 2 - D2
-    const uint8_t low5 = ((p0 & (uint8_t)0x04) >> 2) | ((p1 & (uint8_t)0x04) >> 1);
-    s_sfc_palette_data[high] = output[2];
-    output[2] = s_sfc_palette_data[high | low5];
-    // 1 - D1
-    const uint8_t low6 = ((p0 & (uint8_t)0x02) >> 1) | ((p1 & (uint8_t)0x02) >> 0);
-    s_sfc_palette_data[high] = output[1];
-    output[1] = s_sfc_palette_data[high | low6];
-    // 0 - D0
-    const uint8_t low7 = ((p0 & (uint8_t)0x01) >> 0) | ((p1 & (uint8_t)0x01) << 1);
-    s_sfc_palette_data[high] = output[0];
-    output[0] = s_sfc_palette_data[high | low7];
-}
+//static inline
+//void expand_line_8(uint8_t p0, uint8_t p1, uint8_t high, uint8_t* output) {
+//    // 0 - D7
+//    const uint8_t low0 = ((p0 & (uint8_t)0x80) >> 7) | ((p1 & (uint8_t)0x80) >> 6);
+//    s_sfc_palette_data[high] = output[0];
+//    output[0] = s_sfc_palette_data[high | low0];
+//    // 1 - D6
+//    const uint8_t low1 = ((p0 & (uint8_t)0x40) >> 6) | ((p1 & (uint8_t)0x40) >> 5);
+//    s_sfc_palette_data[high] = output[1];
+//    output[1] = s_sfc_palette_data[high | low1];
+//    // 2 - D5
+//    const uint8_t low2 = ((p0 & (uint8_t)0x20) >> 5) | ((p1 & (uint8_t)0x20) >> 4);
+//    s_sfc_palette_data[high] = output[2];
+//    output[2] = s_sfc_palette_data[high | low2];
+//    // 3 - D4
+//    const uint8_t low3 = ((p0 & (uint8_t)0x10) >> 4) | ((p1 & (uint8_t)0x10) >> 3);
+//    s_sfc_palette_data[high] = output[3];
+//    output[3] = s_sfc_palette_data[high | low3];
+//    // 4 - D3
+//    const uint8_t low4 = ((p0 & (uint8_t)0x08) >> 3) | ((p1 & (uint8_t)0x08) >> 2);
+//    s_sfc_palette_data[high] = output[4];
+//    output[4] = s_sfc_palette_data[high | low4];
+//    // 5 - D2
+//    const uint8_t low5 = ((p0 & (uint8_t)0x04) >> 2) | ((p1 & (uint8_t)0x04) >> 1);
+//    s_sfc_palette_data[high] = output[5];
+//    output[5] = s_sfc_palette_data[high | low5];
+//    // 6 - D1
+//    const uint8_t low6 = ((p0 & (uint8_t)0x02) >> 1) | ((p1 & (uint8_t)0x02) >> 0);
+//    s_sfc_palette_data[high] = output[6];
+//    output[6] = s_sfc_palette_data[high | low6];
+//    // 7 - D0
+//    const uint8_t low7 = ((p0 & (uint8_t)0x01) >> 0) | ((p1 & (uint8_t)0x01) << 1);
+//    s_sfc_palette_data[high] = output[7];
+//    output[7] = s_sfc_palette_data[high | low7];
+//}
+//
+//
+//static inline
+//void expand_line_8_r(uint8_t p0, uint8_t p1, uint8_t high, uint8_t* output) {
+//    // 7 - D7
+//    const uint8_t low0 = ((p0 & (uint8_t)0x80) >> 7) | ((p1 & (uint8_t)0x80) >> 6);
+//    s_sfc_palette_data[high] = output[7];
+//    output[7] = s_sfc_palette_data[high | low0];
+//    // 6 - D6
+//    const uint8_t low1 = ((p0 & (uint8_t)0x40) >> 6) | ((p1 & (uint8_t)0x40) >> 5);
+//    s_sfc_palette_data[high] = output[6];
+//    output[6] = s_sfc_palette_data[high | low1];
+//    // 5 - D5
+//    const uint8_t low2 = ((p0 & (uint8_t)0x20) >> 5) | ((p1 & (uint8_t)0x20) >> 4);
+//    s_sfc_palette_data[high] = output[5];
+//    output[5] = s_sfc_palette_data[high | low2];
+//    // 4 - D4
+//    const uint8_t low3 = ((p0 & (uint8_t)0x10) >> 4) | ((p1 & (uint8_t)0x10) >> 3);
+//    s_sfc_palette_data[high] = output[4];
+//    output[4] = s_sfc_palette_data[high | low3];
+//    // 3 - D3
+//    const uint8_t low4 = ((p0 & (uint8_t)0x08) >> 3) | ((p1 & (uint8_t)0x08) >> 2);
+//    s_sfc_palette_data[high] = output[3];
+//    output[3] = s_sfc_palette_data[high | low4];
+//    // 2 - D2
+//    const uint8_t low5 = ((p0 & (uint8_t)0x04) >> 2) | ((p1 & (uint8_t)0x04) >> 1);
+//    s_sfc_palette_data[high] = output[2];
+//    output[2] = s_sfc_palette_data[high | low5];
+//    // 1 - D1
+//    const uint8_t low6 = ((p0 & (uint8_t)0x02) >> 1) | ((p1 & (uint8_t)0x02) >> 0);
+//    s_sfc_palette_data[high] = output[1];
+//    output[1] = s_sfc_palette_data[high | low6];
+//    // 0 - D0
+//    const uint8_t low7 = ((p0 & (uint8_t)0x01) >> 0) | ((p1 & (uint8_t)0x01) << 1);
+//    s_sfc_palette_data[high] = output[0];
+//    output[0] = s_sfc_palette_data[high | low7];
+//}
 
 /// <summary>
 /// StepFC: 使用简易模式渲染一帧, 效率较高
 /// </summary>
+/// <remarks>
+/// buffer: 
+/// D0 - 0 为全局背景色 1为非全局背景色, 是背景D1和D2'与'操作的结果
+/// D1-D5 - 调色板索引
+/// </remarks>
 /// <param name="famicom">The famicom.</param>
+/// <param name="buffer">The buffer.</param>
 void sfc_render_frame_easy(sfc_famicom_t* famicom, uint8_t* buffer) {
-    enum { SCAN_LINE_COUNT = 240 };
+    enum { SCAN_LINE_COUNT = SFC_HEIGHT };
     uint8_t* const data = buffer;
     const uint16_t vblank_line = famicom->config.vblank_scanline;
     const uint32_t per_scanline = famicom->config.master_cycle_per_scanline;
@@ -349,10 +535,13 @@ void sfc_render_frame_easy(sfc_famicom_t* famicom, uint8_t* buffer) {
     // 精灵使用的图样板
     const uint8_t* spp = famicom->ppu.banks[famicom->ppu.ctrl & SFC_PPU2000_SpTabl ? 4 : 0];
     // 精灵0用命中测试缓存
-    uint8_t sp0_hittest_buffer[256];
+    uint8_t sp0_hittest_buffer[SFC_WIDTH];
     sfc_sprite0_hittest(famicom, spp, sp0_hittest_buffer);
     // 精灵溢出测试
     const uint16_t sp_overflow_line = sfc_sprite_overflow_test(famicom);
+    // 关闭渲染则输出背景色?
+    if (!(famicom->ppu.mask & (uint8_t)SFC_PPU2001_Back))
+        memset(buffer, 0, SFC_WIDTH * SFC_HEIGHT);
     // 预渲染
 
     // 渲染
@@ -369,9 +558,13 @@ void sfc_render_frame_easy(sfc_famicom_t* famicom, uint8_t* buffer) {
         for (; *count < end_cycle_count_this_round;)
             sfc_cpu_execute_one(famicom);
 
-        buffer += 256;
+        buffer += SFC_WIDTH;
         // 执行HBlank
     }
+    // 渲染精灵
+    if (famicom->ppu.mask & (uint8_t)SFC_PPU2001_Sprite)
+        sfc_render_sprites(famicom, buffer);
+    
     // 后渲染
 
 
@@ -404,42 +597,6 @@ void sfc_render_frame_easy(sfc_famicom_t* famicom, uint8_t* buffer) {
             sfc_cpu_execute_one(famicom);
     }
 
-    // 清除计数器
+    // 重置计数器(32位整数太短了)
     famicom->cpu_cycle_count -= end_cycle_count_last_round;
-
-    //return;
-
-    // 生成调色板颜色
-    //memset(data, 0, 256 * 240 * 4);
-    {
-        for (int i = 0; i != 16; ++i) {
-            s_sfc_palette_data[i] = famicom->ppu.spindexes[i + 16];
-        }
-        s_sfc_palette_data[4 * 1] = s_sfc_palette_data[0];
-        s_sfc_palette_data[4 * 2] = s_sfc_palette_data[0];
-        s_sfc_palette_data[4 * 3] = s_sfc_palette_data[0];
-    }
-
-    //LARGE_INTEGER t0, t1;
-    //QueryPerformanceCounter(&t0);
-
-    for (int i = 63; i != -1; --i) {
-        const uint8_t* ptr = famicom->ppu.sprites + i * 4;
-        const uint8_t yy = ptr[0];
-        const uint8_t ii = ptr[1];
-        const uint8_t aa = ptr[2];
-        const uint8_t xx = ptr[3];
-        if (yy >= 0xef) continue;
-        // 查找对应图样表
-        const uint8_t* nowp0 = spp + ii * 16;
-        const uint8_t* nowp1 = nowp0 + 8;
-        const uint8_t high = (aa & 3) << 2 /*| ((aa & 0x20) >> 1)*/;
-        // 水平翻转
-        if (aa & 0x40) for (uint8_t i = 0; i != 8; ++i) {
-            expand_line_8_r(nowp0[i], nowp1[i], high, data + xx + (yy + i + 1) * 256);
-        }
-        else for (uint8_t i = 0; i != 8; ++i) {
-            expand_line_8(nowp0[i], nowp1[i], high, data + xx + (yy + i + 1) * 256);
-        }
-    }
 }

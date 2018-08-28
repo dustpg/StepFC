@@ -9,7 +9,7 @@
 void sfc_log_exec(void* arg, sfc_famicom_t* famicom);
 
 sfc_famicom_t* g_famicom = NULL;
-extern uint32_t sfc_stdalette[];
+extern uint32_t sfc_stdpalette[];
 uint32_t palette_data[16];
 
 /// <summary>
@@ -131,7 +131,7 @@ extern int sub_render(void* bgrx) {
     //memset(data, 0, 256 * 240 * 4);
     {
         for (int i = 0; i != 16; ++i) {
-            palette_data[i] = sfc_stdalette[g_famicom->ppu.spindexes[i + 16]];
+            palette_data[i] = sfc_stdpalette[g_famicom->ppu.spindexes[i + 16]];
         }
         palette_data[4 * 1] = palette_data[0];
         palette_data[4 * 2] = palette_data[0];
@@ -199,7 +199,7 @@ extern void main_render(void* bgrx) {
     // 生成调色板颜色
     {
         for (int i = 0; i != 16; ++i) {
-            palette_data[i] = sfc_stdalette[g_famicom->ppu.spindexes[i]];
+            palette_data[i] = sfc_stdpalette[g_famicom->ppu.spindexes[i]];
         }
         palette_data[4 * 1] = palette_data[0];
         palette_data[4 * 2] = palette_data[0];

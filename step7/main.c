@@ -9,7 +9,7 @@
 void sfc_log_exec(void* arg, sfc_famicom_t* famicom);
 
 sfc_famicom_t* g_famicom = NULL;
-extern uint32_t sfc_stdalette[];
+extern uint32_t sfc_stdpalette[];
 uint32_t palette_data[16];
 
 extern void sfc_render_frame_easy(sfc_famicom_t* famicom, uint8_t* buffer);
@@ -134,7 +134,7 @@ extern int sub_render(void* bgrx) {
     //memset(data, 0, 256 * 240 * 4);
     {
         for (int i = 0; i != 16; ++i) {
-            palette_data[i] = sfc_stdalette[g_famicom->ppu.spindexes[i + 16]];
+            palette_data[i] = sfc_stdpalette[g_famicom->ppu.spindexes[i + 16]];
         }
         palette_data[4 * 1] = palette_data[0];
         palette_data[4 * 2] = palette_data[0];
@@ -198,8 +198,18 @@ extern void main_render(void* bgrx) {
     sfc_render_frame_easy(g_famicom, buffer);
     //sfc_render_frame(g_famicom, buffer);
 
+    // 生成调色板数据
+    uint32_t palette[32];
+    
+    for (int i = 0; i != 32; ++i)
+        palette[i] = sfc_stdpalette[g_famicom->ppu.spindexes[i]];
+    // 镜像数据
+    palette[4 * 1] = palette[0];
+    palette[4 * 2] = palette[0];
+    palette[4 * 3] = palette[0];
+
     for (int i = 0; i != 256 * 240; ++i) {
-        data[i] = sfc_stdalette[buffer[i]];
+        data[i] = palette[buffer[i]>>1];
     }
 #if 0
 
@@ -207,7 +217,7 @@ extern void main_render(void* bgrx) {
     // 生成调色板颜色
     {
         for (int i = 0; i != 16; ++i) {
-            palette_data[i] = sfc_stdalette[g_famicom->ppu.spindexes[i]];
+            palette_data[i] = sfc_stdpalette[g_famicom->ppu.spindexes[i]];
         }
         palette_data[4 * 1] = palette_data[0];
         palette_data[4 * 2] = palette_data[0];
