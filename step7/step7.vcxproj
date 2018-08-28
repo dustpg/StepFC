@@ -138,7 +138,7 @@
     <ClCompile Include="sfc_famicom.c" />
     <ClCompile Include="sfc_mapper.c" />
     <ClCompile Include="sfc_ppu.c" />
-    <ClCompile Include="sfc_render.c" />
+    <ClCompile Include="sfc_render_ez.c" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

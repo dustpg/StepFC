@@ -54,7 +54,7 @@
     <ClCompile Include="sfc_config.c">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="sfc_render.c">
+    <ClCompile Include="sfc_render_ez.c">
       <Filter>src</Filter>
     </ClCompile>
   </ItemGroup>
