@@ -2,6 +2,7 @@
 #include <assert.h>
 #include <string.h>
 
+#define sfc_fallthrough
 // 微软编译器目前不支持C11的关键字_Alignas
 #ifdef _MSC_VER
 #define SFC_ALIGNAS(a) __declspec(align(a))
@@ -262,29 +263,36 @@ static inline void sfc_render_background_pixel16(
 /// <param name="spp">The SPP.</param>
 /// <param name="buffer">The buffer.</param>
 static inline void sfc_render_background_scanline(
-    sfc_famicom_t* famicom, 
+    sfc_famicom_t* famicom,
     uint16_t line,
-    const uint8_t sp0[SFC_HEIGHT +(16)],
+    const uint8_t sp0[SFC_HEIGHT + (16)],
     uint8_t* buffer) {
     // 取消背景显示
     if (!(famicom->ppu.mask & (uint8_t)SFC_PPU2001_Back)) return;
-    
-    // 计算当前偏移量
-    const uint16_t scrollx = famicom->ppu.scroll[0] + 
-        ((famicom->ppu.nametable_select & 1) << 8);
 
-    const uint16_t scrolly = famicom->ppu.scroll[1];
+    // 计算当前偏移量
+    const uint16_t scrollx = (uint16_t)famicom->ppu.scroll[0] +
+        (uint16_t)((famicom->ppu.nametable_select & 1) << 8);
+
+    const uint16_t scrolly = line + (uint16_t)famicom->ppu.now_scrolly +
+        (uint16_t)((famicom->ppu.nametable_select & 2) ? 240 : 0);
+
+    // 由于Y是240一换, 需要膜计算
+    const uint16_t scrolly_index0 = scrolly / (uint16_t)240;
+    const uint16_t scrolly_offset = scrolly % (uint16_t)240;
+
     // 计算背景所使用的图样表
     const uint8_t* const pattern = famicom->ppu.banks[famicom->ppu.ctrl & SFC_PPU2000_BgTabl ? 4 : 0];
-    // TODO: 检测垂直偏移量确定使用图案表的前一半[8-9]还是后一半[10-11]
+    // 检测垂直偏移量确定使用图案表的前一半[8-9]还是后一半[10-11]
+    const uint8_t* table[2];
 
-    // FIXME: 目前假定使用前一半
-    const uint8_t* const * const table = famicom->ppu.banks + 8;
-
+    const int first_buck = 8 + ((scrolly_index0 & 1) << 1);
+    table[0] = famicom->ppu.banks[first_buck];
+    table[1] = famicom->ppu.banks[first_buck+1];
     // 以16像素为单位扫描该行
     SFC_ALIGNAS(16) uint8_t aligned_buffer[SFC_WIDTH + 16 + 16];
     {
-        const uint8_t realy = scrolly + line;
+        const uint8_t realy = (uint8_t)scrolly_offset;
         // 保险起见扫描16+1次
         for (uint16_t i = 0; i != 17; ++i) {
             const uint16_t realx = scrollx + (i << 4);
@@ -329,7 +337,6 @@ static inline void sfc_render_background_scanline(
         famicom->ppu.status |= (uint8_t)SFC_PPU2002_Sp0Hit;
 }
 
-
 /// <summary>
 /// SFCs the sprite0 hittest.
 /// </summary>
@@ -338,7 +345,6 @@ static inline void sfc_render_background_scanline(
 /// <param name="buffer">The buffer.</param>
 static inline void sfc_sprite0_hittest(
     sfc_famicom_t* famicom, 
-    const uint8_t* spp,
     uint8_t buffer[SFC_WIDTH]) {
     // 先清空
     memset(buffer, 0, SFC_WIDTH);
@@ -349,34 +355,57 @@ static inline void sfc_sprite0_hittest(
     const uint8_t yyyyy = famicom->ppu.sprites[0];
     // 0xef以上就算了
     if (yyyyy >= 0xEF) return;
+    // 计算使用的图样板子
+    const uint8_t iiiii = famicom->ppu.sprites[1];
+    const uint8_t sp8x16 = famicom->ppu.ctrl & SFC_PPU2000_Sp8x16;
+    const uint8_t* const spp = famicom->ppu.banks[sp8x16 ?
+        // 偶数使用0000 奇数1000
+        (iiiii & 1 ? 4 : 0) :
+        // 检查SFC_PPU2000_SpTabl
+        (famicom->ppu.ctrl & SFC_PPU2000_SpTabl ? 4 : 0)
+    ];
     // 属性
     const uint8_t aaaaa = famicom->ppu.sprites[2];
     // 获取平面数据
-    const uint8_t* nowp0 = spp + famicom->ppu.sprites[1] * 16;
-    const uint8_t* nowp1 = nowp0 + 8;
+    const uint8_t* const nowp0 = spp + iiiii * 16;
+    const uint8_t* const nowp1 = nowp0 + 8;
     uint8_t* const buffer_write = buffer + yyyyy + 1;
+    // 8x16的情况
+    const int count = sp8x16 ? 16 : 8;
+
     // 水平翻转
     if (aaaaa & (uint8_t)SFC_SPATTR_FlipH) 
-        for (int i = 0; i != 8; ++i) {
+        for (int i = 0; i != count; ++i) {
             const uint8_t data = nowp0[i] | nowp1[i];
             buffer_write[i] = BitReverseTable256[data];
         }
     // 普通
     else 
-        for (int i = 0; i != 8; ++i) {
+        for (int i = 0; i != count; ++i) {
             const uint8_t data = nowp0[i] | nowp1[i];
             buffer_write[i] = data;
         }
     // 垂直翻转
     if (aaaaa & (uint8_t)SFC_SPATTR_FlipV) {
-        sfc_swap_byte(buffer_write + 0, buffer_write + 7);
-        sfc_swap_byte(buffer_write + 1, buffer_write + 6);
-        sfc_swap_byte(buffer_write + 2, buffer_write + 5);
-        sfc_swap_byte(buffer_write + 3, buffer_write + 4);
+        // 8x16
+        if (sp8x16) {
+            sfc_swap_byte(buffer_write + 0, buffer_write + 0xF);
+            sfc_swap_byte(buffer_write + 1, buffer_write + 0xE);
+            sfc_swap_byte(buffer_write + 2, buffer_write + 0xD);
+            sfc_swap_byte(buffer_write + 3, buffer_write + 0xC);
+            sfc_swap_byte(buffer_write + 4, buffer_write + 0xB);
+            sfc_swap_byte(buffer_write + 5, buffer_write + 0xA);
+            sfc_swap_byte(buffer_write + 6, buffer_write + 0x9);
+            sfc_swap_byte(buffer_write + 7, buffer_write + 0x8);
+        }
+        else {
+            sfc_swap_byte(buffer_write + 0, buffer_write + 7);
+            sfc_swap_byte(buffer_write + 1, buffer_write + 6);
+            sfc_swap_byte(buffer_write + 2, buffer_write + 5);
+            sfc_swap_byte(buffer_write + 3, buffer_write + 4);
+        }
     }
-    // TODO: 8x16 支持
 }
-
 
 /// <summary>
 /// SFCs the sprite overflow test.
@@ -388,20 +417,159 @@ static inline uint16_t sfc_sprite_overflow_test(sfc_famicom_t* famicom) {
     enum { BOTH_BS = SFC_PPU2001_Back | SFC_PPU2001_Sprite };
     if (!(famicom->ppu.mask & (uint8_t)BOTH_BS)) return SFC_HEIGHT;
     // 正式处理
-    uint8_t buffer[SFC_WIDTH + 16];
-    memset(buffer, 0, SFC_WIDTH);
+    uint8_t buffer[256 + 16];
+    memset(buffer, 0, 256);
     // 8 x 16
     const int height = famicom->ppu.ctrl & SFC_PPU2000_Sp8x16 ? 16 : 8;
     for (int i = 0; i != SFC_SPRITE_COUNT; ++i) {
         const uint8_t y = famicom->ppu.sprites[i * 4];
         for (int i = 0; i != height; ++i) buffer[y + i]++;
     }
+    // 搜索第一个超过8的
     uint16_t line ;
     for (line = 0; line != SFC_HEIGHT; ++line) if (buffer[line] > 8) break;
     return line;
 }
 
 
+/// <summary>
+/// SFCs the sprite expand 8.
+/// </summary>
+/// <param name="p0">The p0.</param>
+/// <param name="p1">The p1.</param>
+/// <param name="high">The high.</param>
+/// <param name="output">The output.</param>
+static inline void sfc_sprite_expand_8_on(uint8_t p0, uint8_t p1, uint8_t high, uint8_t* output) {
+    // 0 - D7
+    const uint8_t low0 = ((p0 & (uint8_t)0x80) >> 6) | ((p1 & (uint8_t)0x80) >> 5);
+    if (low0) output[0] = high | low0;
+    // 1 - D6
+    const uint8_t low1 = ((p0 & (uint8_t)0x40) >> 5) | ((p1 & (uint8_t)0x40) >> 4);
+    if (low1) output[1] = high | low1;
+    // 2 - D5
+    const uint8_t low2 = ((p0 & (uint8_t)0x20) >> 4) | ((p1 & (uint8_t)0x20) >> 3);
+    if (low2) output[2] = high | low2;
+    // 3 - D4
+    const uint8_t low3 = ((p0 & (uint8_t)0x10) >> 3) | ((p1 & (uint8_t)0x10) >> 2);
+    if (low3) output[3] = high | low3;
+    // 4 - D3
+    const uint8_t low4 = ((p0 & (uint8_t)0x08) >> 2) | ((p1 & (uint8_t)0x08) >> 1);
+    if (low4) output[4] = high | low4;
+    // 5 - D2
+    const uint8_t low5 = ((p0 & (uint8_t)0x04) >> 1) | ((p1 & (uint8_t)0x04) >> 0);
+    if (low5) output[5] = high | low5;
+    // 6 - D1
+    const uint8_t low6 = ((p0 & (uint8_t)0x02) >> 0) | ((p1 & (uint8_t)0x02) << 1);
+    if (low6) output[6] = high | low6;
+    // 7 - D0
+    const uint8_t low7 = ((p0 & (uint8_t)0x01) << 1) | ((p1 & (uint8_t)0x01) << 2);
+    if (low7) output[7] = high | low7;
+}
+
+
+/// <summary>
+/// SFCs the sprite expand 8.
+/// </summary>
+/// <param name="p0">The p0.</param>
+/// <param name="p1">The p1.</param>
+/// <param name="high">The high.</param>
+/// <param name="output">The output.</param>
+static inline void sfc_sprite_expand_8_op(uint8_t p0, uint8_t p1, uint8_t high, uint8_t* output) {
+    // 0 - D7
+    const uint8_t low0 = ((p0 & (uint8_t)0x80) >> 6) | ((p1 & (uint8_t)0x80) >> 5);
+    if (~output[0] & 1) output[0] = high | low0;
+    // 1 - D6
+    const uint8_t low1 = ((p0 & (uint8_t)0x40) >> 5) | ((p1 & (uint8_t)0x40) >> 4);
+    if (~output[1] & 1) output[1] = high | low1;
+    // 2 - D5
+    const uint8_t low2 = ((p0 & (uint8_t)0x20) >> 4) | ((p1 & (uint8_t)0x20) >> 3);
+    if (~output[2] & 1) output[2] = high | low2;
+    // 3 - D4
+    const uint8_t low3 = ((p0 & (uint8_t)0x10) >> 3) | ((p1 & (uint8_t)0x10) >> 2);
+    if (~output[3] & 1) output[3] = high | low3;
+    // 4 - D3
+    const uint8_t low4 = ((p0 & (uint8_t)0x08) >> 2) | ((p1 & (uint8_t)0x08) >> 1);
+    if (~output[4] & 1) output[4] = high | low4;
+    // 5 - D2
+    const uint8_t low5 = ((p0 & (uint8_t)0x04) >> 1) | ((p1 & (uint8_t)0x04) >> 0);
+    if (~output[5] & 1) output[5] = high | low5;
+    // 6 - D1
+    const uint8_t low6 = ((p0 & (uint8_t)0x02) >> 0) | ((p1 & (uint8_t)0x02) << 1);
+    if (~output[6] & 1) output[6] = high | low6;
+    // 7 - D0
+    const uint8_t low7 = ((p0 & (uint8_t)0x01) << 1) | ((p1 & (uint8_t)0x01) << 2);
+    if (~output[7] & 1) output[7] = high | low7;
+}
+
+
+/// <summary>
+/// SFCs the sprite expand 8.
+/// </summary>
+/// <param name="p0">The p0.</param>
+/// <param name="p1">The p1.</param>
+/// <param name="high">The high.</param>
+/// <param name="output">The output.</param>
+static inline void sfc_sprite_expand_8_rn(uint8_t p0, uint8_t p1, uint8_t high, uint8_t* output) {
+    // 7 - D7
+    const uint8_t low0 = ((p0 & (uint8_t)0x80) >> 6) | ((p1 & (uint8_t)0x80) >> 5);
+    if (low0) output[7] = high | low0;
+    // 6 - D6
+    const uint8_t low1 = ((p0 & (uint8_t)0x40) >> 5) | ((p1 & (uint8_t)0x40) >> 4);
+    if (low1) output[6] = high | low1;
+    // 5 - D5
+    const uint8_t low2 = ((p0 & (uint8_t)0x20) >> 4) | ((p1 & (uint8_t)0x20) >> 3);
+    if (low2) output[5] = high | low2;
+    // 4 - D4
+    const uint8_t low3 = ((p0 & (uint8_t)0x10) >> 3) | ((p1 & (uint8_t)0x10) >> 2);
+    if (low3) output[4] = high | low3;
+    // 3 - D3
+    const uint8_t low4 = ((p0 & (uint8_t)0x08) >> 2) | ((p1 & (uint8_t)0x08) >> 1);
+    if (low4) output[3] = high | low4;
+    // 2 - D2
+    const uint8_t low5 = ((p0 & (uint8_t)0x04) >> 1) | ((p1 & (uint8_t)0x04) >> 0);
+    if (low5) output[2] = high | low5;
+    // 1 - D1
+    const uint8_t low6 = ((p0 & (uint8_t)0x02) >> 0) | ((p1 & (uint8_t)0x02) << 1);
+    if (low6) output[1] = high | low6;
+    // 0 - D0
+    const uint8_t low7 = ((p0 & (uint8_t)0x01) << 1) | ((p1 & (uint8_t)0x01) << 2);
+    if (low7) output[0] = high | low7;
+}
+
+
+/// <summary>
+/// SFCs the sprite expand 8.
+/// </summary>
+/// <param name="p0">The p0.</param>
+/// <param name="p1">The p1.</param>
+/// <param name="high">The high.</param>
+/// <param name="output">The output.</param>
+static inline void sfc_sprite_expand_8_rp(uint8_t p0, uint8_t p1, uint8_t high, uint8_t* output) {
+    // 7 - D7
+    const uint8_t low0 = ((p0 & (uint8_t)0x80) >> 6) | ((p1 & (uint8_t)0x80) >> 5);
+    if (~output[7] & 1) output[7] = high | low0;
+    // 6 - D6
+    const uint8_t low1 = ((p0 & (uint8_t)0x40) >> 5) | ((p1 & (uint8_t)0x40) >> 4);
+    if (~output[6] & 1) output[6] = high | low1;
+    // 5 - D5
+    const uint8_t low2 = ((p0 & (uint8_t)0x20) >> 4) | ((p1 & (uint8_t)0x20) >> 3);
+    if (~output[5] & 1) output[5] = high | low2;
+    // 4 - D4
+    const uint8_t low3 = ((p0 & (uint8_t)0x10) >> 3) | ((p1 & (uint8_t)0x10) >> 2);
+    if (~output[4] & 1) output[4] = high | low3;
+    // 3 - D3
+    const uint8_t low4 = ((p0 & (uint8_t)0x08) >> 2) | ((p1 & (uint8_t)0x08) >> 1);
+    if (~output[3] & 1) output[3] = high | low4;
+    // 2 - D2
+    const uint8_t low5 = ((p0 & (uint8_t)0x04) >> 1) | ((p1 & (uint8_t)0x04) >> 0);
+    if (~output[2] & 1) output[2] = high | low5;
+    // 1 - D1
+    const uint8_t low6 = ((p0 & (uint8_t)0x02) >> 0) | ((p1 & (uint8_t)0x02) << 1);
+    if (~output[1] & 1) output[1] = high | low6;
+    // 0 - D0
+    const uint8_t low7 = ((p0 & (uint8_t)0x01) << 1) | ((p1 & (uint8_t)0x01) << 2);
+    if (~output[0] & 1) output[0] = high | low7;
+}
 
 /// <summary>
 /// SFCs the render sprites.
@@ -409,111 +577,124 @@ static inline uint16_t sfc_sprite_overflow_test(sfc_famicom_t* famicom) {
 /// <param name="famicom">The famicom.</param>
 /// <param name="buffer">The buffer.</param>
 static inline void sfc_render_sprites(sfc_famicom_t* famicom, uint8_t* buffer) {
-    // TODO: 8x16
+    // 8 x 16
+    const uint8_t sp8x16 = (famicom->ppu.ctrl & (uint8_t)SFC_PPU2000_Sp8x16) >> 2;
     // 精灵用图样
-    const uint8_t* spp = famicom->ppu.banks[famicom->ppu.ctrl & SFC_PPU2000_SpTabl ? 4 : 0];
+    const uint8_t* sppbuffer[2];
+    sppbuffer[0] = famicom->ppu.banks[
+        (sp8x16) ? 0 : (famicom->ppu.ctrl & SFC_PPU2000_SpTabl ? 4 : 0)];
+
+    sppbuffer[1] = sp8x16 ? famicom->ppu.banks[4] : sppbuffer[0];
+
     // 遍历所有精灵
-    for (int i = 0; i != SFC_SPRITE_COUNT; ++i) {
-        const uint8_t* const base = famicom->ppu.sprites + i * 4;
+    for (int index = 0; index != SFC_SPRITE_COUNT; ++index) {
+        const uint8_t* const base = famicom->ppu.sprites +
+            (SFC_SPRITE_COUNT - 1 - index) * 4;
+
         const uint8_t yyyy = base[0];
         if (yyyy >= (uint8_t)0xEF) continue;
         const uint8_t iiii = base[1];
         const uint8_t aaaa = base[2];
         const uint8_t xxxx = base[3];
-        // 水平翻转
-        // P -> 优先级 1: 真-背景则渲染精灵 否则渲染 背景
-        /*
-           P:   0 + 0 -> 0    FF00
-                0 + 1 -> S    00FF
-                1 + 0 -> B    FF00
-                1 + 1 -> B    FF00
+        const uint8_t high = ((aaaa & 3) | 4) << 3;
 
-           NP:  0 + 0 -> 0    FF00
-                0 + 1 -> S    00FF
-                1 + 0 -> B    FF00
-                1 + 1 -> S    00FF
-
-        */
-        // 
-
-        // H -> 水平翻转
-        // V -> 垂直
-        int bk = 9;
+        const uint8_t* const nowp0 = sppbuffer[iiii & 1] + iiii * 16;
+        const uint8_t* const nowp1 = nowp0 + 8;
+        uint8_t* const write = buffer + xxxx + (yyyy + 1) * SFC_WIDTH;
+        // hVHP
+        switch (((uint8_t)(aaaa >> 5) | sp8x16) & (uint8_t)0x0f)
+        {
+        case 0x8:
+            // 1000: 8x16 前
+            for (int j = 0; j != 8; ++j)
+                sfc_sprite_expand_8_on(nowp0[j + 16], nowp1[j + 16], high, write + SFC_WIDTH * (j + 8));
+            sfc_fallthrough;
+        case 0x0:
+            // 0000: 前
+            for (int j = 0; j != 8; ++j)
+                sfc_sprite_expand_8_on(nowp0[j], nowp1[j], high, write + SFC_WIDTH * j);
+            break;
+        case 0x9:
+            // 1001: 8x16 后
+            for (int j = 0; j != 8; ++j)
+                sfc_sprite_expand_8_op(nowp0[j + 16], nowp1[j + 16], high, write + SFC_WIDTH * (j + 8));
+            sfc_fallthrough;
+        case 0x1:
+            // 0001: 后
+            for (int j = 0; j != 8; ++j)
+                sfc_sprite_expand_8_op(nowp0[j], nowp1[j], high, write + SFC_WIDTH * j);
+            break;
+        case 0xA:
+            // 1010: 8x16 水平翻转 前 
+            for (int j = 0; j != 8; ++j)
+                sfc_sprite_expand_8_rn(nowp0[j + 16], nowp1[j + 16], high, write + SFC_WIDTH * (j + 8));
+            sfc_fallthrough;
+        case 0x2:
+            // 0010: 水平翻转 前 
+            for (int j = 0; j != 8; ++j)
+                sfc_sprite_expand_8_rn(nowp0[j], nowp1[j], high, write + SFC_WIDTH * j);
+            break;
+        case 0xB:
+            // 1011: 8x16 水平翻转 后
+            for (int j = 0; j != 8; ++j)
+                sfc_sprite_expand_8_rp(nowp0[j + 16], nowp1[j + 16], high, write + SFC_WIDTH * (j + 8));
+            sfc_fallthrough;
+        case 0x3:
+            // 0011: 水平翻转 后
+            for (int j = 0; j != 8; ++j)
+                sfc_sprite_expand_8_rp(nowp0[j], nowp1[j], high, write + SFC_WIDTH * j);
+            break;
+        case 0xC:
+            // 1100: 8x16 垂直翻转 前
+            for (int j = 0; j != 8; ++j)
+                sfc_sprite_expand_8_on(nowp0[j + 16], nowp1[j + 16], high, write + SFC_WIDTH * (7 - j));
+            for (int j = 0; j != 8; ++j)
+                sfc_sprite_expand_8_on(nowp0[j], nowp1[j], high, write + SFC_WIDTH * (15 - j));
+            break;
+        case 0x4:
+            // 0100: 垂直翻转 前 
+            for (int j = 0; j != 8; ++j)
+                sfc_sprite_expand_8_on(nowp0[j], nowp1[j], high, write + SFC_WIDTH * (7 - j));
+            break;
+        case 0xD:
+            // 1101: 8x16 垂直翻转 后
+            for (int j = 0; j != 8; ++j)
+                sfc_sprite_expand_8_op(nowp0[j + 16], nowp1[j + 16], high, write + SFC_WIDTH * (7 - j));
+            for (int j = 0; j != 8; ++j)
+                sfc_sprite_expand_8_op(nowp0[j], nowp1[j], high, write + SFC_WIDTH * (15 - j));
+            break;
+        case 0x5:
+            // 0101: 垂直翻转 后
+            for (int j = 0; j != 8; ++j)
+                sfc_sprite_expand_8_op(nowp0[j], nowp1[j], high, write + SFC_WIDTH * (7 - j));
+            break;
+        case 0xE: 
+            // 1110: 8x16 垂直翻转 水平翻转 前 
+            for (int j = 0; j != 8; ++j)
+                sfc_sprite_expand_8_rn(nowp0[j + 16], nowp1[j + 16], high, write + SFC_WIDTH * (7 - j));
+            for (int j = 0; j != 8; ++j)
+                sfc_sprite_expand_8_rn(nowp0[j], nowp1[j], high, write + SFC_WIDTH * (15 - j));
+            break;
+        case 0x6:
+            // 0110: 8x16 垂直翻转 水平翻转 前 
+            for (int j = 0; j != 8; ++j)
+                sfc_sprite_expand_8_rn(nowp0[j], nowp1[j], high, write + SFC_WIDTH * (7 - j));
+            break;
+        case 0xF:
+            // 1111: 8x16 垂直翻转 水平翻转 后
+            for (int j = 0; j != 8; ++j)
+                sfc_sprite_expand_8_rp(nowp0[j + 16], nowp1[j + 16], high, write + SFC_WIDTH * (7 - j));
+            for (int j = 0; j != 8; ++j)
+                sfc_sprite_expand_8_rp(nowp0[j], nowp1[j], high, write + SFC_WIDTH * (15 - j));
+            break;
+        case 0x7:
+            // 0111: 垂直翻转 水平翻转 后
+            for (int j = 0; j != 8; ++j)
+                sfc_sprite_expand_8_rp(nowp0[j], nowp1[j], high, write + SFC_WIDTH * (7 - j));
+            break;
+        }
     }
 }
-
-//static inline
-//void expand_line_8(uint8_t p0, uint8_t p1, uint8_t high, uint8_t* output) {
-//    // 0 - D7
-//    const uint8_t low0 = ((p0 & (uint8_t)0x80) >> 7) | ((p1 & (uint8_t)0x80) >> 6);
-//    s_sfc_palette_data[high] = output[0];
-//    output[0] = s_sfc_palette_data[high | low0];
-//    // 1 - D6
-//    const uint8_t low1 = ((p0 & (uint8_t)0x40) >> 6) | ((p1 & (uint8_t)0x40) >> 5);
-//    s_sfc_palette_data[high] = output[1];
-//    output[1] = s_sfc_palette_data[high | low1];
-//    // 2 - D5
-//    const uint8_t low2 = ((p0 & (uint8_t)0x20) >> 5) | ((p1 & (uint8_t)0x20) >> 4);
-//    s_sfc_palette_data[high] = output[2];
-//    output[2] = s_sfc_palette_data[high | low2];
-//    // 3 - D4
-//    const uint8_t low3 = ((p0 & (uint8_t)0x10) >> 4) | ((p1 & (uint8_t)0x10) >> 3);
-//    s_sfc_palette_data[high] = output[3];
-//    output[3] = s_sfc_palette_data[high | low3];
-//    // 4 - D3
-//    const uint8_t low4 = ((p0 & (uint8_t)0x08) >> 3) | ((p1 & (uint8_t)0x08) >> 2);
-//    s_sfc_palette_data[high] = output[4];
-//    output[4] = s_sfc_palette_data[high | low4];
-//    // 5 - D2
-//    const uint8_t low5 = ((p0 & (uint8_t)0x04) >> 2) | ((p1 & (uint8_t)0x04) >> 1);
-//    s_sfc_palette_data[high] = output[5];
-//    output[5] = s_sfc_palette_data[high | low5];
-//    // 6 - D1
-//    const uint8_t low6 = ((p0 & (uint8_t)0x02) >> 1) | ((p1 & (uint8_t)0x02) >> 0);
-//    s_sfc_palette_data[high] = output[6];
-//    output[6] = s_sfc_palette_data[high | low6];
-//    // 7 - D0
-//    const uint8_t low7 = ((p0 & (uint8_t)0x01) >> 0) | ((p1 & (uint8_t)0x01) << 1);
-//    s_sfc_palette_data[high] = output[7];
-//    output[7] = s_sfc_palette_data[high | low7];
-//}
-//
-//
-//static inline
-//void expand_line_8_r(uint8_t p0, uint8_t p1, uint8_t high, uint8_t* output) {
-//    // 7 - D7
-//    const uint8_t low0 = ((p0 & (uint8_t)0x80) >> 7) | ((p1 & (uint8_t)0x80) >> 6);
-//    s_sfc_palette_data[high] = output[7];
-//    output[7] = s_sfc_palette_data[high | low0];
-//    // 6 - D6
-//    const uint8_t low1 = ((p0 & (uint8_t)0x40) >> 6) | ((p1 & (uint8_t)0x40) >> 5);
-//    s_sfc_palette_data[high] = output[6];
-//    output[6] = s_sfc_palette_data[high | low1];
-//    // 5 - D5
-//    const uint8_t low2 = ((p0 & (uint8_t)0x20) >> 5) | ((p1 & (uint8_t)0x20) >> 4);
-//    s_sfc_palette_data[high] = output[5];
-//    output[5] = s_sfc_palette_data[high | low2];
-//    // 4 - D4
-//    const uint8_t low3 = ((p0 & (uint8_t)0x10) >> 4) | ((p1 & (uint8_t)0x10) >> 3);
-//    s_sfc_palette_data[high] = output[4];
-//    output[4] = s_sfc_palette_data[high | low3];
-//    // 3 - D3
-//    const uint8_t low4 = ((p0 & (uint8_t)0x08) >> 3) | ((p1 & (uint8_t)0x08) >> 2);
-//    s_sfc_palette_data[high] = output[3];
-//    output[3] = s_sfc_palette_data[high | low4];
-//    // 2 - D2
-//    const uint8_t low5 = ((p0 & (uint8_t)0x04) >> 2) | ((p1 & (uint8_t)0x04) >> 1);
-//    s_sfc_palette_data[high] = output[2];
-//    output[2] = s_sfc_palette_data[high | low5];
-//    // 1 - D1
-//    const uint8_t low6 = ((p0 & (uint8_t)0x02) >> 1) | ((p1 & (uint8_t)0x02) >> 0);
-//    s_sfc_palette_data[high] = output[1];
-//    output[1] = s_sfc_palette_data[high | low6];
-//    // 0 - D0
-//    const uint8_t low7 = ((p0 & (uint8_t)0x01) >> 0) | ((p1 & (uint8_t)0x01) << 1);
-//    s_sfc_palette_data[high] = output[0];
-//    output[0] = s_sfc_palette_data[high | low7];
-//}
 
 /// <summary>
 /// StepFC: 使用简易模式渲染一帧, 效率较高
@@ -532,18 +713,14 @@ void sfc_render_frame_easy(sfc_famicom_t* famicom, uint8_t* buffer) {
     const uint32_t per_scanline = famicom->config.master_cycle_per_scanline;
     uint32_t end_cycle_count = 0;
 
-    // 精灵使用的图样板
-    const uint8_t* spp = famicom->ppu.banks[famicom->ppu.ctrl & SFC_PPU2000_SpTabl ? 4 : 0];
     // 精灵0用命中测试缓存
     uint8_t sp0_hittest_buffer[SFC_WIDTH];
-    sfc_sprite0_hittest(famicom, spp, sp0_hittest_buffer);
+    sfc_sprite0_hittest(famicom, sp0_hittest_buffer);
     // 精灵溢出测试
     const uint16_t sp_overflow_line = sfc_sprite_overflow_test(famicom);
     // 关闭渲染则输出背景色?
     if (!(famicom->ppu.mask & (uint8_t)SFC_PPU2001_Back))
         memset(buffer, 0, SFC_WIDTH * SFC_HEIGHT);
-    // 预渲染
-
     // 渲染
     for (uint16_t i = 0; i != (uint16_t)SCAN_LINE_COUNT; ++i) {
         end_cycle_count += per_scanline;
@@ -557,17 +734,21 @@ void sfc_render_frame_easy(sfc_famicom_t* famicom, uint8_t* buffer) {
         // 执行CPU
         for (; *count < end_cycle_count_this_round;)
             sfc_cpu_execute_one(famicom);
-
         buffer += SFC_WIDTH;
         // 执行HBlank
     }
     // 渲染精灵
     if (famicom->ppu.mask & (uint8_t)SFC_PPU2001_Sprite)
-        sfc_render_sprites(famicom, buffer);
+        sfc_render_sprites(famicom, data);
     
     // 后渲染
-
-
+    {
+        end_cycle_count += per_scanline;
+        const uint32_t end_cycle_count_this_round = end_cycle_count / MASTER_CYCLE_PER_CPU;
+        uint32_t* const count = &famicom->cpu_cycle_count;
+        for (; *count < end_cycle_count_this_round;)
+            sfc_cpu_execute_one(famicom);
+    }
     // 垂直空白期间
 
     // 开始
@@ -585,6 +766,8 @@ void sfc_render_frame_easy(sfc_famicom_t* famicom, uint8_t* buffer) {
     }
     // 结束
     famicom->ppu.status = 0;
+    // 垂直滚动仅对下帧有效
+    famicom->ppu.now_scrolly = famicom->ppu.scroll[1];
 
     // 预渲染
     end_cycle_count += per_scanline * 2;

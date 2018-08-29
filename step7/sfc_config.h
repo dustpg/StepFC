@@ -13,6 +13,8 @@ enum sfc_config_constant {
 /// StepFC: 配置信息
 /// </summary>
 typedef struct {
+    // CPU 主频 Hz
+    float           cpu_clock;
     // 屏幕刷新率
     uint16_t        refresh_rate;
     // 每条扫描线周期 Master-Clock 

@@ -1,6 +1,7 @@
-﻿#include "sfc_famicom.h"
+﻿#include "../step7/sfc_famicom.h"
+#include "../step7/sfc_cpu.h"
 #include "../common/d2d_interface.h"
-#include "sfc_cpu.h"
+#include "../common/xa2_interface.h"
 #include <stdio.h>
 #include <math.h>
 #include <string.h>
@@ -123,67 +124,8 @@ void expand_line_8_r(uint8_t p0, uint8_t p1, uint8_t high, uint32_t* output) {
     output[0] = palette_data[high | low7];
 }
 
-//#include <Windows.h>
-//enum { SAMPLE_COUNT = 128 };
-//double samples[SAMPLE_COUNT];
-
 extern int sub_render(void* bgrx) {
     return 0;
-    uint32_t* const data = bgrx;
-    // 生成调色板颜色
-    //memset(data, 0, 256 * 240 * 4);
-    {
-        for (int i = 0; i != 16; ++i) {
-            palette_data[i] = sfc_stdpalette[g_famicom->ppu.spindexes[i + 16]];
-        }
-        palette_data[4 * 1] = palette_data[0];
-        palette_data[4 * 2] = palette_data[0];
-        palette_data[4 * 3] = palette_data[0];
-    }
-    // 设置为背景色
-    for (int i = 0; i != 256 * 240; ++i) data[i] = palette_data[0];
-
-    // 精灵
-    const uint8_t* spp = g_famicom->ppu.banks[
-        g_famicom->ppu.ctrl & SFC_PPU2000_SpTabl ? 4 : 0];
-
-    //LARGE_INTEGER t0, t1;
-    //QueryPerformanceCounter(&t0);
-
-    for (int i = 63; i != -1; --i) {
-        const uint8_t* ptr = g_famicom->ppu.sprites + i * 4;
-        const uint8_t yy = ptr[0];
-        const uint8_t ii = ptr[1];
-        const uint8_t aa = ptr[2];
-        const uint8_t xx = ptr[3];
-        if (yy >= 0xef) continue;
-        // 查找对应图样表
-        const uint8_t* nowp0 = spp + ii * 16;
-        const uint8_t* nowp1 = nowp0 + 8;
-        const uint8_t high = (aa & 3) << 2;
-        // 水平翻转
-        if (aa & 0x40) for (uint8_t i = 0; i != 8; ++i) {
-            expand_line_8_r(nowp0[i], nowp1[i], high, data + xx + (yy + i + 1) * 256);
-        }
-        else for (uint8_t i = 0; i != 8; ++i) {
-            expand_line_8(nowp0[i], nowp1[i], high, data + xx + (yy + i + 1) * 256);
-        }
-    }
-    //QueryPerformanceCounter(&t1);
-    //LARGE_INTEGER frequency;
-    //QueryPerformanceFrequency(&frequency);
-    //const double elapsed = (t1.QuadPart - t0.QuadPart) * 1000.0 / frequency.QuadPart;
-    //static unsigned index = 0;
-    //samples[index & (unsigned)(SAMPLE_COUNT-1)] = elapsed;
-    //++index;
-    //if ((index & (unsigned)(SAMPLE_COUNT - 1)) == 0) {
-    //    double sum = 0.;
-    //    for (int i = 0; i != SAMPLE_COUNT; ++i) {
-    //        sum += samples[i];
-    //    }
-    //    printf("%.4lfms\n", sum / SAMPLE_COUNT);
-    //}
-    return 1;
 }
 
 /// <summary>
@@ -255,8 +197,9 @@ int main() {
         (int)famicom.rom_info.count_chrrom_8kb,
         (int)famicom.rom_info.mapper_number
     );
-
+    xa2_init();
     main_cpp();
+    xa2_clean();
 
     sfc_famicom_uninit(&famicom);
     return 0;
