@@ -1,4 +1,4 @@
-#include "sfc_6502.h"
+ï»¿#include "sfc_6502.h"
 #include "sfc_cpu.h"
 #include "sfc_famicom.h"
 #include <assert.h>
@@ -8,13 +8,13 @@
 extern inline void sfc_btoh(char o[], uint8_t b);
 
 /// <summary>
-/// StepFC: Ö¸¶¨µØ·½·´»ã±à
+/// StepFC: æŒ‡å®šåœ°æ–¹åæ±‡ç¼–
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
 /// <param name="buf">The buf.</param>
 void sfc_fc_disassembly(uint16_t address, const sfc_famicom_t* famicom, char buf[]) {
-    // TODO: ¸ù¾İ²Ù×÷Âë¶ÁÈ¡¶ÔÓ¦×Ö½Ú
+    // TODO: æ ¹æ®æ“ä½œç è¯»å–å¯¹åº”å­—èŠ‚
     enum {
         OFFSET_M = SFC_DISASSEMBLY_BUF_LEN2 - SFC_DISASSEMBLY_BUF_LEN,
         OFFSET = 8
@@ -27,25 +27,25 @@ void sfc_fc_disassembly(uint16_t address, const sfc_famicom_t* famicom, char buf
 
     sfc_6502_code_t code;
     code.data = 0;
-    // ±©Á¦(NoMo)¶ÁÈ¡3×Ö½Ú
+    // æš´åŠ›(NoMo)è¯»å–3å­—èŠ‚
     code.op = sfc_read_cpu_address(address, famicom);
     code.a1 = sfc_read_cpu_address(address + 1, famicom);
     code.a2 = sfc_read_cpu_address(address + 2, famicom);
-    // ·´»ã±à
+    // åæ±‡ç¼–
     sfc_6502_disassembly(code, buf + OFFSET);
 }
 
 /// <summary>
-/// StepFC: ¶ÁÈ¡CPUµØÖ·Êı¾İ
+/// StepFC: è¯»å–CPUåœ°å€æ•°æ®
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
 /// <returns></returns>
 uint8_t sfc_read_cpu_address(uint16_t address, const sfc_famicom_t* famicom) {
     /* 
-    CPU µØÖ·¿Õ¼ä
+    CPU åœ°å€ç©ºé—´
     +---------+-------+-------+-----------------------+
-    | µØÖ·    | ´óĞ¡  | ±ê¼Ç  |         ÃèÊö          |
+    | åœ°å€    | å¤§å°  | æ ‡è®°  |         æè¿°          |
     +---------+-------+-------+-----------------------+
     | $0000   | $800  |       | RAM                   |
     | $0800   | $800  | M     | RAM                   |
@@ -59,28 +59,28 @@ uint8_t sfc_read_cpu_address(uint16_t address, const sfc_famicom_t* famicom) {
     | $8000   | $4000 |       | PRG-ROM               |
     | $C000   | $4000 |       | PRG-ROM               |
     +---------+-------+-------+-----------------------+
-    ±ê¼ÇÍ¼Àı: M = $0000µÄ¾µÏñ
-              R = $2000-2008 Ã¿ 8 bytes µÄ¾µÏñ
+    æ ‡è®°å›¾ä¾‹: M = $0000çš„é•œåƒ
+              R = $2000-2008 æ¯ 8 bytes çš„é•œåƒ
             (e.g. $2008=$2000, $2018=$2000, etc.)
     */
     switch (address >> 13)
     {
     case 0:
-        // ¸ßÈıÎ»Îª0: [$0000, $2000): ÏµÍ³Ö÷ÄÚ´æ, 4´Î¾µÏñ
+        // é«˜ä¸‰ä½ä¸º0: [$0000, $2000): ç³»ç»Ÿä¸»å†…å­˜, 4æ¬¡é•œåƒ
         return famicom->main_memory[address & (uint16_t)0x07ff];
     case 1:
-        // ¸ßÈıÎ»Îª1, [$2000, $4000): PPU¼Ä´æÆ÷, 8×Ö½Ú²½½ø¾µÏñ
+        // é«˜ä¸‰ä½ä¸º1, [$2000, $4000): PPUå¯„å­˜å™¨, 8å­—èŠ‚æ­¥è¿›é•œåƒ
         assert(!"NOT IMPL");
         return 0;
     case 2:
-        // ¸ßÈıÎ»Îª2, [$4000, $6000): pAPU¼Ä´æÆ÷ À©Õ¹ROMÇø
+        // é«˜ä¸‰ä½ä¸º2, [$4000, $6000): pAPUå¯„å­˜å™¨ æ‰©å±•ROMåŒº
         assert(!"NOT IMPL");
         return 0;
     case 3:
-        // ¸ßÈıÎ»Îª3, [$6000, $8000): ´æµµ SRAMÇø
+        // é«˜ä¸‰ä½ä¸º3, [$6000, $8000): å­˜æ¡£ SRAMåŒº
         return famicom->save_memory[address & (uint16_t)0x1fff];
     case 4: case 5: case 6: case 7:
-        // ¸ßÒ»Î»Îª1, [$8000, $10000) ³ÌĞòPRG-ROMÇø
+        // é«˜ä¸€ä½ä¸º1, [$8000, $10000) ç¨‹åºPRG-ROMåŒº
         return famicom->prg_banks[address >> 13][address & (uint16_t)0x1fff];
     }
     assert(!"invalid address");
@@ -96,9 +96,9 @@ uint8_t sfc_read_cpu_address(uint16_t address, const sfc_famicom_t* famicom) {
 /// <param name="famicom">The famicom.</param>
 void sfc_write_cpu_address(uint16_t address, uint8_t data, sfc_famicom_t* famicom) {
     /* 
-    CPU µØÖ·¿Õ¼ä
+    CPU åœ°å€ç©ºé—´
     +---------+-------+-------+-----------------------+
-    | µØÖ·    | ´óĞ¡  | ±ê¼Ç  |         ÃèÊö          |
+    | åœ°å€    | å¤§å°  | æ ‡è®°  |         æè¿°          |
     +---------+-------+-------+-----------------------+
     | $0000   | $800  |       | RAM                   |
     | $0800   | $800  | M     | RAM                   |
@@ -112,30 +112,30 @@ void sfc_write_cpu_address(uint16_t address, uint8_t data, sfc_famicom_t* famico
     | $8000   | $4000 |       | PRG-ROM               |
     | $C000   | $4000 |       | PRG-ROM               |
     +---------+-------+-------+-----------------------+
-    ±ê¼ÇÍ¼Àı: M = $0000µÄ¾µÏñ
-              R = $2000-2008 Ã¿ 8 bytes µÄ¾µÏñ
+    æ ‡è®°å›¾ä¾‹: M = $0000çš„é•œåƒ
+              R = $2000-2008 æ¯ 8 bytes çš„é•œåƒ
             (e.g. $2008=$2000, $2018=$2000, etc.)
     */
     switch (address >> 13)
     {
     case 0:
-        // ¸ßÈıÎ»Îª0: [$0000, $2000): ÏµÍ³Ö÷ÄÚ´æ, 4´Î¾µÏñ
+        // é«˜ä¸‰ä½ä¸º0: [$0000, $2000): ç³»ç»Ÿä¸»å†…å­˜, 4æ¬¡é•œåƒ
         famicom->main_memory[address & (uint16_t)0x07ff] = data;
         return;
     case 1:
-        // ¸ßÈıÎ»Îª1, [$2000, $4000): PPU¼Ä´æÆ÷, 8×Ö½Ú²½½ø¾µÏñ
+        // é«˜ä¸‰ä½ä¸º1, [$2000, $4000): PPUå¯„å­˜å™¨, 8å­—èŠ‚æ­¥è¿›é•œåƒ
         assert(!"NOT IMPL");
         return;
     case 2:
-        // ¸ßÈıÎ»Îª2, [$4000, $6000): pAPU¼Ä´æÆ÷ À©Õ¹ROMÇø
+        // é«˜ä¸‰ä½ä¸º2, [$4000, $6000): pAPUå¯„å­˜å™¨ æ‰©å±•ROMåŒº
         assert(!"NOT IMPL");
         return;
     case 3:
-        // ¸ßÈıÎ»Îª3, [$6000, $8000): ´æµµ SRAMÇø
+        // é«˜ä¸‰ä½ä¸º3, [$6000, $8000): å­˜æ¡£ SRAMåŒº
         famicom->save_memory[address & (uint16_t)0x1fff] = data;
         return;
     case 4: case 5: case 6: case 7:
-        // ¸ßÒ»Î»Îª1, [$8000, $10000) ³ÌĞòPRG-ROMÇø
+        // é«˜ä¸€ä½ä¸º1, [$8000, $10000) ç¨‹åºPRG-ROMåŒº
         assert(!"WARNING: PRG-ROM");
         famicom->prg_banks[address >> 13][address & (uint16_t)0x1fff] = data;
         return;

@@ -1,24 +1,24 @@
-#include "sfc_famicom.h"
+ï»¿#include "sfc_famicom.h"
 #include <assert.h>
 #include <string.h>
 
-// ¼ÓÔØÄ¬ÈÏROM
+// åŠ è½½é»˜è®¤ROM
 static sfc_ecode sfc_load_default_rom(void*, sfc_rom_info_t*);
-// ÊÍ·ÅÄ¬ÈÏROM
+// é‡Šæ”¾é»˜è®¤ROM
 static sfc_ecode sfc_free_default_rom(void*, sfc_rom_info_t*);
-// ÊÍ·ÅÄ¬ÈÏROM
+// é‡Šæ”¾é»˜è®¤ROM
 static void sfc_before_execute(void*, sfc_famicom_t*);
-// ¼ÓÔØĞÂµÄROM
+// åŠ è½½æ–°çš„ROM
 static sfc_ecode sfc_load_new_rom(sfc_famicom_t* famicom);
-// ¼ÓÔØmapper
+// åŠ è½½mapper
 extern sfc_ecode sfc_load_mapper(sfc_famicom_t* famicom, uint8_t);
 
 
-// ÉùÃ÷Ò»¸öËæ±ã(SB)µÄº¯ÊıÖ¸ÕëÀàĞÍ
+// å£°æ˜ä¸€ä¸ªéšä¾¿(SB)çš„å‡½æ•°æŒ‡é’ˆç±»å‹
 typedef void(*sfc_funcptr_t)();
 
 /// <summary>
-/// StepFC: ³õÊ¼»¯famicom
+/// StepFC: åˆå§‹åŒ–famicom
 /// </summary>
 /// <param name="famicom">The famicom.</param>
 /// <param name="argument">The argument.</param>
@@ -29,64 +29,64 @@ sfc_ecode sfc_famicom_init(
     void* argument, 
     const sfc_interface_t* interfaces) {
     assert(famicom && "bad famicom");
-    // Çå¿ÕÊı¾İ
+    // æ¸…ç©ºæ•°æ®
     memset(famicom, 0, sizeof(sfc_famicom_t));
-    // ±£Áô²ÎÊı
+    // ä¿ç•™å‚æ•°
     famicom->argument = argument;
-    // ÔØÈëÄ¬ÈÏ½Ó¿Ú
+    // è½½å…¥é»˜è®¤æ¥å£
     famicom->interfaces.load_rom = sfc_load_default_rom;
     famicom->interfaces.free_rom = sfc_free_default_rom;
     famicom->interfaces.before_execute = sfc_before_execute;
-    // ³õ²½BANK
+    // åˆæ­¥BANK
     famicom->prg_banks[0] = famicom->main_memory;
     famicom->prg_banks[3] = famicom->save_memory;
-    // Ìá¹©ÁË½Ó¿Ú
+    // æä¾›äº†æ¥å£
     if (interfaces) {
         const int count = sizeof(*interfaces) / sizeof(interfaces->load_rom);
-        // ¸´ÖÆÓĞĞ§µÄº¯ÊıÖ¸Õë
-        // UB: C±ê×¼²¢²»Ò»¶¨±£Ö¤sizeof(void*)µÈÍ¬sizeof(fp) (·Ç·ëÌåÏµ)
-        //     ËùÒÔÕâÀïÉùÃ÷ÁËÒ»¸ösfc_funcptr_t
+        // å¤åˆ¶æœ‰æ•ˆçš„å‡½æ•°æŒ‡é’ˆ
+        // UB: Cæ ‡å‡†å¹¶ä¸ä¸€å®šä¿è¯sizeof(void*)ç­‰åŒsizeof(fp) (éå†¯ä½“ç³»)
+        //     æ‰€ä»¥è¿™é‡Œå£°æ˜äº†ä¸€ä¸ªsfc_funcptr_t
         sfc_funcptr_t* const func_src = (sfc_funcptr_t*)interfaces;
         sfc_funcptr_t* const func_des = (sfc_funcptr_t*)&famicom->interfaces;
         for (int i = 0; i != count; ++i) if (func_src[i]) func_des[i] = func_src[i];
     }
-    // Ä¬ÈÏÊÇNTSCÖÆÊ½
+    // é»˜è®¤æ˜¯NTSCåˆ¶å¼
     famicom->config = SFC_CONFIG_NTSC;
-    // Ò»¿ªÊ¼ÔØÈë²âÊÔROM
+    // ä¸€å¼€å§‹è½½å…¥æµ‹è¯•ROM
     return sfc_load_new_rom(famicom);
     return SFC_ERROR_OK;
 }
 
 /// <summary>
-/// StepFC: ·´³õÊ¼»¯famicom
+/// StepFC: ååˆå§‹åŒ–famicom
 /// </summary>
 /// <param name="famicom">The famicom.</param>
 void sfc_famicom_uninit(sfc_famicom_t* famicom) {
-    // ÊÍ·ÅROM
+    // é‡Šæ”¾ROM
     famicom->interfaces.free_rom(famicom->argument, &famicom->rom_info);
 }
 
 
 /// <summary>
-/// StepFC: ÉèÖÃÃû´Ê±íÓÃ²Ö¿â
+/// StepFC: è®¾ç½®åè¯è¡¨ç”¨ä»“åº“
 /// </summary>
 /// <param name="famicom">The famicom.</param>
 static inline void sfc_setup_nametable_bank(sfc_famicom_t* famicom) {
-    // 4ÆÁ
+    // 4å±
     if (famicom->rom_info.four_screen) {
         famicom->ppu.banks[0x8] = famicom->video_memory + 0x400 * 0;
         famicom->ppu.banks[0x9] = famicom->video_memory + 0x400 * 1;
         famicom->ppu.banks[0xa] = famicom->video_memory_ex + 0x400 * 0;
         famicom->ppu.banks[0xb] = famicom->video_memory_ex + 0x400 * 1;
     }
-    // ºá°æ
+    // æ¨ªç‰ˆ
     else if (famicom->rom_info.vmirroring) {
         famicom->ppu.banks[0x8] = famicom->video_memory + 0x400 * 0;
         famicom->ppu.banks[0x9] = famicom->video_memory + 0x400 * 1;
         famicom->ppu.banks[0xa] = famicom->video_memory + 0x400 * 0;
         famicom->ppu.banks[0xb] = famicom->video_memory + 0x400 * 1;
     }
-    // ×İ°æ
+    // çºµç‰ˆ
     else {
         famicom->ppu.banks[0x8] = famicom->video_memory + 0x400 * 0;
         famicom->ppu.banks[0x9] = famicom->video_memory + 0x400 * 0;
@@ -96,17 +96,17 @@ static inline void sfc_setup_nametable_bank(sfc_famicom_t* famicom) {
 }
 
 /// <summary>
-/// StepFC: ÖØÖÃfamicom
+/// StepFC: é‡ç½®famicom
 /// </summary>
 /// <param name="famicom">The famicom.</param>
 /// <returns></returns>
 sfc_ecode sfc_famicom_reset(sfc_famicom_t* famicom) {
-    // Çå¿ÕPPUÊı¾İ
+    // æ¸…ç©ºPPUæ•°æ®
     memset(&famicom->ppu, 0, sizeof(famicom->ppu));
-    // ÖØÖÃmapper
+    // é‡ç½®mapper
     sfc_ecode ecode = famicom->mapper.reset(famicom);
     if (ecode) return ecode;
-    // ³õÊ¼»¯¼Ä´æÆ÷
+    // åˆå§‹åŒ–å¯„å­˜å™¨
     const uint8_t pcl = sfc_read_cpu_address(SFC_VERCTOR_RESET + 0, famicom);
     const uint8_t pch = sfc_read_cpu_address(SFC_VERCTOR_RESET + 1, famicom);
     famicom->registers.program_counter = (uint16_t)pcl | (uint16_t)pch << 8;
@@ -115,12 +115,12 @@ sfc_ecode sfc_famicom_reset(sfc_famicom_t* famicom) {
     famicom->registers.y_index = 0;
     famicom->registers.stack_pointer = 0xff;
     famicom->registers.status = 0
-        | SFC_FLAG_R    //  Ò»Ö±Îª1
+        | SFC_FLAG_R    //  ä¸€ç›´ä¸º1
         ;
-    // µ÷É«°å
-    // Ãû³Æ±í
+    // è°ƒè‰²æ¿
+    // åç§°è¡¨
     sfc_setup_nametable_bank(famicom);
-    // ¾µÏñ
+    // é•œåƒ
     famicom->ppu.banks[0xc] = famicom->ppu.banks[0x8];
     famicom->ppu.banks[0xd] = famicom->ppu.banks[0x9];
     famicom->ppu.banks[0xe] = famicom->ppu.banks[0xa];
@@ -134,7 +134,7 @@ sfc_ecode sfc_famicom_reset(sfc_famicom_t* famicom) {
 #include <stdlib.h>
 
 /// <summary>
-/// ¼ÓÔØÄ¬ÈÏ²âÊÔROM
+/// åŠ è½½é»˜è®¤æµ‹è¯•ROM
 /// </summary>
 /// <param name="arg">The argument.</param>
 /// <param name="info">The information.</param>
@@ -142,34 +142,34 @@ sfc_ecode sfc_famicom_reset(sfc_famicom_t* famicom) {
 sfc_ecode sfc_load_default_rom(void* arg, sfc_rom_info_t* info) {
     assert(info->data_prgrom == NULL && "FREE FIRST");
     FILE* const file = fopen("spritecans.nes", "rb");
-    // ÎÄ±¾Î´ÕÒµ½
+    // æ–‡æœ¬æœªæ‰¾åˆ°
     if (!file) return SFC_ERROR_FILE_NOT_FOUND;
     sfc_ecode code = SFC_ERROR_ILLEGAL_FILE;
-    // ¶ÁÈ¡ÎÄ¼şÍ·
+    // è¯»å–æ–‡ä»¶å¤´
     sfc_nes_header_t nes_header;
     if (fread(&nes_header, sizeof(nes_header), 1, file)) {
-        // ¿ªÍ·4×Ö½Ú
+        // å¼€å¤´4å­—èŠ‚
         union { uint32_t u32; uint8_t id[4]; } this_union;
         this_union.id[0] = 'N';
         this_union.id[1] = 'E';
         this_union.id[2] = 'S';
         this_union.id[3] = '\x1A';
-        // ±È½ÏÕâËÄ×Ö½Ú
+        // æ¯”è¾ƒè¿™å››å­—èŠ‚
         if (this_union.u32 == nes_header.id) {
             const size_t size1 = 16 * 1024 * nes_header.count_prgrom16kb;
-            // ÔÊĞíÃ»ÓĞCHR-ROM(Ê¹ÓÃCHR-RAM´úÌæ)
+            // å…è®¸æ²¡æœ‰CHR-ROM(ä½¿ç”¨CHR-RAMä»£æ›¿)
             const size_t size2 = 8 * 1024 * (nes_header.count_chrrom_8kb | 1);
             uint8_t* const ptr = (uint8_t*)malloc(size1 + size2);
-            // ÄÚ´æÉêÇë³É¹¦
+            // å†…å­˜ç”³è¯·æˆåŠŸ
             if (ptr) {
                 code = SFC_ERROR_OK;
-                // TODO: ÊµÏÖTrainer
-                // Ìø¹ıTrainerÊı¾İ
+                // TODO: å®ç°Trainer
+                // è·³è¿‡Traineræ•°æ®
                 if (nes_header.control1 & SFC_NES_TRAINER) fseek(file, 512, SEEK_CUR);
-                // Õâ¶¼´íÁË¾Í²»¹ÜÎÒµÄÊÂÇéÁË
+                // è¿™éƒ½é”™äº†å°±ä¸ç®¡æˆ‘çš„äº‹æƒ…äº†
                 fread(ptr, size1 + size2, 1, file);
 
-                // ÌîĞ´infoÊı¾İ±í¸ñ
+                // å¡«å†™infoæ•°æ®è¡¨æ ¼
                 info->data_prgrom = ptr;
                 info->data_chrrom = ptr + size1;
                 info->count_prgrom16kb = nes_header.count_prgrom16kb;
@@ -185,23 +185,23 @@ sfc_ecode sfc_load_default_rom(void* arg, sfc_rom_info_t* info) {
                 assert(!(nes_header.control2 & SFC_NES_VS_UNISYSTEM) && "unsupported");
                 assert(!(nes_header.control2 & SFC_NES_Playchoice10) && "unsupported");
             }
-            // ÄÚ´æ²»×ã
+            // å†…å­˜ä¸è¶³
             else code = SFC_ERROR_OUT_OF_MEMORY;
         }
-        // ·Ç·¨ÎÄ¼ş
+        // éæ³•æ–‡ä»¶
     }
     fclose(file);
     return code;
 }
 
 /// <summary>
-/// ÊÍ·ÅÄ¬ÈÏ²âÊÔROM
+/// é‡Šæ”¾é»˜è®¤æµ‹è¯•ROM
 /// </summary>
 /// <param name="arg">The argument.</param>
 /// <param name="info">The information.</param>
 /// <returns></returns>
 sfc_ecode sfc_free_default_rom(void* arg, sfc_rom_info_t* info) {
-    // ÊÍ·Å¶¯Ì¬ÉêÇëµÄÊı¾İ
+    // é‡Šæ”¾åŠ¨æ€ç”³è¯·çš„æ•°æ®
     free(info->data_prgrom);
     info->data_prgrom = NULL;
 
@@ -210,7 +210,7 @@ sfc_ecode sfc_free_default_rom(void* arg, sfc_rom_info_t* info) {
 
 
 /// <summary>
-/// Ä¬ÈÏÖ´ĞĞÇ°µÄĞĞÎª
+/// é»˜è®¤æ‰§è¡Œå‰çš„è¡Œä¸º
 /// </summary>
 /// <param name="">The .</param>
 /// <param name="">The .</param>
@@ -221,33 +221,33 @@ void sfc_before_execute(void* arg, sfc_famicom_t* info) {
 
 
 /// <summary>
-/// StepFC: ¼ÓÔØROM
+/// StepFC: åŠ è½½ROM
 /// </summary>
 /// <param name="famicom">The famicom.</param>
 /// <returns></returns>
 sfc_ecode sfc_load_new_rom(sfc_famicom_t* famicom) {
-    // ÏÈÊÍ·Å¾ÉµÄROM
+    // å…ˆé‡Šæ”¾æ—§çš„ROM
     sfc_ecode code = famicom->interfaces.free_rom(
         famicom->argument,
         &famicom->rom_info
     );
-    // Çå¿ÕÊı¾İ
+    // æ¸…ç©ºæ•°æ®
     memset(&famicom->rom_info, 0, sizeof(famicom));
-    // ÔØÈëROM
+    // è½½å…¥ROM
     if (code == SFC_ERROR_OK) {
         code = famicom->interfaces.load_rom(
             famicom->argument,
             &famicom->rom_info
         );
     }
-    // ÔØÈëĞÂµÄMapper
+    // è½½å…¥æ–°çš„Mapper
     if (code == SFC_ERROR_OK) {
         code = sfc_load_mapper(
             famicom,
             famicom->rom_info.mapper_number
         );
     }
-    // Ê×´ÎÖØÖÃ
+    // é¦–æ¬¡é‡ç½®
     if (code == SFC_ERROR_OK) {
         code = sfc_famicom_reset(famicom);
     }

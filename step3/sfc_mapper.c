@@ -1,10 +1,10 @@
-#include "sfc_cpu.h"
+Ôªø#include "sfc_cpu.h"
 #include "sfc_famicom.h"
 #include <assert.h>
 #include <string.h>
 
 /// <summary>
-///  µ”√∫Ø ˝-StepFC: ‘ÿ»Î8k PRG-ROM
+/// ÂÆûÁî®ÂáΩÊï∞-StepFC: ËΩΩÂÖ•8k PRG-ROM
 /// </summary>
 /// <param name="famicom">The famicom.</param>
 /// <param name="des">The DES.</param>
@@ -21,7 +21,7 @@ static inline sfc_ecode sfc_load_mapper_00(sfc_famicom_t* famicom);
 #define SFC_CASE_LOAD_MAPPER(id) case 0x##id: return sfc_load_mapper_##id(famicom);
 
 /// <summary>
-/// StepFC: º”‘ÿMapper
+/// StepFC: Âä†ËΩΩMapper
 /// </summary>
 /// <param name="famicom">The famicom.</param>
 /// <param name="id">The identifier.</param>
@@ -40,16 +40,16 @@ extern sfc_ecode sfc_load_mapper(sfc_famicom_t* famicom, uint8_t id) {
 // ------------------------------- MAPPER 000 - NROM
 
 /// <summary>
-/// StepFC: MAPPER 000 - NROM ÷ÿ÷√
+/// StepFC: MAPPER 000 - NROM ÈáçÁΩÆ
 /// </summary>
 /// <param name="famicom">The famicom.</param>
 /// <returns></returns>
 static sfc_ecode sfc_mapper_00_reset(sfc_famicom_t* famicom) {
     assert(famicom->rom_info.count_prgrom16kb && "bad count");
     assert(famicom->rom_info.count_prgrom16kb <= 2 && "bad count");
-    // 16KB -> ‘ÿ»Î $8000-$BFFF, $C000-$FFFF Œ™æµœÒ
+    // 16KB -> ËΩΩÂÖ• $8000-$BFFF, $C000-$FFFF ‰∏∫ÈïúÂÉè
     const int id2 = famicom->rom_info.count_prgrom16kb & 2;
-    // 32KB -> ‘ÿ»Î $8000-$FFFF
+    // 32KB -> ËΩΩÂÖ• $8000-$FFFF
     sfc_load_prgrom_8k(famicom, 0, 0);
     sfc_load_prgrom_8k(famicom, 1, 1);
     sfc_load_prgrom_8k(famicom, 2, id2 + 0);

@@ -1,44 +1,46 @@
-#pragma once
+ï»¿#pragma once
+// License: MIT  http://opensource.org/licenses/MIT
+// Author: dustpg   mailto:dustpg@gmail.com
 #include <stdint.h>
 
-// PPUÓÃ±êÖ¾
+// PPUç”¨æ ‡å¿—
 enum sfc_ppu_flag {
-    SFC_PPU2000_NMIGen  = 0x80, // [0x2000]VBlankÆÚ¼äÊÇ·ñ²úÉúNMI
-    SFC_PPU2000_Sp8x16  = 0x20, // [0x2000]¾«ÁéÎª8x16(1), »¹ÊÇ8x8(0)
-    SFC_PPU2000_BgTabl  = 0x10, // [0x2000]±³¾°µ÷É«°å±íµØÖ·$1000(1), $0000(0)
-    SFC_PPUFLAG_SpTabl  = 0x08, // [0x2000]¾«Áéµ÷É«°å±íµØÖ·$1000(1), $0000(0), 8x16Ä£Ê½ÏÂ±»ºöÂÔ
-    SFC_PPU2000_VINC32  = 0x04, // [0x2000]VRAM¶ÁĞ´Ôö¼ÓÖµ32(1), 1(0)
+    SFC_PPU2000_NMIGen  = 0x80, // [0x2000]VBlankæœŸé—´æ˜¯å¦äº§ç”ŸNMI
+    SFC_PPU2000_Sp8x16  = 0x20, // [0x2000]ç²¾çµä¸º8x16(1), è¿˜æ˜¯8x8(0)
+    SFC_PPU2000_BgTabl  = 0x10, // [0x2000]èƒŒæ™¯è°ƒè‰²æ¿è¡¨åœ°å€$1000(1), $0000(0)
+    SFC_PPUFLAG_SpTabl  = 0x08, // [0x2000]ç²¾çµè°ƒè‰²æ¿è¡¨åœ°å€$1000(1), $0000(0), 8x16æ¨¡å¼ä¸‹è¢«å¿½ç•¥
+    SFC_PPU2000_VINC32  = 0x04, // [0x2000]VRAMè¯»å†™å¢åŠ å€¼32(1), 1(0)
         
-    SFC_PPU2002_VBlank  = 0x80, // [0x2002]´¹Ö±¿Õ°×¼äÏ¶±êÖ¾
-    SFC_PPU2002_Sp0Hit  = 0x40, // [0x2002]ÁãºÅ¾«ÁéÃüÖĞ±êÖ¾
-    SFC_PPU2002_SpOver  = 0x20, // [0x2002]¾«ÁéÒç³ö±êÖ¾
+    SFC_PPU2002_VBlank  = 0x80, // [0x2002]å‚ç›´ç©ºç™½é—´éš™æ ‡å¿—
+    SFC_PPU2002_Sp0Hit  = 0x40, // [0x2002]é›¶å·ç²¾çµå‘½ä¸­æ ‡å¿—
+    SFC_PPU2002_SpOver  = 0x20, // [0x2002]ç²¾çµæº¢å‡ºæ ‡å¿—
 };
 
 /// <summary>
 /// 
 /// </summary>
 typedef struct {
-    // ÄÚ´æµØÖ·¿â
+    // å†…å­˜åœ°å€åº“
     uint8_t*        banks[0x4000 / 0x0400];
-    // VRAM µØÖ·
+    // VRAM åœ°å€
     uint16_t        vramaddr;
-    // ¼Ä´æÆ÷ PPUCTRL      @$2000
+    // å¯„å­˜å™¨ PPUCTRL      @$2000
     uint8_t         ctrl;
-    // ¼Ä´æÆ÷ PPUMASK      @$2001
+    // å¯„å­˜å™¨ PPUMASK      @$2001
     uint8_t         mask;
-    // ¼Ä´æÆ÷ PPUSTATUS    @$2002
+    // å¯„å­˜å™¨ PPUSTATUS    @$2002
     uint8_t         status;
-    // ¼Ä´æÆ÷ OAMADDR      @$2003
+    // å¯„å­˜å™¨ OAMADDR      @$2003
     uint8_t         oamaddr;
-    // ¹ö¶¯Æ«ÒÆ
+    // æ»šåŠ¨åç§»
     uint8_t         scroll[2];
-    // ¹ö¶¯Æ«ÒÆË«Ğ´Î»ÖÃ¼ÇÂ¼
+    // æ»šåŠ¨åç§»åŒå†™ä½ç½®è®°å½•
     uint8_t         writex2;
-    // ÏÔ´æ¶ÁÈ¡»º³åÖµ
+    // æ˜¾å­˜è¯»å–ç¼“å†²å€¼
     uint8_t         pseudo;
-    // ¾«Áéµ÷É«°åË÷Òı
+    // ç²¾çµè°ƒè‰²æ¿ç´¢å¼•
     uint8_t         spindexes[0x20];
-    // ¾«ÁéÊı¾İ: 256B
+    // ç²¾çµæ•°æ®: 256B
     uint8_t         sprites[0x100];
 } sfc_ppu_t;
 

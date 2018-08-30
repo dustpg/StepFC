@@ -1,16 +1,16 @@
-#include "sfc_ppu.h"
+ï»¿#include "sfc_ppu.h"
 #include <assert.h>
 #include <string.h>
 
 /// <summary>
-/// StepFC: ¶ÁÈ¡PPUµØÖ·¿Õ¼ä
+/// StepFC: è¯»å–PPUåœ°å€ç©ºé—´
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="data">The data.</param>
 /// <param name="ppu">The ppu.</param>
 uint8_t sfc_read_ppu_address(uint16_t address, sfc_ppu_t* ppu) {
     const uint16_t real_address = address & (uint16_t)0x3FFF;
-    // Ê¹ÓÃBANK¶ÁÈ¡
+    // ä½¿ç”¨BANKè¯»å–
     if (real_address < (uint16_t)0x3F00) {
         const uint16_t index = real_address >> 10;
         const uint16_t offset = real_address & (uint16_t)0x3FF;
@@ -19,19 +19,19 @@ uint8_t sfc_read_ppu_address(uint16_t address, sfc_ppu_t* ppu) {
         ppu->pseudo = ppu->banks[index][offset];
         return data;
     }
-    // µ÷É«°åË÷Òı
+    // è°ƒè‰²æ¿ç´¢å¼•
     else return ppu->pseudo = ppu->spindexes[real_address & (uint16_t)0x1f];
 }
 
 /// <summary>
-/// StepFC: Ğ´ÈëPPUµØÖ·¿Õ¼ä
+/// StepFC: å†™å…¥PPUåœ°å€ç©ºé—´
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="data">The data.</param>
 /// <param name="ppu">The ppu.</param>
 void sfc_write_ppu_address(uint16_t address, uint8_t data, sfc_ppu_t* ppu) {
     const uint16_t real_address = address & (uint16_t)0x3FFF;
-    // Ê¹ÓÃBANKĞ´Èë
+    // ä½¿ç”¨BANKå†™å…¥
     if (real_address < (uint16_t)0x3F00) {
         assert(real_address >= 0x2000);
         const uint16_t index = real_address >> 10;
@@ -39,13 +39,13 @@ void sfc_write_ppu_address(uint16_t address, uint8_t data, sfc_ppu_t* ppu) {
         assert(ppu->banks[index]);
         ppu->banks[index][offset] = data;
     }
-    // µ÷É«°åË÷Òı
+    // è°ƒè‰²æ¿ç´¢å¼•
     else {
-        // ¶ÀÁ¢µØÖ·
+        // ç‹¬ç«‹åœ°å€
         if (real_address & (uint16_t)0x03) {
             ppu->spindexes[real_address & (uint16_t)0x1f] = data;
         }
-        // ¾µÏñ$3F00/$3F04/$3F08/$3F0C
+        // é•œåƒ$3F00/$3F04/$3F08/$3F0C
         else {
             const uint16_t offset = real_address & (uint16_t)0x0f;
             ppu->spindexes[offset] = data;
@@ -56,52 +56,52 @@ void sfc_write_ppu_address(uint16_t address, uint8_t data, sfc_ppu_t* ppu) {
 
 
 /// <summary>
-/// StepFC: Ê¹ÓÃCPUµØÖ·¿Õ¼ä¶ÁÈ¡PPU¼Ä´æÆ÷
+/// StepFC: ä½¿ç”¨CPUåœ°å€ç©ºé—´è¯»å–PPUå¯„å­˜å™¨
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="ppu">The ppu.</param>
 /// <returns></returns>
 uint8_t sfc_read_ppu_register_via_cpu(uint16_t address, sfc_ppu_t* ppu) {
     uint8_t data = 0x00;
-    // 8×Ö½Ú¾µÏñ
+    // 8å­—èŠ‚é•œåƒ
     switch (address & (uint16_t)0x7)
     {
     case 0:
         // 0x2000: Controller ($2000) > write
-        // Ö»Ğ´¼Ä´æÆ÷
+        // åªå†™å¯„å­˜å™¨
     case 1:
         // 0x2001: Mask ($2001) > write
-        // Ö»Ğ´¼Ä´æÆ÷
+        // åªå†™å¯„å­˜å™¨
         assert(!"write only!");
         break;
     case 2:
         // 0x2002: Status ($2002) < read
-        // Ö»¶Á×´Ì¬¼Ä´æÆ÷
+        // åªè¯»çŠ¶æ€å¯„å­˜å™¨
         data = ppu->status;
-        // ¶ÁÈ¡ºó»áÇå³ıVBlank×´Ì¬
+        // è¯»å–åä¼šæ¸…é™¤VBlankçŠ¶æ€
         ppu->status &= ~(uint8_t)SFC_PPU2002_VBlank;
         break;
     case 3:
         // 0x2003: OAM address port ($2003) > write
-        // Ö»Ğ´¼Ä´æÆ÷
+        // åªå†™å¯„å­˜å™¨
         assert(!"write only!");
         break;
     case 4:
         // 0x2004: OAM data ($2004) <> read/write
-        // ¶ÁĞ´¼Ä´æÆ÷
+        // è¯»å†™å¯„å­˜å™¨
         data = ppu->sprites[ppu->oamaddr++];
         break;
     case 5:
         // 0x2005: Scroll ($2005) >> write x2
-        // Ë«Ğ´¼Ä´æÆ÷
+        // åŒå†™å¯„å­˜å™¨
     case 6:
         // 0x2006: Address ($2006) >> write x2
-        // Ë«Ğ´¼Ä´æÆ÷
+        // åŒå†™å¯„å­˜å™¨
         assert(!"write only!");
         break;
     case 7:
         // 0x2007: Data ($2007) <> read/write
-        // PPU VRAM¶ÁĞ´¶Ë¿Ú
+        // PPU VRAMè¯»å†™ç«¯å£
         data = sfc_read_ppu_address(ppu->vramaddr, ppu);
         ppu->vramaddr += (uint16_t)((ppu->ctrl & SFC_PPU2000_VINC32) ? 32 : 1);
         break;
@@ -111,7 +111,7 @@ uint8_t sfc_read_ppu_register_via_cpu(uint16_t address, sfc_ppu_t* ppu) {
 
 
 /// <summary>
-/// StepFC: Ê¹ÓÃCPUµØÖ·¿Õ¼äĞ´ÈëPPU¼Ä´æÆ÷
+/// StepFC: ä½¿ç”¨CPUåœ°å€ç©ºé—´å†™å…¥PPUå¯„å­˜å™¨
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="data">The data.</param>
@@ -121,44 +121,44 @@ void sfc_write_ppu_register_via_cpu(uint16_t address, uint8_t data, sfc_ppu_t* p
     switch (address & (uint16_t)0x7)
     {
     case 0:
-        // PPU ¿ØÖÆ¼Ä´æÆ÷
+        // PPU æ§åˆ¶å¯„å­˜å™¨
         // 0x2000: Controller ($2000) > write
         ppu->ctrl = data;
         break;
     case 1:
-        // PPU ÑÚÂë¼Ä´æÆ÷
+        // PPU æ©ç å¯„å­˜å™¨
         // 0x2001: Mask ($2001) > write
         ppu->mask = data;
         break;
     case 2:
         // 0x2002: Status ($2002) < read
-        // Ö»¶Á
+        // åªè¯»
         assert(!"read only");
         break;
     case 3:
         // 0x2003: OAM address port ($2003) > write
-        // PPU OAM µØÖ·¶Ë¿Ú
+        // PPU OAM åœ°å€ç«¯å£
         ppu->oamaddr = data;
         break;
     case 4:
         // 0x2004: OAM data ($2004) <> read/write
-        // PPU OAM Êı¾İ¶Ë¿Ú
+        // PPU OAM æ•°æ®ç«¯å£
         ppu->sprites[ppu->oamaddr++] = data;
         break;
     case 5:
         // 0x2005: Scroll ($2005) >> write x2
-        // PPU ¹ö¶¯Î»ÖÃ¼Ä´æÆ÷ - Ë«Ğ´
+        // PPU æ»šåŠ¨ä½ç½®å¯„å­˜å™¨ - åŒå†™
         ppu->scroll[ppu->writex2 & 1] = data;
         ++ppu->writex2;
         break;
     case 6:
         // 0x2006: Address ($2006) >> write x2
-        // PPU µØÖ·¼Ä´æÆ÷ - Ë«Ğ´
-        // Ğ´Èë¸ß×Ö½Ú
+        // PPU åœ°å€å¯„å­˜å™¨ - åŒå†™
+        // å†™å…¥é«˜å­—èŠ‚
         if (ppu->writex2 & 1) {
             ppu->vramaddr = (ppu->vramaddr & (uint16_t)0xFF00) | (uint16_t)data;
         }
-        // Ğ´ÈëµÍ×Ö½Ú
+        // å†™å…¥ä½å­—èŠ‚
         else {
             ppu->vramaddr = (ppu->vramaddr & (uint16_t)0x00FF) | ((uint16_t)data << 8);
         }
@@ -166,7 +166,7 @@ void sfc_write_ppu_register_via_cpu(uint16_t address, uint8_t data, sfc_ppu_t* p
         break;
     case 7:
         // 0x2007: Data ($2007) <> read/write
-        // PPU VRAMÊı¾İ¶Ë
+        // PPU VRAMæ•°æ®ç«¯
         sfc_write_ppu_address(ppu->vramaddr, data, ppu);
         ppu->vramaddr += (uint16_t)((ppu->ctrl & SFC_PPU2000_VINC32) ? 32 : 1);
         break;
@@ -175,7 +175,7 @@ void sfc_write_ppu_register_via_cpu(uint16_t address, uint8_t data, sfc_ppu_t* p
 
 
 /// <summary>
-/// µ÷É«°åÊı¾İ
+/// è°ƒè‰²æ¿æ•°æ®
 /// </summary>
 const union sfc_palette_data {
     struct { uint8_t r, g, a, x; };

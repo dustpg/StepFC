@@ -1,17 +1,17 @@
-#include "sfc_famicom.h"
+ï»¿#include "sfc_famicom.h"
 #include <assert.h>
 #include <string.h>
 
-// ¼ÓÔØÄ¬ÈÏROM
+// åŠ è½½é»˜è®¤ROM
 static sfc_ecode sfc_load_default_rom(void*, sfc_rom_info_t*);
-// ÊÍ·ÅÄ¬ÈÏROM
+// é‡Šæ”¾é»˜è®¤ROM
 static sfc_ecode sfc_free_default_rom(void*, sfc_rom_info_t*);
 
-// ÉùÃ÷Ò»¸öËæ±ã(SB)µÄº¯ÊıÖ¸ÕëÀàĞÍ
+// å£°æ˜ä¸€ä¸ªéšä¾¿(SB)çš„å‡½æ•°æŒ‡é’ˆç±»å‹
 typedef void(*sfc_funcptr_t)();
 
 /// <summary>
-/// StepFC: ³õÊ¼»¯famicom
+/// StepFC: åˆå§‹åŒ–famicom
 /// </summary>
 /// <param name="famicom">The famicom.</param>
 /// <param name="argument">The argument.</param>
@@ -23,32 +23,32 @@ sfc_ecode sfc_famicom_init(
     const sfc_interface_t* interfaces) {
     assert(famicom && "bad famicom");
     famicom->argument = argument;
-    // ÔØÈëÄ¬ÈÏ½Ó¿Ú
+    // è½½å…¥é»˜è®¤æ¥å£
     famicom->interfaces.load_rom = sfc_load_default_rom;
     famicom->interfaces.free_rom = sfc_free_default_rom;
-    // Çå¿ÕÊı¾İ
+    // æ¸…ç©ºæ•°æ®
     memset(&famicom->rom_info, 0, sizeof(famicom->rom_info));
-    // Ìá¹©ÁË½Ó¿Ú
+    // æä¾›äº†æ¥å£
     if (interfaces) {
         const int count = sizeof(*interfaces) / sizeof(interfaces->load_rom);
-        // ¸´ÖÆÓĞĞ§µÄº¯ÊıÖ¸Õë
-        // UB: C±ê×¼²¢²»Ò»¶¨±£Ö¤sizeof(void*)µÈÍ¬sizeof(fp) (·Ç·ëÌåÏµ)
-        //     ËùÒÔÕâÀïÉùÃ÷ÁËÒ»¸ösfc_funcptr_t
+        // å¤åˆ¶æœ‰æ•ˆçš„å‡½æ•°æŒ‡é’ˆ
+        // UB: Cæ ‡å‡†å¹¶ä¸ä¸€å®šä¿è¯sizeof(void*)ç­‰åŒsizeof(fp) (éå†¯ä½“ç³»)
+        //     æ‰€ä»¥è¿™é‡Œå£°æ˜äº†ä¸€ä¸ªsfc_funcptr_t
         sfc_funcptr_t* const func_src = (sfc_funcptr_t*)interfaces;
         sfc_funcptr_t* const func_des = (sfc_funcptr_t*)&famicom->interfaces;
         for (int i = 0; i != count; ++i) if (func_src[i]) func_des[i] = func_src[i];
     }
-    // Ò»¿ªÊ¼ÔØÈë²âÊÔROM
+    // ä¸€å¼€å§‹è½½å…¥æµ‹è¯•ROM
     return famicom->interfaces.load_rom(argument, &famicom->rom_info);
     return SFC_ERROR_OK;
 }
 
 /// <summary>
-/// StepFC: ·´³õÊ¼»¯famicom
+/// StepFC: ååˆå§‹åŒ–famicom
 /// </summary>
 /// <param name="famicom">The famicom.</param>
 void sfc_famicom_uninit(sfc_famicom_t* famicom) {
-    // ÊÍ·ÅROM
+    // é‡Šæ”¾ROM
     famicom->interfaces.free_rom(famicom->argument, &famicom->rom_info);
 }
 
@@ -57,7 +57,7 @@ void sfc_famicom_uninit(sfc_famicom_t* famicom) {
 #include <stdlib.h>
 
 /// <summary>
-/// ¼ÓÔØÄ¬ÈÏ²âÊÔROM
+/// åŠ è½½é»˜è®¤æµ‹è¯•ROM
 /// </summary>
 /// <param name="arg">The argument.</param>
 /// <param name="info">The information.</param>
@@ -65,33 +65,33 @@ void sfc_famicom_uninit(sfc_famicom_t* famicom) {
 sfc_ecode sfc_load_default_rom(void* arg, sfc_rom_info_t* info) {
     assert(info->data_prgrom == NULL && "FREE FIRST");
     FILE* const file = fopen("nestest.nes", "rb");
-    // ÎÄ±¾Î´ÕÒµ½
+    // æ–‡æœ¬æœªæ‰¾åˆ°
     if (!file) return SFC_ERROR_FILE_NOT_FOUND;
     sfc_ecode code = SFC_ERROR_ILLEGAL_FILE;
-    // ¶ÁÈ¡ÎÄ¼şÍ·
+    // è¯»å–æ–‡ä»¶å¤´
     sfc_nes_header_t nes_header;
     if (fread(&nes_header, sizeof(nes_header), 1, file)) {
-        // ¿ªÍ·4×Ö½Ú
+        // å¼€å¤´4å­—èŠ‚
         union { uint32_t u32; uint8_t id[4]; } this_union;
         this_union.id[0] = 'N';
         this_union.id[1] = 'E';
         this_union.id[2] = 'S';
         this_union.id[3] = '\x1A';
-        // ±È½ÏÕâËÄ×Ö½Ú
+        // æ¯”è¾ƒè¿™å››å­—èŠ‚
         if (this_union.u32 == nes_header.id) {
             const size_t size1 = 16 * 1024 * nes_header.count_prgrom16kb;
             const size_t size2 =  8 * 1024 * nes_header.count_chrrom_8kb;
             uint8_t* const ptr = (uint8_t*)malloc(size1 + size2);
-            // ÄÚ´æÉêÇë³É¹¦
+            // å†…å­˜ç”³è¯·æˆåŠŸ
             if (ptr) {
                 code = SFC_ERROR_OK;
-                // TODO: ÊµÏÖTrainer
-                // Ìø¹ıTrainerÊı¾İ
+                // TODO: å®ç°Trainer
+                // è·³è¿‡Traineræ•°æ®
                 if (nes_header.control1 & SFC_NES_TRAINER) fseek(file, 512, SEEK_CUR);
-                // Õâ¶¼´íÁË¾Í²»¹ÜÎÒµÄÊÂÇéÁË
+                // è¿™éƒ½é”™äº†å°±ä¸ç®¡æˆ‘çš„äº‹æƒ…äº†
                 fread(ptr, size1 + size2, 1, file);
 
-                // ÌîĞ´infoÊı¾İ±í¸ñ
+                // å¡«å†™infoæ•°æ®è¡¨æ ¼
                 info->data_prgrom = ptr;
                 info->data_chrrom = ptr + size1;
                 info->count_prgrom16kb = nes_header.count_prgrom16kb;
@@ -107,23 +107,23 @@ sfc_ecode sfc_load_default_rom(void* arg, sfc_rom_info_t* info) {
                 assert(!(nes_header.control2 & SFC_NES_VS_UNISYSTEM) && "unsupported");
                 assert(!(nes_header.control2 & SFC_NES_Playchoice10) && "unsupported");
             }
-            // ÄÚ´æ²»×ã
+            // å†…å­˜ä¸è¶³
             else code = SFC_ERROR_OUT_OF_MEMORY;
         }
-        // ·Ç·¨ÎÄ¼ş
+        // éæ³•æ–‡ä»¶
     }
     fclose(file);
     return code;
 }
 
 /// <summary>
-/// ÊÍ·ÅÄ¬ÈÏ²âÊÔROM
+/// é‡Šæ”¾é»˜è®¤æµ‹è¯•ROM
 /// </summary>
 /// <param name="arg">The argument.</param>
 /// <param name="info">The information.</param>
 /// <returns></returns>
 sfc_ecode sfc_free_default_rom(void* arg, sfc_rom_info_t* info) {
-    // ÊÍ·Å¶¯Ì¬ÉêÇëµÄÊı¾İ
+    // é‡Šæ”¾åŠ¨æ€ç”³è¯·çš„æ•°æ®
     free(info->data_prgrom);
     info->data_prgrom = NULL;
 
