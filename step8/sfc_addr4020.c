@@ -1,6 +1,6 @@
-﻿#include "sfc_6502.h"
-#include "sfc_cpu.h"
-#include "sfc_famicom.h"
+﻿#include "../step7/sfc_6502.h"
+#include "../step7/sfc_cpu.h"
+#include "../step7/sfc_famicom.h"
 #include <assert.h>
 #include <string.h>
 
@@ -66,9 +66,30 @@ static inline const uint8_t* sfc_get_dma_address(uint8_t data, const sfc_famicom
 extern inline void sfc_write_cpu_address4020(uint16_t address, uint8_t data, sfc_famicom_t* famicom) {
     switch (address & (uint16_t)0x1f)
     {
+    case 0x00:
+        // $4000 - 方波 1
+        /*
+            DDLC NNNN 
+                - [D] 占空比
+                - [L] 循环包络/禁止长度计数器
+                - [C] 恒定音量标志位(1: 固定音量 0:使用包络的音量)
+                - [N] 恒定音量模式下的音量 或者作为包络的分频器
+
+        */
+        break;
     case 0x14:
         // 精灵RAM直接储存器访问
-        memcpy(famicom->ppu.sprites, sfc_get_dma_address(data, famicom), 256);
+        if (famicom->ppu.oamaddr) {
+            uint8_t* dst = famicom->ppu.sprites;
+            const uint8_t len = famicom->ppu.oamaddr;
+            const uint8_t* src = sfc_get_dma_address(data, famicom);
+            // 需要换行
+            memcpy(dst, src + len, len);
+            memcpy(dst + len, src, 256 - len);
+        }
+        else memcpy(famicom->ppu.sprites, sfc_get_dma_address(data, famicom), 256);
+        famicom->cpu_cycle_count += 513;
+        famicom->cpu_cycle_count += famicom->cpu_cycle_count & 1;
         break;
     case 0x16:
         // 手柄端口

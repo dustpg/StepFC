@@ -1,11 +1,11 @@
-#include "sfc_6502.h"
+ï»¿#include "sfc_6502.h"
 #include "sfc_cpu.h"
 #include "sfc_famicom.h"
 #include <assert.h>
 #include <string.h>
 
 /// <summary>
-/// StepFC: ¶ÁÈ¡CPUµØÖ·Êı¾İ4020
+/// StepFC: è¯»å–CPUåœ°å€æ•°æ®4020
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
@@ -15,12 +15,12 @@ extern inline uint8_t sfc_read_cpu_address4020(uint16_t address, sfc_famicom_t* 
     switch (address & (uint16_t)0x1f)
     {
     case 0x16:
-        // ÊÖ±ú¶Ë¿Ú#1
+        // æ‰‹æŸ„ç«¯å£#1
         data = (famicom->button_states+0)[famicom->button_index_1 & famicom->button_index_mask];
         ++famicom->button_index_1;
         break;
     case 0x17:
-        // ÊÖ±ú¶Ë¿Ú#2
+        // æ‰‹æŸ„ç«¯å£#2
         data = (famicom->button_states+8)[famicom->button_index_2 & famicom->button_index_mask];
         ++famicom->button_index_2;
         break;
@@ -30,7 +30,7 @@ extern inline uint8_t sfc_read_cpu_address4020(uint16_t address, sfc_famicom_t* 
 
 
 /// <summary>
-/// StepFC: »ñÈ¡DMAµØÖ·
+/// StepFC: è·å–DMAåœ°å€
 /// </summary>
 /// <param name="data">The data.</param>
 /// <returns></returns>
@@ -40,25 +40,25 @@ static inline const uint8_t* sfc_get_dma_address(uint8_t data, const sfc_famicom
     {
     default:
     case 1:
-        // PPU¼Ä´æÆ÷
+        // PPUå¯„å­˜å™¨
         assert(!"PPU REG!");
     case 2:
-        // À©Õ¹Çø
+        // æ‰©å±•åŒº
         assert(!"TODO");
     case 0:
-        // ÏµÍ³ÄÚ´æ
+        // ç³»ç»Ÿå†…å­˜
         return famicom->main_memory + offset;
     case 3:
-        // ´æµµ SRAMÇø
+        // å­˜æ¡£ SRAMåŒº
         return famicom->save_memory + offset;
     case 4: case 5: case 6: case 7:
-        // ¸ßÒ»Î»Îª1, [$8000, $10000) ³ÌĞòPRG-ROMÇø
+        // é«˜ä¸€ä½ä¸º1, [$8000, $10000) ç¨‹åºPRG-ROMåŒº
         return famicom->prg_banks[data >> 5] + offset;
     }
 }
 
 /// <summary>
-/// StepFC: Ğ´ÈëCPUµØÖ·Êı¾İ4020
+/// StepFC: å†™å…¥CPUåœ°å€æ•°æ®4020
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="data">The data.</param>
@@ -67,12 +67,12 @@ extern inline void sfc_write_cpu_address4020(uint16_t address, uint8_t data, sfc
     switch (address & (uint16_t)0x1f)
     {
     case 0x14:
-        // ¾«ÁéRAMÖ±½Ó´¢´æÆ÷·ÃÎÊ
+        // ç²¾çµRAMç›´æ¥å‚¨å­˜å™¨è®¿é—®
         if (famicom->ppu.oamaddr) {
             uint8_t* dst = famicom->ppu.sprites;
             const uint8_t len = famicom->ppu.oamaddr;
             const uint8_t* src = sfc_get_dma_address(data, famicom);
-            // ĞèÒª»»ĞĞ
+            // éœ€è¦æ¢è¡Œ
             memcpy(dst, src + len, len);
             memcpy(dst + len, src, 256 - len);
         }
@@ -81,7 +81,7 @@ extern inline void sfc_write_cpu_address4020(uint16_t address, uint8_t data, sfc
         famicom->cpu_cycle_count += famicom->cpu_cycle_count & 1;
         break;
     case 0x16:
-        // ÊÖ±ú¶Ë¿Ú
+        // æ‰‹æŸ„ç«¯å£
         famicom->button_index_mask = (data & 1) ? 0x0 : 0x7;
         if (data & 1) {
             famicom->button_index_1 = 0;

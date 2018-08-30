@@ -1,11 +1,11 @@
-#include "sfc_6502.h"
+ï»¿#include "sfc_6502.h"
 #include "sfc_cpu.h"
 #include "sfc_famicom.h"
 #include <assert.h>
 #include <string.h>
 
 /// <summary>
-/// StepFC: ¶ÁÈ¡CPUµØÖ·Êı¾İ4020
+/// StepFC: è¯»å–CPUåœ°å€æ•°æ®4020
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
@@ -15,12 +15,12 @@ extern inline uint8_t sfc_read_cpu_address4020(uint16_t address, sfc_famicom_t* 
     switch (address & (uint16_t)0x1f)
     {
     case 0x16:
-        // ÊÖ±ú¶Ë¿Ú#1
+        // æ‰‹æŸ„ç«¯å£#1
         data = (famicom->button_states+0)[famicom->button_index_1 & famicom->button_index_mask];
         ++famicom->button_index_1;
         break;
     case 0x17:
-        // ÊÖ±ú¶Ë¿Ú#2
+        // æ‰‹æŸ„ç«¯å£#2
         data = (famicom->button_states+8)[famicom->button_index_2 & famicom->button_index_mask];
         ++famicom->button_index_2;
         break;
@@ -29,7 +29,7 @@ extern inline uint8_t sfc_read_cpu_address4020(uint16_t address, sfc_famicom_t* 
 }
 
 /// <summary>
-/// StepFC: Ğ´ÈëCPUµØÖ·Êı¾İ4020
+/// StepFC: å†™å…¥CPUåœ°å€æ•°æ®4020
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="data">The data.</param>
@@ -38,7 +38,7 @@ extern inline void sfc_write_cpu_address4020(uint16_t address, uint8_t data, sfc
     switch (address & (uint16_t)0x1f)
     {
     case 0x16:
-        // ÊÖ±ú¶Ë¿Ú
+        // æ‰‹æŸ„ç«¯å£
         famicom->button_index_mask = (data & 1) ? 0x0 : 0x7;
         if (data & 1) {
             famicom->button_index_1 = 0;

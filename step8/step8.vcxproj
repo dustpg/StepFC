@@ -122,7 +122,6 @@
     <ClCompile Include="..\common\d2d_draw.cpp" />
     <ClCompile Include="..\common\xa2_play.cpp" />
     <ClCompile Include="..\step7\sfc_6502.c" />
-    <ClCompile Include="..\step7\sfc_addr4020.c" />
     <ClCompile Include="..\step7\sfc_config.c" />
     <ClCompile Include="..\step7\sfc_cpu.c" />
     <ClCompile Include="..\step7\sfc_famicom.c" />
@@ -130,6 +129,7 @@
     <ClCompile Include="..\step7\sfc_ppu.c" />
     <ClCompile Include="..\step7\sfc_render_ez.c" />
     <ClCompile Include="main.c" />
+    <ClCompile Include="sfc_addr4020.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\common\d2d_interface.h" />

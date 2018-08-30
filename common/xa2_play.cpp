@@ -53,6 +53,43 @@ struct sfc_ez_wave {
     uint8_t                                 wave[0];
 };
 
+static inline float frac(float value) {
+    return value - (float)((long)value);
+}
+
+void make_square_wave(
+    float buf[],
+    uint32_t len,
+    uint32_t samples_per_sec,
+    float frequency,
+    float value) {
+
+    const float sps = (float)samples_per_sec;
+    for (uint32_t i = 0; i != len; ++i) {
+        const float index = (float)i;
+        const float time = index * frequency / sps;
+        buf[i] = frac(time) >= 0.5f ? value : -value;
+    }
+}
+
+
+void make_triangle_wave(
+    float buf[],
+    uint32_t len,
+    uint32_t samples_per_sec,
+    float frequency,
+    float value) {
+
+    const float sps = (float)samples_per_sec;
+    for (uint32_t i = 0; i != len; ++i) {
+        const float index = (float)i;
+        const float time = index * frequency / sps;
+
+        const float now = frac(time) * 2.f;
+        buf[i] = value * (now >= 1.f ? (now - 0.5f) : (1.5f - now));
+    }
+}
+
 
 extern "C" void* xa2_create_clip() noexcept {
     XAudio2::WAVEFORMATEX fmt = {};
@@ -86,10 +123,11 @@ extern "C" void* xa2_create_clip() noexcept {
 
             ez_wave = reinterpret_cast<sfc_ez_wave*>(buffer);
             const auto ptr = reinterpret_cast<float*>(ez_wave->wave);
-            for (uint32_t i = 0; i != countlen; ++i) {
-                const auto time = float(i) / float(countlen);
-                ptr[i] = std::sin(time * 2.f * pi * frequency);
-            }
+            //make_square_wave(ptr, countlen, countlen, frequency, 0.233f);
+            make_triangle_wave(ptr, countlen, countlen, frequency, 0.666f);
+
+            
+
             XAudio2::XAUDIO2_BUFFER xbuffer = {};
             xbuffer.pAudioData = ez_wave->wave;
             xbuffer.AudioBytes = countlen * sizeof(float);
@@ -173,7 +211,7 @@ extern "C" int xa2_init() noexcept {
         );
     }
 
-    //const auto clip = xa2_create_clip();
+    const auto clip = xa2_create_clip();
 
     return !!SUCCEEDED(hr);
 }

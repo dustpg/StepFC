@@ -33,9 +33,6 @@
     <ClCompile Include="..\step7\sfc_6502.c">
       <Filter>src\from7</Filter>
     </ClCompile>
-    <ClCompile Include="..\step7\sfc_addr4020.c">
-      <Filter>src\from7</Filter>
-    </ClCompile>
     <ClCompile Include="..\step7\sfc_config.c">
       <Filter>src\from7</Filter>
     </ClCompile>
@@ -53,6 +50,9 @@
     </ClCompile>
     <ClCompile Include="..\step7\sfc_render_ez.c">
       <Filter>src\from7</Filter>
+    </ClCompile>
+    <ClCompile Include="sfc_addr4020.c">
+      <Filter>src\new</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
