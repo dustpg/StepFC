@@ -10,15 +10,6 @@
     <Filter Include="src">
       <UniqueIdentifier>{da879543-edaa-40ea-a7ff-1f1948827d47}</UniqueIdentifier>
     </Filter>
-    <Filter Include="src\new">
-      <UniqueIdentifier>{04917524-2b6d-4ff3-903a-aa05fa7f5380}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="src\from7">
-      <UniqueIdentifier>{d16dc320-808a-4d09-815c-8305957e4ba9}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="header\from7">
-      <UniqueIdentifier>{53dd7ee1-d041-4a1c-a237-3db7678a2b9c}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\common\d2d_draw.cpp">
@@ -27,32 +18,32 @@
     <ClCompile Include="..\common\xa2_play.cpp">
       <Filter>cpp</Filter>
     </ClCompile>
+    <ClCompile Include="sfc_6502.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="sfc_config.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="sfc_cpu.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="sfc_famicom.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="sfc_mapper.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="sfc_ppu.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="sfc_render_ez.c">
+      <Filter>src</Filter>
+    </ClCompile>
     <ClCompile Include="main.c">
-      <Filter>src\new</Filter>
-    </ClCompile>
-    <ClCompile Include="..\step7\sfc_6502.c">
-      <Filter>src\from7</Filter>
-    </ClCompile>
-    <ClCompile Include="..\step7\sfc_config.c">
-      <Filter>src\from7</Filter>
-    </ClCompile>
-    <ClCompile Include="..\step7\sfc_cpu.c">
-      <Filter>src\from7</Filter>
-    </ClCompile>
-    <ClCompile Include="..\step7\sfc_famicom.c">
-      <Filter>src\from7</Filter>
-    </ClCompile>
-    <ClCompile Include="..\step7\sfc_mapper.c">
-      <Filter>src\from7</Filter>
-    </ClCompile>
-    <ClCompile Include="..\step7\sfc_ppu.c">
-      <Filter>src\from7</Filter>
-    </ClCompile>
-    <ClCompile Include="..\step7\sfc_render_ez.c">
-      <Filter>src\from7</Filter>
+      <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="sfc_addr4020.c">
-      <Filter>src\new</Filter>
+      <Filter>src</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -68,26 +59,29 @@
     <ClInclude Include="..\common\xa2_interface.h">
       <Filter>cpp</Filter>
     </ClInclude>
-    <ClInclude Include="..\step7\sfc_6502.h">
-      <Filter>header\from7</Filter>
+    <ClInclude Include="sfc_ppu.h">
+      <Filter>header</Filter>
     </ClInclude>
-    <ClInclude Include="..\step7\sfc_code.h">
-      <Filter>header\from7</Filter>
+    <ClInclude Include="sfc_rom.h">
+      <Filter>header</Filter>
     </ClInclude>
-    <ClInclude Include="..\step7\sfc_config.h">
-      <Filter>header\from7</Filter>
+    <ClInclude Include="sfc_6502.h">
+      <Filter>header</Filter>
     </ClInclude>
-    <ClInclude Include="..\step7\sfc_cpu.h">
-      <Filter>header\from7</Filter>
+    <ClInclude Include="sfc_code.h">
+      <Filter>header</Filter>
     </ClInclude>
-    <ClInclude Include="..\step7\sfc_famicom.h">
-      <Filter>header\from7</Filter>
+    <ClInclude Include="sfc_config.h">
+      <Filter>header</Filter>
     </ClInclude>
-    <ClInclude Include="..\step7\sfc_ppu.h">
-      <Filter>header\from7</Filter>
+    <ClInclude Include="sfc_cpu.h">
+      <Filter>header</Filter>
     </ClInclude>
-    <ClInclude Include="..\step7\sfc_rom.h">
-      <Filter>header\from7</Filter>
+    <ClInclude Include="sfc_famicom.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="sfc_apu.h">
+      <Filter>header</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

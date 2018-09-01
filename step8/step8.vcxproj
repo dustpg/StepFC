@@ -121,28 +121,29 @@
   <ItemGroup>
     <ClCompile Include="..\common\d2d_draw.cpp" />
     <ClCompile Include="..\common\xa2_play.cpp" />
-    <ClCompile Include="..\step7\sfc_6502.c" />
-    <ClCompile Include="..\step7\sfc_config.c" />
-    <ClCompile Include="..\step7\sfc_cpu.c" />
-    <ClCompile Include="..\step7\sfc_famicom.c" />
-    <ClCompile Include="..\step7\sfc_mapper.c" />
-    <ClCompile Include="..\step7\sfc_ppu.c" />
-    <ClCompile Include="..\step7\sfc_render_ez.c" />
     <ClCompile Include="main.c" />
+    <ClCompile Include="sfc_6502.c" />
     <ClCompile Include="sfc_addr4020.c" />
+    <ClCompile Include="sfc_config.c" />
+    <ClCompile Include="sfc_cpu.c" />
+    <ClCompile Include="sfc_famicom.c" />
+    <ClCompile Include="sfc_mapper.c" />
+    <ClCompile Include="sfc_ppu.c" />
+    <ClCompile Include="sfc_render_ez.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\common\d2d_interface.h" />
     <ClInclude Include="..\common\p_XAudio2_7.h" />
     <ClInclude Include="..\common\p_XAudio2_base.h" />
     <ClInclude Include="..\common\xa2_interface.h" />
-    <ClInclude Include="..\step7\sfc_6502.h" />
-    <ClInclude Include="..\step7\sfc_code.h" />
-    <ClInclude Include="..\step7\sfc_config.h" />
-    <ClInclude Include="..\step7\sfc_cpu.h" />
-    <ClInclude Include="..\step7\sfc_famicom.h" />
-    <ClInclude Include="..\step7\sfc_ppu.h" />
-    <ClInclude Include="..\step7\sfc_rom.h" />
+    <ClInclude Include="sfc_6502.h" />
+    <ClInclude Include="sfc_apu.h" />
+    <ClInclude Include="sfc_code.h" />
+    <ClInclude Include="sfc_config.h" />
+    <ClInclude Include="sfc_cpu.h" />
+    <ClInclude Include="sfc_famicom.h" />
+    <ClInclude Include="sfc_ppu.h" />
+    <ClInclude Include="sfc_rom.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

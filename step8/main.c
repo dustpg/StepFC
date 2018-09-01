@@ -1,5 +1,5 @@
-﻿#include "../step7/sfc_famicom.h"
-#include "../step7/sfc_cpu.h"
+﻿#include "sfc_famicom.h"
+#include "sfc_cpu.h"
 #include "../common/d2d_interface.h"
 #include "../common/xa2_interface.h"
 #include <stdio.h>
@@ -137,6 +137,7 @@ extern void main_render(void* bgrx) {
 
     uint8_t buffer[256 * 256];
 
+    //printf("\nFRAME: ");
     sfc_render_frame_easy(g_famicom, buffer);
     //sfc_render_frame(g_famicom, buffer);
 
@@ -219,8 +220,18 @@ void user_input(int index, unsigned char data) {
 
 
 void sfc_log_exec(void* arg, sfc_famicom_t* famicom) {
+    const uint32_t cycle = famicom->cpu_cycle_count;
     const uint16_t pc = famicom->registers.program_counter;
     static int line = 0;  line++;
+    if (pc == 0xe05a) {
+        int bk = 8;
+    }
+    if (pc == 0xe02d) {
+        int bk = 8;
+    }
+    if (pc == 0xe02a) {
+        int bk = 8;
+    }
     return;
     //if (line < 230297) return;
 

@@ -48,8 +48,43 @@ enum FormatWave : uint8_t {
 };
 
 
+//struct SFCCallback : XAudio2::Ver2_7::IXAudio2VoiceCallback {
+//    uint32_t a = 0;
+//    uint32_t b = 0;
+//    uint32_t c = 0;
+//    uint32_t d = 0;
+//    uint32_t e = 0;
+//    uint32_t f = 0;
+//
+//    STDMETHOD_(void, OnVoiceProcessingPassStart) (UINT32 BytesRequired) {
+//        ++a;
+//    }
+//    STDMETHOD_(void, OnVoiceProcessingPassEnd) () {
+//        ++b;
+//    }
+//    STDMETHOD_(void, OnStreamEnd) () {
+//        ++c;
+//    }
+//    STDMETHOD_(void, OnBufferStart) (void* pBufferContext) {
+//        ++d;
+//    }
+//    STDMETHOD_(void, OnBufferEnd) (void* pBufferContext) {
+//        ++e;
+//    }
+//    STDMETHOD_(void, OnLoopEnd) (void* pBufferContext) {
+//        ++f;
+//    }
+//    STDMETHOD_(void, OnVoiceError) (void* pBufferContext, HRESULT Error) {
+//
+//    }
+//};
+
+
+//SFCCallback* g_callback = nullptr;
+
 struct sfc_ez_wave {
     XAudio2::Ver2_7::IXAudio2SourceVoice*   source;
+    //size_t                                  callback[sizeof(SFCCallback) / sizeof(size_t)];
     uint8_t                                 wave[0];
 };
 
@@ -103,39 +138,46 @@ extern "C" void* xa2_create_clip() noexcept {
     fmt.wFormatTag = Wave_IEEEFloat;
 
     // get length of buffer
-    const uint32_t countlen = fmt.nSamplesPerSec;
+    const uint32_t countlen = fmt.nSamplesPerSec * 2;
     const uint32_t bytelen = countlen * sizeof(float) + sizeof(sfc_ez_wave);
 
 
     XAudio2::Ver2_7::IXAudio2SourceVoice* source = nullptr;
     sfc_ez_wave* ez_wave = nullptr;
-    // 创建Source
-    auto hr = g_xa2_data.xaudio2_7->CreateSourceVoice(
-        &source,
-        &fmt
-    );
+    // 生成波
+
+
+    constexpr float pi = float(3.1415926536);
+    constexpr float frequency = 400;
+
+    HRESULT hr = S_OK;
+
     // 生成波
     if (SUCCEEDED(hr)) {
         if (const auto buffer = std::malloc(bytelen)) {
-
-            constexpr float pi = float(3.1415926536);
-            constexpr float frequency = 400;
-
             ez_wave = reinterpret_cast<sfc_ez_wave*>(buffer);
+            //g_callback = new(ez_wave->callback) SFCCallback;
             const auto ptr = reinterpret_cast<float*>(ez_wave->wave);
-            //make_square_wave(ptr, countlen, countlen, frequency, 0.233f);
-            make_triangle_wave(ptr, countlen, countlen, frequency, 0.666f);
-
-            
-
-            XAudio2::XAUDIO2_BUFFER xbuffer = {};
-            xbuffer.pAudioData = ez_wave->wave;
-            xbuffer.AudioBytes = countlen * sizeof(float);
-            xbuffer.LoopCount = XAudio2::XAUDIO2_LOOP_INFINITE;
-            hr = source->SubmitSourceBuffer(&xbuffer);
+            //make_square_wave(ptr, countlen, fmt.nSamplesPerSec, frequency, 0.233f);
+            make_triangle_wave(ptr, countlen, fmt.nSamplesPerSec, frequency, 0.666f);
         }
         else hr = E_OUTOFMEMORY;
-
+    }
+    // 创建Source
+    if (SUCCEEDED(hr)) {
+        hr = g_xa2_data.xaudio2_7->CreateSourceVoice(
+            &source,
+            &fmt
+            //, 0, 2.f, g_callback
+        );
+    }
+    // 提交片段
+    if (SUCCEEDED(hr)) {
+        XAudio2::XAUDIO2_BUFFER xbuffer = {};
+        xbuffer.pAudioData = ez_wave->wave;
+        xbuffer.AudioBytes = countlen * sizeof(float);
+        xbuffer.LoopCount = XAudio2::XAUDIO2_LOOP_INFINITE;
+        hr = source->SubmitSourceBuffer(&xbuffer);
     }
     // 播放
     if (SUCCEEDED(hr)) {
@@ -211,7 +253,7 @@ extern "C" int xa2_init() noexcept {
         );
     }
 
-    const auto clip = xa2_create_clip();
+    //const auto clip = xa2_create_clip();
 
     return !!SUCCEEDED(hr);
 }
