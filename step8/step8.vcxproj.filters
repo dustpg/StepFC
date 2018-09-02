@@ -45,6 +45,9 @@
     <ClCompile Include="sfc_addr4020.c">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="sfc_play_ez.c">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\common\d2d_interface.h">
@@ -81,6 +84,9 @@
       <Filter>header</Filter>
     </ClInclude>
     <ClInclude Include="sfc_apu.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="sfc_play.h">
       <Filter>header</Filter>
     </ClInclude>
   </ItemGroup>

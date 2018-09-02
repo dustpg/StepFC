@@ -1,5 +1,6 @@
 ﻿#include "sfc_famicom.h"
 #include "sfc_cpu.h"
+#include "sfc_play.h"
 #include "../common/d2d_interface.h"
 #include "../common/xa2_interface.h"
 #include <stdio.h>
@@ -128,6 +129,61 @@ extern int sub_render(void* bgrx) {
     return 0;
 }
 
+static sfc_channel_state_t states[4];
+static int index;
+
+void pin_audio() {
+    sfc_play_audio_easy(g_famicom, states + index);
+    ++index;
+    index = index & 3;
+}
+
+int index240 = 0;
+void play_240() {
+    sfc_channel_state_t state = states[index240];
+    // 方波#1
+    xa2_play_square1(
+        state.square1.frequency,
+        state.square1.duty,
+        state.square1.volume
+    );
+    // 方波#2
+    xa2_play_square2(
+        state.square2.frequency,
+        state.square2.duty,
+        state.square2.volume
+    );
+
+    ++index240;
+    index240 = index240 & 3;
+}
+
+
+void play_audio() {
+    index240 = 0;
+
+    return;
+    sfc_channel_state_t state = states[1];
+    //assert(memcmp(states + 0, states + 1, sizeof(states[0])) == 0);
+    //assert(memcmp(states + 1, states + 2, sizeof(states[0])) == 0);
+    //assert(memcmp(states + 2, states + 3, sizeof(states[0])) == 0);
+    //sfc_play_audio_easy(g_famicom, &state);
+    // 方波#1
+    xa2_play_square1(
+        state.square1.frequency,
+        state.square1.duty,
+        state.square1.volume
+    );
+    // 方波#2
+    xa2_play_square2(
+        state.square2.frequency,
+        state.square2.duty,
+        state.square2.volume
+    );
+
+}
+
+
 /// <summary>
 /// 主渲染
 /// </summary>
@@ -139,6 +195,7 @@ extern void main_render(void* bgrx) {
 
     //printf("\nFRAME: ");
     sfc_render_frame_easy(g_famicom, buffer);
+
     //sfc_render_frame(g_famicom, buffer);
 
     // 生成调色板数据
@@ -158,6 +215,9 @@ extern void main_render(void* bgrx) {
     for (int i = 0; i != 256 * 240; ++i) {
         data[i] = palette[buffer[i]>>1];
     }
+
+
+    play_audio();
 #if 0
 
 

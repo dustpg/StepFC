@@ -694,6 +694,12 @@ static inline void sfc_render_sprites(sfc_famicom_t* famicom, uint8_t* buffer) {
         }
     }
 }
+ 
+
+// 触发帧计数器
+extern void sfc_trigger_frame_counter(sfc_apu_register_t* apu);
+
+
 
 /// <summary>
 /// StepFC: 使用简易模式渲染一帧, 效率较高
@@ -735,6 +741,9 @@ void sfc_render_frame_easy(sfc_famicom_t* famicom, uint8_t* buffer) {
             sfc_cpu_execute_one(famicom);
         buffer += SFC_WIDTH;
         // 执行HBlank
+        // 每65.5(这里是64)行进行一次帧计数
+        if ((i & (uint16_t)0x3F) == (uint16_t)0x3F)
+            sfc_trigger_frame_counter(&famicom->apu);
     }
     // 渲染精灵
     if (famicom->ppu.mask & (uint8_t)SFC_PPU2001_Sprite)
@@ -767,6 +776,9 @@ void sfc_render_frame_easy(sfc_famicom_t* famicom, uint8_t* buffer) {
     famicom->ppu.status = 0;
     // 垂直滚动仅对下帧有效
     famicom->ppu.now_scrolly = famicom->ppu.scroll[1];
+
+    // 第四次触发
+    sfc_trigger_frame_counter(&famicom->apu);
 
     // 预渲染
     end_cycle_count += per_scanline * 2;
