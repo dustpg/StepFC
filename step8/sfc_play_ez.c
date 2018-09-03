@@ -23,7 +23,7 @@ static void sfc_play_square1(
     state->duty = famicom->apu.square1.ctrl >> 6;
     // 固定音量
     if (famicom->apu.square1.envelope.ctrl6 & (SFC_APUCTRL6_ConstVolume))
-        state->volume = famicom->apu.square1.ctrl & 0xf;
+        state->volume = famicom->apu.square1.envelope.ctrl6 & 0xf;
     // 包络音量
     else
         state->volume = famicom->apu.square1.envelope.counter;
@@ -48,11 +48,54 @@ static void sfc_play_square2(
     state->duty = famicom->apu.square2.ctrl >> 6;
     // 固定音量
     if (famicom->apu.square2.envelope.ctrl6 & (SFC_APUCTRL6_ConstVolume))
-        state->volume = famicom->apu.square2.ctrl & 0xf;
+        state->volume = famicom->apu.square2.envelope.ctrl6 & 0xf;
     // 包络音量
     else
         state->volume = famicom->apu.square2.envelope.counter;
 }
+
+
+/// <summary>
+/// SFCs the play triangle.
+/// </summary>
+/// <param name="famicom">The famicom.</param>
+/// <param name="state">The state.</param>
+static void sfc_play_triangle(
+    const sfc_famicom_t* famicom,
+    struct sfc_triangle_channel_state_t* state) {
+    // 使能
+    if (!(famicom->apu.status_write & SFC_APU4015_WRITE_EnableTriangle)) return;
+    // 长度计数器为0
+    if (famicom->apu.triangle.length_counter == 0) return;
+    // 线性计数器为0
+    if (famicom->apu.triangle.linear_counter == 0) return;
+    // 输出频率
+    state->frequency = famicom->config.cpu_clock / 32.f /
+        (float)(famicom->apu.triangle.cur_period + 1);
+}
+
+/// <summary>
+/// SFCs the play noise.
+/// </summary>
+/// <param name="famicom">The famicom.</param>
+/// <param name="state">The state.</param>
+static void sfc_play_noise(
+    const sfc_famicom_t* famicom,
+    struct sfc_noise_channel_state_t* state) {
+    // 使能
+    if (!(famicom->apu.status_write & SFC_APU4015_WRITE_EnableNoise)) return;
+    // 长度计数器为0
+    if (famicom->apu.noise.length_counter == 0) return;
+    // 数据
+    state->data = famicom->apu.noise.short_mode__period_index;
+    // 固定音量
+    if (famicom->apu.noise.envelope.ctrl6 & (SFC_APUCTRL6_ConstVolume))
+        state->volume = famicom->apu.noise.envelope.ctrl6 & 0xf;
+    // 包络音量
+    else
+        state->volume = famicom->apu.noise.envelope.counter;
+}
+
 
 /// <summary>
 /// SFCs the play audio easy.
@@ -67,4 +110,8 @@ void sfc_play_audio_easy(
     sfc_play_square1(famicom, &state->square1);
     // 方波#1
     sfc_play_square2(famicom, &state->square2);
+    // 三角波
+    sfc_play_triangle(famicom, &state->triangle);
+    // 噪声
+    sfc_play_noise(famicom, &state->noise);
 }

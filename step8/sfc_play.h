@@ -20,11 +20,35 @@ struct sfc_square_channel_state_t {
 /// <summary>
 /// 
 /// </summary>
+struct sfc_triangle_channel_state_t {
+    // 三角波 频率 
+    float       frequency;
+};
+
+
+/// <summary>
+/// 
+/// </summary>
+struct sfc_noise_channel_state_t {
+    // 噪音 音量
+    uint16_t    volume;
+    // 噪音 频率数据
+    uint16_t    data;
+};
+
+/// <summary>
+/// 
+/// </summary>
 typedef struct {
     // 方波#1
-    struct sfc_square_channel_state_t square1;
+    struct sfc_square_channel_state_t   square1;
     // 方波#2
-    struct sfc_square_channel_state_t square2;
+    struct sfc_square_channel_state_t   square2;
+    // 三角波
+    struct sfc_triangle_channel_state_t triangle;
+    // 噪音
+    struct sfc_noise_channel_state_t    noise;
+
 } sfc_channel_state_t;
 
 

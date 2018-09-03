@@ -60,7 +60,7 @@ typedef struct {
     // 内存地址库
     uint8_t*        banks[0x4000 / 0x0400];
     // 名称表选择(PPUCTRL低2位, 以及渲染中VRAM指针AB位)
-    uint8_t        nametable_select;
+    uint8_t         nametable_select;
     // 当前允许使用的垂直滚动偏移
     uint8_t         now_scrolly;
     // VRAM 地址

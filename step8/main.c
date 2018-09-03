@@ -14,7 +14,10 @@ sfc_famicom_t* g_famicom = NULL;
 extern uint32_t sfc_stdpalette[];
 uint32_t palette_data[16];
 
-extern void sfc_render_frame_easy(sfc_famicom_t* famicom, uint8_t* buffer);
+extern void sfc_render_frame_easy(
+    sfc_famicom_t* famicom, 
+    uint8_t* buffer
+);
 
 /// <summary>
 /// 获取坐标像素
@@ -129,45 +132,16 @@ extern int sub_render(void* bgrx) {
     return 0;
 }
 
-static sfc_channel_state_t states[4];
-static int index;
-
-void pin_audio() {
-    sfc_play_audio_easy(g_famicom, states + index);
-    ++index;
-    index = index & 3;
-}
-
-int index240 = 0;
-void play_240() {
-    sfc_channel_state_t state = states[index240];
-    // 方波#1
-    xa2_play_square1(
-        state.square1.frequency,
-        state.square1.duty,
-        state.square1.volume
-    );
-    // 方波#2
-    xa2_play_square2(
-        state.square2.frequency,
-        state.square2.duty,
-        state.square2.volume
-    );
-
-    ++index240;
-    index240 = index240 & 3;
-}
-
-
 void play_audio() {
-    index240 = 0;
+    sfc_channel_state_t state ;
+    //int changed = 0;
+    //for (int i = 0; i != 3; ++i)
+    //if (memcmp(states + i, states + i + 1, sizeof(states[0])))
+    //    changed++;
+    //assert(changed < 2);
 
-    return;
-    sfc_channel_state_t state = states[1];
-    //assert(memcmp(states + 0, states + 1, sizeof(states[0])) == 0);
-    //assert(memcmp(states + 1, states + 2, sizeof(states[0])) == 0);
-    //assert(memcmp(states + 2, states + 3, sizeof(states[0])) == 0);
-    //sfc_play_audio_easy(g_famicom, &state);
+    sfc_play_audio_easy(g_famicom, &state);
+#if 1
     // 方波#1
     xa2_play_square1(
         state.square1.frequency,
@@ -180,7 +154,16 @@ void play_audio() {
         state.square2.duty,
         state.square2.volume
     );
-
+    // 三角波
+    xa2_play_triangle(
+        state.triangle.frequency
+    );
+#endif
+    // 噪音
+    xa2_play_noise(
+        state.noise.data,
+        state.noise.volume
+    );
 }
 
 
@@ -275,6 +258,36 @@ int main() {
 void user_input(int index, unsigned char data) {
     assert(index >= 0 && index < 16);
     g_famicom->button_states[index] = data;
+}
+
+
+void qsave() {
+    FILE* const file = fopen("save.sfc", "wb");
+    if (!file) return;
+    fwrite(g_famicom, 1, sizeof(*g_famicom), file);
+    fclose(file);
+}
+
+void qload() {
+    FILE* const file = fopen("save.sfc", "rb");
+    if (!file) return;
+    sfc_famicom_t buf;
+    fread(&buf, 1, sizeof(buf), file);
+    g_famicom->registers = buf.registers;
+    g_famicom->cpu_cycle_count = buf.cpu_cycle_count;
+    g_famicom->apu = buf.apu;
+
+    char banks[sizeof(g_famicom->ppu.banks)];
+    memcpy(banks, g_famicom->ppu.banks, sizeof(banks));
+    g_famicom->ppu = buf.ppu;
+    memcpy(g_famicom->ppu.banks, banks, sizeof(banks));
+
+
+    memcpy(g_famicom->main_memory, buf.main_memory, sizeof(buf.main_memory));
+    memcpy(g_famicom->video_memory, buf.video_memory, sizeof(buf.main_memory));
+    //memcpy(g_famicom->video_memory_ex, buf.video_memory_ex, sizeof(buf.main_memory));
+
+    fclose(file);
 }
 
 

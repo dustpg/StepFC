@@ -57,7 +57,38 @@ struct {
     sfc_ez_wave*                                square2;
     sfc_square_channel_state                    square2_state;
 
+    sfc_ez_wave*                                triangle;
+    float                                       triangle_frequency;
+
+    bool                                        square1_stop;
+    bool                                        square2_stop;
+    bool                                        triangle_stop;
+
+
+    sfc_ez_wave*                                noise;
+    uint32_t                                    noise_data;
+
+
 } g_xa2_data;
+
+static const float NOSIE_FLIST[] = {
+    178977.30f,
+    99431.83f,
+    52640.38f,
+    27117.77f,
+    13767.48f,
+    9225.63f,
+    6937.10f,
+    5558.30f,
+    4408.31f,
+    3509.36f,
+    2348.78f,
+    1758.13f,
+    1172.85f,
+    879.93f,
+    439.75f,
+    219.93f,
+};
 
 // wave format
 enum FormatWave : uint8_t {
@@ -103,6 +134,23 @@ enum FormatWave : uint8_t {
 //    }
 //};
 
+//struct SFCTriangleCallback : XAudio2::Ver2_7::IXAudio2VoiceCallback {
+//    STDMETHOD_(void, OnVoiceProcessingPassStart) (UINT32 BytesRequired) {
+//    }
+//    STDMETHOD_(void, OnVoiceProcessingPassEnd) () {
+//    }
+//    STDMETHOD_(void, OnStreamEnd) () {
+//    }
+//    STDMETHOD_(void, OnBufferStart) (void* pBufferContext) {
+//    }
+//    STDMETHOD_(void, OnBufferEnd) (void* pBufferContext) {
+//    }
+//    STDMETHOD_(void, OnLoopEnd) (void* pBufferContext) {
+//    }
+//    STDMETHOD_(void, OnVoiceError) (void* pBufferContext, HRESULT Error) {
+//    }
+//};
+
 
 //SFCCallback* g_callback = nullptr;
 
@@ -111,46 +159,103 @@ static inline float frac(float value) {
     return value - (float)((long)value);
 }
 
-void make_square_wave(
+void make_square_wave_ex(
     float buf[],
     uint32_t len,
-    uint32_t samples_per_sec,
     float duty,
-    float frequency,
     float value) {
 
-    const float sps = (float)samples_per_sec;
     for (uint32_t i = 0; i != len; ++i) {
-        const float index = (float)i;
-        const float time = index * frequency / sps;
+        const float time = (float)i / (float)len;
         buf[i] = frac(time) >= duty ? value : -value;
     }
 }
 
-
-void make_triangle_wave(
+void make_triangle_wave_ex(
     float buf[],
     uint32_t len,
-    uint32_t samples_per_sec,
-    float frequency,
     float value) {
 
-    const float sps = (float)samples_per_sec;
     for (uint32_t i = 0; i != len; ++i) {
         const float index = (float)i;
-        const float time = index * frequency / sps;
+        const float time = index / len;
 
         const float now = frac(time) * 2.f;
-        buf[i] = value * (now >= 1.f ? (now - 0.5f) : (1.5f - now));
+        //buf[i] = value * (now >= 1.f ? (now * 2.f - 3.f) : (1.f - now * 2.f));
+        if (now <= 0.5f)
+            buf[i] = now * 2.f * value;
+        else if (now > 1.5f)
+            buf[i] = (now - 2.f) * 2.f * value;
+        else
+            buf[i] = (2.f - now * 2.f)* value;
+    }
+}
+
+uint16_t lfsr_long(uint16_t v) noexcept {
+    const uint16_t a = v & 1;
+    const uint16_t b = (v >> 1) & 1;
+    return uint16_t(v >> 1) | uint16_t((a ^ b) << 14);
+}
+
+uint16_t lfsr_short(uint16_t v) noexcept {
+    const uint16_t a = v & 1;
+    const uint16_t b = (v >> 6) & 1;
+    return uint16_t(v >> 1) | uint16_t((a ^ b) << 14);
+}
+
+void make_noise_short(
+    float buf[],
+    uint32_t len,
+    float value) {
+    uint16_t lfsr = 1;
+    for (uint32_t i = 0; i != len; ++i) {
+        lfsr = lfsr_short(lfsr);
+        buf[i] = (lfsr & 1) ? value : -value;
+    }
+}
+
+void make_noise_long(
+    float buf[],
+    uint32_t len,
+    float value) {
+    uint16_t lfsr = 1;
+    for (uint32_t i = 0; i != len; ++i) {
+        lfsr = lfsr_long(lfsr);
+        buf[i] = (lfsr & 1) ? value : -value;
     }
 }
 
 enum {
     SAMPLE_PER_SEC = 44100,
-    BASE_FREQUENCY = 880,
+    BASE_FREQUENCY = 220,
 };
 
-extern "C" void play_240() noexcept;
+
+/*
+                          95.88
+    square_out = -----------------------
+                        8128
+                 ----------------- + 100
+                 square1 + square2
+
+
+                          159.79
+    tnd_out = ------------------------------
+                          1
+              ------------------------ + 100
+              triangle   noise    dmc
+              -------- + ----- + -----
+                8227     12241   22638
+
+*/
+
+constexpr float base_quare_vol = 95.88f / (8128.f/15.f+100.f);
+constexpr float base_triangle_vol = 159.79f / (100.f+1.f/(15.f/8227.f));
+constexpr float base_noise_vol = 159.79f / (100.f + 1.f / (15.f / 12241.f));
+
+//extern "C" void play_240() noexcept;
+
+
 
 
 HRESULT xa2_create_clip(sfc_ez_wave** output) noexcept {
@@ -165,7 +270,7 @@ HRESULT xa2_create_clip(sfc_ez_wave** output) noexcept {
     fmt.wFormatTag = Wave_IEEEFloat;
 
     // get length of buffer
-    const uint32_t countlen = fmt.nSamplesPerSec;
+    const uint32_t countlen = BASE_FREQUENCY * 4;
     const uint32_t bytelen = countlen * sizeof(float) + sizeof(sfc_ez_wave);
 
 
@@ -184,14 +289,12 @@ HRESULT xa2_create_clip(sfc_ez_wave** output) noexcept {
         if (const auto buffer = std::malloc(bytelen)) {
             ez_wave = reinterpret_cast<sfc_ez_wave*>(buffer);
             const auto ptr = reinterpret_cast<float*>(ez_wave->wave);
-            const auto at = 0.123f;
 
-            constexpr uint32_t length_unit = SAMPLE_PER_SEC / 4;
-            make_square_wave(ptr + length_unit * 0, length_unit, fmt.nSamplesPerSec, 0.125f, frequency, at);
-            make_square_wave(ptr + length_unit * 1, length_unit, fmt.nSamplesPerSec, 0.25f, frequency, at);
-            make_square_wave(ptr + length_unit * 2, length_unit, fmt.nSamplesPerSec, 0.5f, frequency, at);
-            make_square_wave(ptr + length_unit * 3, length_unit, fmt.nSamplesPerSec, 0.75f, frequency, at);
-
+            constexpr uint32_t length_unit = BASE_FREQUENCY;
+            make_square_wave_ex(ptr + length_unit * 0, length_unit, 0.875f, base_quare_vol);
+            make_square_wave_ex(ptr + length_unit * 1, length_unit, 0.750f, base_quare_vol);
+            make_square_wave_ex(ptr + length_unit * 2, length_unit, 0.500f, base_quare_vol);
+            make_square_wave_ex(ptr + length_unit * 3, length_unit, 0.250f, base_quare_vol);
         }
         else hr = E_OUTOFMEMORY;
     }
@@ -199,21 +302,153 @@ HRESULT xa2_create_clip(sfc_ez_wave** output) noexcept {
     if (SUCCEEDED(hr)) {
         hr = g_xa2_data.xaudio2_7->CreateSourceVoice(
             &source,
-            &fmt
-            //, 0, 2.f, g_callback
+            &fmt, 
+            0,
+            100.f
+            //, g_callback
         );
     }
-    // 提交片段
+    // 返回对象?
+    if (SUCCEEDED(hr)) {
+        ez_wave->source = source;
+        *output = ez_wave;
+    }
+    else {
+        if (source) source->DestroyVoice();
+        std::free(ez_wave);
+    }
+    return hr;
+}
+
+
+HRESULT xa2_create_clip_tri(sfc_ez_wave** output) noexcept {
+    XAudio2::WAVEFORMATEX fmt = {};
+    // CD
+    fmt.nSamplesPerSec = SAMPLE_PER_SEC;
+    // a block = a float var
+    fmt.nBlockAlign = sizeof(float);
+    // one channel
+    fmt.nChannels = 1;
+    // single float
+    fmt.wFormatTag = Wave_IEEEFloat;
+
+    // get length of buffer
+    const uint32_t countlen = BASE_FREQUENCY;
+    const uint32_t bytelen = countlen * sizeof(float) + sizeof(sfc_ez_wave);
+
+
+    XAudio2::Ver2_7::IXAudio2SourceVoice* source = nullptr;
+    sfc_ez_wave* ez_wave = nullptr;
+    // 生成波
+
+
+    constexpr float frequency = BASE_FREQUENCY;
+
+    HRESULT hr = S_OK;
+
+    // 生成波
+    if (SUCCEEDED(hr)) {
+        if (const auto buffer = std::malloc(bytelen)) {
+            ez_wave = reinterpret_cast<sfc_ez_wave*>(buffer);
+            const auto ptr = reinterpret_cast<float*>(ez_wave->wave);
+
+            constexpr uint32_t length_unit = BASE_FREQUENCY;
+            make_triangle_wave_ex(ptr, length_unit, base_triangle_vol);
+        }
+        else hr = E_OUTOFMEMORY;
+    }
+    // 创建Source
+    if (SUCCEEDED(hr)) {
+        hr = g_xa2_data.xaudio2_7->CreateSourceVoice(
+            &source,
+            &fmt,
+            0,
+            100.f
+            //, g_callback
+        );
+    }
+    // 提交缓冲区
+    if (SUCCEEDED(hr)) {
+        constexpr uint32_t length_unit = BASE_FREQUENCY * sizeof(float);
+
+        XAudio2::XAUDIO2_BUFFER xbuffer = {};
+        xbuffer.Flags = XAudio2::XAUDIO2_END_OF_STREAM;
+        xbuffer.pAudioData = ez_wave->wave;
+        xbuffer.AudioBytes = length_unit;
+        xbuffer.LoopCount = XAudio2::XAUDIO2_LOOP_INFINITE;
+        hr = source->SubmitSourceBuffer(&xbuffer);
+    }
+    // 返回对象?
+    if (SUCCEEDED(hr)) {
+        ez_wave->source = source;
+        *output = ez_wave;
+    }
+    else {
+        if (source) source->DestroyVoice();
+        std::free(ez_wave);
+    }
+    return hr;
+}
+
+
+HRESULT xa2_create_clip_noi(sfc_ez_wave** output) noexcept {
+    XAudio2::WAVEFORMATEX fmt = {};
+    // CD
+    fmt.nSamplesPerSec = SAMPLE_PER_SEC;
+    // a block = a float var
+    fmt.nBlockAlign = sizeof(float);
+    // one channel
+    fmt.nChannels = 1;
+    // single float
+    fmt.wFormatTag = Wave_IEEEFloat;
+
+    constexpr uint32_t LEN = 0x10000;
+    // get length of buffer
+    const uint32_t countlen = LEN;
+    const uint32_t bytelen = countlen * sizeof(float) + sizeof(sfc_ez_wave);
+
+
+    XAudio2::Ver2_7::IXAudio2SourceVoice* source = nullptr;
+    sfc_ez_wave* ez_wave = nullptr;
+    // 生成波
+
+
+    constexpr float frequency = BASE_FREQUENCY;
+
+
+    HRESULT hr = S_OK;
+
+    // 生成波
+    if (SUCCEEDED(hr)) {
+        if (const auto buffer = std::malloc(bytelen)) {
+            ez_wave = reinterpret_cast<sfc_ez_wave*>(buffer);
+            const auto ptr = reinterpret_cast<float*>(ez_wave->wave);
+
+            make_noise_long(ptr, LEN / 2, base_noise_vol);
+            make_noise_short(ptr + LEN / 2, LEN / 2, base_noise_vol);
+        }
+        else hr = E_OUTOFMEMORY;
+    }
+    // 创建Source
+    if (SUCCEEDED(hr)) {
+        hr = g_xa2_data.xaudio2_7->CreateSourceVoice(
+            &source,
+            &fmt,
+            0,
+            100.f
+            //, g_callback
+        );
+    }
+    // 提交缓冲区
     //if (SUCCEEDED(hr)) {
+    //    constexpr uint32_t length_unit = LEN * sizeof(float);
+
     //    XAudio2::XAUDIO2_BUFFER xbuffer = {};
-    //    xbuffer.pAudioData = ez_wave->wave;
-    //    xbuffer.AudioBytes = countlen * sizeof(float);
+    //    xbuffer.Flags = XAudio2::XAUDIO2_END_OF_STREAM;
+    //    xbuffer.pAudioData = ez_wave->wave + length_unit / 2;
+    //    xbuffer.AudioBytes = length_unit / 2;
     //    xbuffer.LoopCount = XAudio2::XAUDIO2_LOOP_INFINITE;
     //    hr = source->SubmitSourceBuffer(&xbuffer);
-    //}
-    //// 播放
-    //if (SUCCEEDED(hr)) {
-    //    hr = source->Start(0);
     //}
     // 返回对象?
     if (SUCCEEDED(hr)) {
@@ -240,22 +475,32 @@ extern "C" void xa2_play_square1(float frequency, uint16_t duty, uint16_t volume
     auto& old64 = reinterpret_cast<uint64_t&>(g_xa2_data.square1_state);
 
     if (now64 == old64) return;
+
+    //std::printf("%f - %d - %d\n", frequency, duty, volume);
     old64 = now64;
-    std::printf("%f\n", frequency);
+
 
 
     const auto ez_wave = g_xa2_data.square1;
     const auto square = ez_wave->source;
-    if (!volume) { square->Stop(0);  return; }
+    if (!volume) {
+        square->ExitLoop();
+        g_xa2_data.square1_stop = true;
+        return;
+    }
 
-    constexpr uint32_t length_unit = SAMPLE_PER_SEC * sizeof(float) / 4;
+    if (g_xa2_data.square1_stop) {
+        g_xa2_data.square1_stop = false;
+        constexpr uint32_t length_unit = BASE_FREQUENCY * sizeof(float);
+        XAudio2::XAUDIO2_BUFFER xbuffer = {};
+        xbuffer.Flags = XAudio2::XAUDIO2_END_OF_STREAM;
+        xbuffer.pAudioData = ez_wave->wave + length_unit * duty;
+        xbuffer.AudioBytes = length_unit;
+        xbuffer.LoopCount = XAudio2::XAUDIO2_LOOP_INFINITE;
+        square->FlushSourceBuffers();
+        square->SubmitSourceBuffer(&xbuffer);
+    }
 
-    XAudio2::XAUDIO2_BUFFER xbuffer = {};
-    xbuffer.pAudioData = ez_wave->wave + length_unit * duty;
-    xbuffer.AudioBytes = length_unit;
-    xbuffer.LoopCount = XAudio2::XAUDIO2_LOOP_INFINITE;
-    square->FlushSourceBuffers();
-    square->SubmitSourceBuffer(&xbuffer);
     square->SetVolume((float)volume / 15.f);
     square->SetFrequencyRatio(frequency / (float)BASE_FREQUENCY);
     square->Start();
@@ -276,30 +521,110 @@ extern "C" void xa2_play_square2(float frequency, uint16_t duty, uint16_t volume
 
     const auto ez_wave = g_xa2_data.square2;
     const auto square = ez_wave->source;
-    if (!volume) { square->Stop(0);  return; }
+    if (!volume) { 
+        square->ExitLoop();
+        g_xa2_data.square2_stop = true;
+        return;
+    }
 
-    constexpr uint32_t length_unit = SAMPLE_PER_SEC * sizeof(float) / 4;
+    if (g_xa2_data.square2_stop) {
+        g_xa2_data.square2_stop = false;
+        constexpr uint32_t length_unit = BASE_FREQUENCY * sizeof(float);
+        XAudio2::XAUDIO2_BUFFER xbuffer = {};
+        xbuffer.Flags = XAudio2::XAUDIO2_END_OF_STREAM;
+        xbuffer.pAudioData = ez_wave->wave + length_unit * duty;
+        xbuffer.AudioBytes = length_unit;
+        xbuffer.LoopCount = XAudio2::XAUDIO2_LOOP_INFINITE;
+        square->FlushSourceBuffers();
+        square->SubmitSourceBuffer(&xbuffer);
+    }
 
-    XAudio2::XAUDIO2_BUFFER xbuffer = {};
-    xbuffer.pAudioData = ez_wave->wave + length_unit * duty;
-    xbuffer.AudioBytes = length_unit;
-    xbuffer.LoopCount = XAudio2::XAUDIO2_LOOP_INFINITE;
-    square->FlushSourceBuffers();
-    square->SubmitSourceBuffer(&xbuffer);
     square->SetVolume((float)volume / 15.f);
     square->SetFrequencyRatio(frequency / (float)BASE_FREQUENCY);
     square->Start();
 }
 
 
-extern "C" void xa2_delete_clip(void* p) noexcept {
-    const auto wave = reinterpret_cast<sfc_ez_wave*>(p);
-    if (wave) {
-        assert(wave->source);
-        wave->source->DestroyVoice();
-        std::free(wave);
+extern "C" void xa2_play_triangle(float frequency) noexcept {
+    if (frequency == g_xa2_data.triangle_frequency) return;
+    g_xa2_data.triangle_frequency = frequency;
+
+    const auto ez_wave = g_xa2_data.triangle;
+    const auto triangle = ez_wave->source;
+    // 40Hz - 10kHz认为有效
+    if (frequency < 40 || frequency > 10000) { 
+        triangle->ExitLoop();
+        g_xa2_data.triangle_stop = true;
+        return;
     }
+
+    //std::printf("TRI: %f\n", frequency);
+
+    if (g_xa2_data.triangle_stop) {
+        g_xa2_data.triangle_stop = false;
+        constexpr uint32_t length_unit = BASE_FREQUENCY * sizeof(float);
+        XAudio2::XAUDIO2_BUFFER xbuffer = {};
+        xbuffer.Flags = XAudio2::XAUDIO2_END_OF_STREAM;
+        xbuffer.pAudioData = ez_wave->wave;
+        xbuffer.AudioBytes = length_unit;
+        xbuffer.LoopCount = XAudio2::XAUDIO2_LOOP_INFINITE;
+        triangle->SubmitSourceBuffer(&xbuffer);
+    }
+
+    //triangle->Discontinuity();
+    triangle->SetFrequencyRatio(frequency / (float)BASE_FREQUENCY);
+    triangle->Start();
+
 }
+
+extern "C" void xa2_play_noise(uint16_t data, uint16_t volume) noexcept {
+    union { uint16_t u16[2]; uint32_t u32; } udata;
+    udata.u16[0] = volume;
+    udata.u16[1] = data;
+    if (udata.u32 == g_xa2_data.noise_data) return;
+    g_xa2_data.noise_data = udata.u32;
+
+
+    const auto ez_wave = g_xa2_data.noise;
+    const auto noise = ez_wave->source;
+    if (volume == 0) {
+        noise->Stop();
+        return;
+    }
+
+    std::printf("NIS: 0x%02X  - @ %d\n", data, volume);
+    const auto length_unit = 0x8000 * sizeof(float);
+
+    XAudio2::XAUDIO2_BUFFER xbuffer = {};
+    xbuffer.Flags = XAudio2::XAUDIO2_END_OF_STREAM;
+
+    const auto offset = (data & 0x80) ? length_unit : 0;
+
+    xbuffer.pAudioData = ez_wave->wave + offset;
+    xbuffer.AudioBytes = length_unit;
+    xbuffer.LoopCount = XAudio2::XAUDIO2_LOOP_INFINITE;
+
+    noise->FlushSourceBuffers();
+    noise->SubmitSourceBuffer(&xbuffer);
+
+    const float ratio = SAMPLE_PER_SEC;
+    const float f = NOSIE_FLIST[data & (uint16_t)0xF] / ratio;
+    noise->SetFrequencyRatio(f*2.f);
+
+    noise->SetVolume((float)volume / 15.f);
+
+    noise->Start();
+}
+
+
+//extern "C" void xa2_delete_clip(void* p) noexcept {
+//    const auto wave = reinterpret_cast<sfc_ez_wave*>(p);
+//    if (wave) {
+//        assert(wave->source);
+//        wave->source->DestroyVoice();
+//        std::free(wave);
+//    }
+//}
 
 
 
@@ -353,13 +678,13 @@ extern "C" int xa2_init() noexcept {
         );
     }
 
-    ::CreateThread(0, 0, [](void*) ->DWORD {
-        while (true) {
-            play_240();
-            Sleep(4);
-        }
-        return 0;
-    }, 0, 0, 0);
+    //::CreateThread(0, 0, [](void*) ->DWORD {
+    //    while (true) {
+    //        play_240();
+    //        Sleep(4);
+    //    }
+    //    return 0;
+    //}, 0, 0, 0);
     
     // 创建方波#1
     if (SUCCEEDED(hr)) {
@@ -369,13 +694,29 @@ extern "C" int xa2_init() noexcept {
     if (SUCCEEDED(hr)) {
         hr = xa2_create_clip(&g_xa2_data.square2);
     }
-
-
+    // 创建三角波
+    if (SUCCEEDED(hr)) {
+        hr = xa2_create_clip_tri(&g_xa2_data.triangle);
+    }
+    // 创建噪音
+    if (SUCCEEDED(hr)) {
+        hr = xa2_create_clip_noi(&g_xa2_data.noise);
+    }
     return !!SUCCEEDED(hr);
 }
 
 
 extern "C" void xa2_clean() noexcept {
+    if (g_xa2_data.noise) {
+        g_xa2_data.noise->source->DestroyVoice();
+        std::free(g_xa2_data.noise);
+        g_xa2_data.noise = nullptr;
+    }
+    if (g_xa2_data.triangle) {
+        g_xa2_data.triangle->source->DestroyVoice();
+        std::free(g_xa2_data.triangle);
+        g_xa2_data.triangle = nullptr;
+    }
     if (g_xa2_data.square2) {
         g_xa2_data.square2->source->DestroyVoice();
         std::free(g_xa2_data.square2);

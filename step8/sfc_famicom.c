@@ -125,7 +125,8 @@ sfc_ecode sfc_famicom_reset(sfc_famicom_t* famicom) {
     famicom->ppu.banks[0xd] = famicom->ppu.banks[0x9];
     famicom->ppu.banks[0xe] = famicom->ppu.banks[0xa];
     famicom->ppu.banks[0xf] = famicom->ppu.banks[0xb];
-
+    // 重置APU
+    sfc_apu_on_reset(&famicom->apu);
     return SFC_ERROR_OK;
 }
 
@@ -141,8 +142,9 @@ sfc_ecode sfc_famicom_reset(sfc_famicom_t* famicom) {
 /// <returns></returns>
 sfc_ecode sfc_load_default_rom(void* arg, sfc_rom_info_t* info) {
     assert(info->data_prgrom == NULL && "FREE FIRST");
-    FILE* const file = fopen("square.nes", "rb");
-    //FILE* const file = fopen("sweep_sub.nes", "rb");
+    FILE* const file = fopen("spritecans.nes", "rb");
+    //FILE* const file = fopen("test_apu_env.nes", "rb");
+    //FILE* const file = fopen("D:/doc/fcrom/smb.nes", "rb");
 
     // 文本未找到
     if (!file) return SFC_ERROR_FILE_NOT_FOUND;

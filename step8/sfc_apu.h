@@ -90,6 +90,39 @@ struct sfc_square_data_t {
     uint8_t         sweep_shift;
 };
 
+
+/// <summary>
+/// 三角波寄存器/数据
+/// </summary>
+struct sfc_triangle_data_t {
+    // 当前周期
+    uint16_t        cur_period;
+    // 长度计数器
+    uint8_t         length_counter;
+    // 线性计数器
+    uint8_t         linear_counter;
+    // 线性计数器 重载值
+    uint8_t         value_reload;
+    // 线性计数器 重载标志
+    uint8_t         flag_reload;
+    // 长度计数器/线性计数器暂停值
+    uint8_t         flag_halt;
+};
+
+/// <summary>
+/// 
+/// </summary>
+struct sfc_noise_data_t {
+    // 包络
+    sfc_envelope_t  envelope;
+    // 线性反馈移位寄存器(暂时没用到)
+    uint16_t        lfsr;
+    // 长度计数器
+    uint8_t         length_counter;
+    // 短模式[D7] 周期索引[D0-D3]
+    uint8_t         short_mode__period_index;
+};
+
 /// <summary>
 /// APU寄存器数据
 /// </summary>
@@ -98,6 +131,10 @@ typedef struct {
     struct sfc_square_data_t    square1;
     // 方波 #2
     struct sfc_square_data_t    square2;
+    // 三角波
+    struct sfc_triangle_data_t  triangle;
+    // 噪声
+    struct sfc_noise_data_t     noise;
     // 状态寄存器(写: 声道使能)
     uint8_t                     status_write;
     // 状态寄存器(读:)
@@ -113,6 +150,9 @@ typedef struct {
 // typedef
 //struct sfc_famicom;
 //typedef struct sfc_famicom sfc_famicom_t;
+
+// 重置后
+void sfc_apu_on_reset(sfc_apu_register_t*);
 
 // 触发一次帧计数器
 void sfc_trigger_frame_counter(sfc_apu_register_t*);

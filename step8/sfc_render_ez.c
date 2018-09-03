@@ -741,8 +741,8 @@ void sfc_render_frame_easy(sfc_famicom_t* famicom, uint8_t* buffer) {
             sfc_cpu_execute_one(famicom);
         buffer += SFC_WIDTH;
         // 执行HBlank
-        // 每65.5(这里是64)行进行一次帧计数
-        if ((i & (uint16_t)0x3F) == (uint16_t)0x3F)
+        // 每65.5(这里就66)行进行一次帧计数
+        if (i % 66 == 65)
             sfc_trigger_frame_counter(&famicom->apu);
     }
     // 渲染精灵
@@ -777,9 +777,6 @@ void sfc_render_frame_easy(sfc_famicom_t* famicom, uint8_t* buffer) {
     // 垂直滚动仅对下帧有效
     famicom->ppu.now_scrolly = famicom->ppu.scroll[1];
 
-    // 第四次触发
-    sfc_trigger_frame_counter(&famicom->apu);
-
     // 预渲染
     end_cycle_count += per_scanline * 2;
     // 最后一次保证是偶数(DMA使用)
@@ -793,4 +790,7 @@ void sfc_render_frame_easy(sfc_famicom_t* famicom, uint8_t* buffer) {
 
     // 重置计数器(32位整数太短了)
     famicom->cpu_cycle_count -= end_cycle_count_last_round;
+
+    // 第四次触发
+    sfc_trigger_frame_counter(&famicom->apu);
 }

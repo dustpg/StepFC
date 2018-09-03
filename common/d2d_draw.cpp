@@ -107,6 +107,8 @@ static const unsigned sc_key_map[16] = {
     VK_NUMPAD2, VK_NUMPAD3, VK_NUMPAD5, VK_NUMPAD6, 
     VK_UP, VK_DOWN, VK_LEFT, VK_RIGHT,
 };
+extern "C" void qsave() noexcept;
+extern "C" void qload() noexcept;
 
 
 LRESULT CALLBACK ThisWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) noexcept {
@@ -130,6 +132,13 @@ LRESULT CALLBACK ThisWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
                 const int index = itr - std::begin(sc_key_map);
                 ::user_input(index, msg == WM_KEYDOWN);
             }
+            else if (unsigned(wParam) == VK_F1) {
+                qsave();
+            }
+            else if (unsigned(wParam) == VK_F2) {
+                qload();
+            }
+
         }
         return 0;
     }
