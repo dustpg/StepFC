@@ -19,115 +19,6 @@ extern void sfc_render_frame_easy(
     uint8_t* buffer
 );
 
-/// <summary>
-/// 获取坐标像素
-/// </summary>
-/// <param name="x">The x.</param>
-/// <param name="y">The y.</param>
-/// <param name="nt">The nt.</param>
-/// <param name="bg">The bg.</param>
-/// <returns></returns>
-uint32_t get_pixel(unsigned x, unsigned y, const uint8_t* nt, const uint8_t* bg) {
-    // 获取所在名称表
-    const unsigned id = (x >> 3) + (y >> 3) * 32;
-    const uint32_t name = nt[id];
-    // 查找对应图样表
-    const uint8_t* nowp0 = bg + name * 16;
-    const uint8_t* nowp1 = nowp0 + 8;
-    // Y坐标为平面内偏移
-    const uint8_t p0 = nowp0[y & 0x7];
-    const uint8_t p1 = nowp1[y & 0x7];
-    // X坐标为字节内偏移
-    const uint8_t shift = (~x) & 0x7;
-    const uint8_t mask = 1 << shift;
-    // 计算低二位
-    const uint8_t low = ((p0 & mask) >> shift) | ((p1 & mask) >> shift << 1);
-    // 计算所在属性表
-    const unsigned aid = (x >> 5) + (y >> 5) * 8;
-    const uint8_t attr = nt[aid + (32 * 30)];
-    // 获取属性表内位偏移
-    const uint8_t aoffset = ((x & 0x10) >> 3) | ((y & 0x10) >> 2);
-    // 计算高两位
-    const uint8_t high = (attr & (3 << aoffset)) >> aoffset << 2;
-    // 合并作为颜色
-    const uint8_t index = high | low;
-
-    return palette_data[index];
-}
-
-//__declspec(noinline)
-void expand_line_8(uint8_t p0, uint8_t p1, uint8_t high, uint32_t* output) {
-    // 0 - D7
-    const uint8_t low0 = ((p0 & (uint8_t)0x80) >> 7) | ((p1 & (uint8_t)0x80) >> 6);
-    palette_data[high] = output[0];
-    output[0] = palette_data[high | low0];
-    // 1 - D6
-    const uint8_t low1 = ((p0 & (uint8_t)0x40) >> 6) | ((p1 & (uint8_t)0x40) >> 5);
-    palette_data[high] = output[1];
-    output[1] = palette_data[high | low1];
-    // 2 - D5
-    const uint8_t low2 = ((p0 & (uint8_t)0x20) >> 5) | ((p1 & (uint8_t)0x20) >> 4);
-    palette_data[high] = output[2];
-    output[2] = palette_data[high | low2];
-    // 3 - D4
-    const uint8_t low3 = ((p0 & (uint8_t)0x10) >> 4) | ((p1 & (uint8_t)0x10) >> 3);
-    palette_data[high] = output[3];
-    output[3] = palette_data[high | low3];
-    // 4 - D3
-    const uint8_t low4 = ((p0 & (uint8_t)0x08) >> 3) | ((p1 & (uint8_t)0x08) >> 2);
-    palette_data[high] = output[4];
-    output[4] = palette_data[high | low4];
-    // 5 - D2
-    const uint8_t low5 = ((p0 & (uint8_t)0x04) >> 2) | ((p1 & (uint8_t)0x04) >> 1);
-    palette_data[high] = output[5];
-    output[5] = palette_data[high | low5];
-    // 6 - D1
-    const uint8_t low6 = ((p0 & (uint8_t)0x02) >> 1) | ((p1 & (uint8_t)0x02) >> 0);
-    palette_data[high] = output[6];
-    output[6] = palette_data[high | low6];
-    // 7 - D0
-    const uint8_t low7 = ((p0 & (uint8_t)0x01) >> 0) | ((p1 & (uint8_t)0x01) << 1);
-    palette_data[high] = output[7];
-    output[7] = palette_data[high | low7];
-}
-
-
-//__declspec(noinline)
-void expand_line_8_r(uint8_t p0, uint8_t p1, uint8_t high, uint32_t* output) {
-    // 7 - D7
-    const uint8_t low0 = ((p0 & (uint8_t)0x80) >> 7) | ((p1 & (uint8_t)0x80) >> 6);
-    palette_data[high] = output[7];
-    output[7] = palette_data[high | low0];
-    // 6 - D6
-    const uint8_t low1 = ((p0 & (uint8_t)0x40) >> 6) | ((p1 & (uint8_t)0x40) >> 5);
-    palette_data[high] = output[6];
-    output[6] = palette_data[high | low1];
-    // 5 - D5
-    const uint8_t low2 = ((p0 & (uint8_t)0x20) >> 5) | ((p1 & (uint8_t)0x20) >> 4);
-    palette_data[high] = output[5];
-    output[5] = palette_data[high | low2];
-    // 4 - D4
-    const uint8_t low3 = ((p0 & (uint8_t)0x10) >> 4) | ((p1 & (uint8_t)0x10) >> 3);
-    palette_data[high] = output[4];
-    output[4] = palette_data[high | low3];
-    // 3 - D3
-    const uint8_t low4 = ((p0 & (uint8_t)0x08) >> 3) | ((p1 & (uint8_t)0x08) >> 2);
-    palette_data[high] = output[3];
-    output[3] = palette_data[high | low4];
-    // 2 - D2
-    const uint8_t low5 = ((p0 & (uint8_t)0x04) >> 2) | ((p1 & (uint8_t)0x04) >> 1);
-    palette_data[high] = output[2];
-    output[2] = palette_data[high | low5];
-    // 1 - D1
-    const uint8_t low6 = ((p0 & (uint8_t)0x02) >> 1) | ((p1 & (uint8_t)0x02) >> 0);
-    palette_data[high] = output[1];
-    output[1] = palette_data[high | low6];
-    // 0 - D0
-    const uint8_t low7 = ((p0 & (uint8_t)0x01) >> 0) | ((p1 & (uint8_t)0x01) << 1);
-    palette_data[high] = output[0];
-    output[0] = palette_data[high | low7];
-}
-
 extern int sub_render(void* bgrx) {
     return 0;
 }
@@ -180,6 +71,9 @@ extern void main_render(void* bgrx) {
     sfc_render_frame_easy(g_famicom, buffer);
 
     //sfc_render_frame(g_famicom, buffer);
+
+    // 0->1 =>
+    // 1->0
 
     // 生成调色板数据
     uint32_t palette[32];

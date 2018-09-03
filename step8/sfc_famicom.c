@@ -143,7 +143,7 @@ sfc_ecode sfc_famicom_reset(sfc_famicom_t* famicom) {
 sfc_ecode sfc_load_default_rom(void* arg, sfc_rom_info_t* info) {
     assert(info->data_prgrom == NULL && "FREE FIRST");
     FILE* const file = fopen("spritecans.nes", "rb");
-    //FILE* const file = fopen("test_apu_env.nes", "rb");
+    //FILE* const file = fopen("testrom/3-irq_flag.nes", "rb");
     //FILE* const file = fopen("D:/doc/fcrom/smb.nes", "rb");
 
     // 文本未找到

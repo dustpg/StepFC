@@ -27,6 +27,15 @@ static const LENGTH_COUNTER_TABLE[] = {
 /// <returns></returns>
 static inline uint8_t sfc_read_apu_status(sfc_famicom_t* famicom) {
     uint8_t state = 0;
+    // IF-D NT21 DMC interrupt (I), frame interrupt (F), DMC active (D), length counter > 0 (N/T/2/1)
+    if (famicom->apu.square1.length_counter > 0)
+        state |= SFC_APU4015_READ_Square1Length;
+    if (famicom->apu.square2.length_counter > 0)
+        state |= SFC_APU4015_READ_Square2Length;
+    if (famicom->apu.triangle.length_counter > 0)
+        state |= SFC_APU4015_READ_TriangleLength;
+    if (famicom->apu.noise.length_counter > 0)
+        state |= SFC_APU4015_READ_NoiseLength;
 
     return state;
 }
@@ -125,7 +134,10 @@ extern inline void sfc_write_cpu_address4020(uint16_t address, uint8_t data, sfc
         break;
     case 0x03:
         // $4003 LLLL LTTT
-        famicom->apu.square1.length_counter = LENGTH_COUNTER_TABLE[data >> 3];
+        // 禁止状态不会重置
+        if (famicom->apu.status_write & (uint8_t)SFC_APU4015_WRITE_EnableSquare1)
+            famicom->apu.square1.length_counter = LENGTH_COUNTER_TABLE[data >> 3];
+
         famicom->apu.square1.cur_period
             = (famicom->apu.square1.cur_period & (uint16_t)0x00ff)
             | (((uint16_t)data & (uint16_t)0x07) << 8);
@@ -154,7 +166,9 @@ extern inline void sfc_write_cpu_address4020(uint16_t address, uint8_t data, sfc
         break;
     case 0x07:
         // $4007 LLLL LTTT
-        famicom->apu.square2.length_counter = LENGTH_COUNTER_TABLE[data >> 3];
+        // 禁止状态不会重置
+        if (famicom->apu.status_write & (uint8_t)SFC_APU4015_WRITE_EnableSquare2)
+            famicom->apu.square2.length_counter = LENGTH_COUNTER_TABLE[data >> 3];
         famicom->apu.square2.cur_period
             = (famicom->apu.square2.cur_period & (uint16_t)0x00ff)
             | (((uint16_t)data & (uint16_t)0x07) << 8);
@@ -174,7 +188,9 @@ extern inline void sfc_write_cpu_address4020(uint16_t address, uint8_t data, sfc
         break;
     case 0x0B:
         // $400B LLLL LTTT
-        famicom->apu.triangle.length_counter = LENGTH_COUNTER_TABLE[data >> 3];
+        // 禁止状态不会重置
+        if (famicom->apu.status_write & (uint8_t)SFC_APU4015_WRITE_EnableTriangle)
+            famicom->apu.triangle.length_counter = LENGTH_COUNTER_TABLE[data >> 3];
         famicom->apu.triangle.cur_period
             = (famicom->apu.triangle.cur_period & (uint16_t)0x00ff)
             | (((uint16_t)data & (uint16_t)0x07) << 8);
@@ -190,7 +206,10 @@ extern inline void sfc_write_cpu_address4020(uint16_t address, uint8_t data, sfc
         break;
     case 0x0F:
         // $400E LLLL L---
-        famicom->apu.noise.length_counter = LENGTH_COUNTER_TABLE[data >> 3];
+        // 禁止状态不会重置
+        if (famicom->apu.status_write & (uint8_t)SFC_APU4015_WRITE_EnableNoise)
+            famicom->apu.noise.length_counter = LENGTH_COUNTER_TABLE[data >> 3];
+
         famicom->apu.noise.envelope.start = 1;
         break;
     case 0x14:

@@ -65,13 +65,17 @@ struct {
     bool                                        triangle_stop;
 
 
-    sfc_ez_wave*                                noise;
+    sfc_ez_wave*                                noise_l;
+    sfc_ez_wave*                                noise_s;
+    //sfc_ez_wave*                                noise_last;
     uint32_t                                    noise_data;
-
-
+    bool                                        noise_l_stop;
+    bool                                        noise_s_stop;
+    //sfc_ez_wave*                                test;
 } g_xa2_data;
 
 static const float NOSIE_FLIST[] = {
+#if 0
     178977.30f,
     99431.83f,
     52640.38f,
@@ -88,6 +92,28 @@ static const float NOSIE_FLIST[] = {
     879.93f,
     439.75f,
     219.93f,
+#else
+    223721.625f,
+    111860.812f,
+    55930.406f,
+    27965.203f,
+    13982.602f,
+    9321.734f,
+    6991.301f,
+    5593.041f,
+    4430.131f,
+    3523.175f,
+    2354.964f,
+    1761.588f,
+    1174.392f,
+    880.794f,
+    439.964f,
+    219.982f,
+#endif
+};
+
+const static int timer_period[] = {
+    4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068
 };
 
 // wave format
@@ -391,7 +417,7 @@ HRESULT xa2_create_clip_tri(sfc_ez_wave** output) noexcept {
 }
 
 
-HRESULT xa2_create_clip_noi(sfc_ez_wave** output) noexcept {
+HRESULT xa2_create_clip_noi(sfc_ez_wave** output, int mode) noexcept {
     XAudio2::WAVEFORMATEX fmt = {};
     // CD
     fmt.nSamplesPerSec = SAMPLE_PER_SEC;
@@ -402,7 +428,7 @@ HRESULT xa2_create_clip_noi(sfc_ez_wave** output) noexcept {
     // single float
     fmt.wFormatTag = Wave_IEEEFloat;
 
-    constexpr uint32_t LEN = 0x10000;
+    constexpr uint32_t LEN = 0x8000;
     // get length of buffer
     const uint32_t countlen = LEN;
     const uint32_t bytelen = countlen * sizeof(float) + sizeof(sfc_ez_wave);
@@ -423,9 +449,10 @@ HRESULT xa2_create_clip_noi(sfc_ez_wave** output) noexcept {
         if (const auto buffer = std::malloc(bytelen)) {
             ez_wave = reinterpret_cast<sfc_ez_wave*>(buffer);
             const auto ptr = reinterpret_cast<float*>(ez_wave->wave);
-
-            make_noise_long(ptr, LEN / 2, base_noise_vol);
-            make_noise_short(ptr + LEN / 2, LEN / 2, base_noise_vol);
+            if (mode)
+                make_noise_short(ptr, LEN, base_noise_vol);
+            else 
+                make_noise_long(ptr, LEN, base_noise_vol);
         }
         else hr = E_OUTOFMEMORY;
     }
@@ -440,16 +467,15 @@ HRESULT xa2_create_clip_noi(sfc_ez_wave** output) noexcept {
         );
     }
     // 提交缓冲区
-    //if (SUCCEEDED(hr)) {
-    //    constexpr uint32_t length_unit = LEN * sizeof(float);
-
-    //    XAudio2::XAUDIO2_BUFFER xbuffer = {};
-    //    xbuffer.Flags = XAudio2::XAUDIO2_END_OF_STREAM;
-    //    xbuffer.pAudioData = ez_wave->wave + length_unit / 2;
-    //    xbuffer.AudioBytes = length_unit / 2;
-    //    xbuffer.LoopCount = XAudio2::XAUDIO2_LOOP_INFINITE;
-    //    hr = source->SubmitSourceBuffer(&xbuffer);
-    //}
+    if (SUCCEEDED(hr)) {
+        constexpr uint32_t length_unit = LEN * sizeof(float);
+        XAudio2::XAUDIO2_BUFFER xbuffer = {};
+        xbuffer.Flags = XAudio2::XAUDIO2_END_OF_STREAM;
+        xbuffer.pAudioData = ez_wave->wave;
+        xbuffer.AudioBytes = length_unit;
+        xbuffer.LoopCount = XAudio2::XAUDIO2_LOOP_INFINITE;
+        hr = source->SubmitSourceBuffer(&xbuffer);
+    }
     // 返回对象?
     if (SUCCEEDED(hr)) {
         ez_wave->source = source;
@@ -584,28 +610,29 @@ extern "C" void xa2_play_noise(uint16_t data, uint16_t volume) noexcept {
     if (udata.u32 == g_xa2_data.noise_data) return;
     g_xa2_data.noise_data = udata.u32;
 
-
-    const auto ez_wave = g_xa2_data.noise;
-    const auto noise = ez_wave->source;
     if (volume == 0) {
-        noise->Stop();
+        if (!g_xa2_data.noise_l_stop)
+            g_xa2_data.noise_l->source->Stop();
+        if (!g_xa2_data.noise_s_stop)
+            g_xa2_data.noise_s->source->Stop();
+        g_xa2_data.noise_s_stop = true;
+        g_xa2_data.noise_l_stop = true;
         return;
     }
 
+
+
+    const auto ez_wave = (data & uint16_t(0x80)) 
+        ? g_xa2_data.noise_s
+        : g_xa2_data.noise_l
+        ;
+    auto& noise_stop = (data & uint16_t(0x80))
+        ? g_xa2_data.noise_s_stop
+        : g_xa2_data.noise_l_stop
+        ;
+
+    const auto noise = ez_wave->source;
     std::printf("NIS: 0x%02X  - @ %d\n", data, volume);
-    const auto length_unit = 0x8000 * sizeof(float);
-
-    XAudio2::XAUDIO2_BUFFER xbuffer = {};
-    xbuffer.Flags = XAudio2::XAUDIO2_END_OF_STREAM;
-
-    const auto offset = (data & 0x80) ? length_unit : 0;
-
-    xbuffer.pAudioData = ez_wave->wave + offset;
-    xbuffer.AudioBytes = length_unit;
-    xbuffer.LoopCount = XAudio2::XAUDIO2_LOOP_INFINITE;
-
-    noise->FlushSourceBuffers();
-    noise->SubmitSourceBuffer(&xbuffer);
 
     const float ratio = SAMPLE_PER_SEC;
     const float f = NOSIE_FLIST[data & (uint16_t)0xF] / ratio;
@@ -613,7 +640,10 @@ extern "C" void xa2_play_noise(uint16_t data, uint16_t volume) noexcept {
 
     noise->SetVolume((float)volume / 15.f);
 
-    noise->Start();
+    if (noise_stop) {
+        noise->Start();
+        noise_stop = false;
+    }
 }
 
 
@@ -698,19 +728,30 @@ extern "C" int xa2_init() noexcept {
     if (SUCCEEDED(hr)) {
         hr = xa2_create_clip_tri(&g_xa2_data.triangle);
     }
-    // 创建噪音
+    // 创建噪音 Long模式
     if (SUCCEEDED(hr)) {
-        hr = xa2_create_clip_noi(&g_xa2_data.noise);
+        hr = xa2_create_clip_noi(&g_xa2_data.noise_l, 0);
+        g_xa2_data.noise_l_stop = true;
+    }
+    // 创建噪音 Short模式
+    if (SUCCEEDED(hr)) {
+        hr = xa2_create_clip_noi(&g_xa2_data.noise_s, 1);
+        g_xa2_data.noise_s_stop = true;
     }
     return !!SUCCEEDED(hr);
 }
 
 
 extern "C" void xa2_clean() noexcept {
-    if (g_xa2_data.noise) {
-        g_xa2_data.noise->source->DestroyVoice();
-        std::free(g_xa2_data.noise);
-        g_xa2_data.noise = nullptr;
+    if (g_xa2_data.noise_l) {
+        g_xa2_data.noise_l->source->DestroyVoice();
+        std::free(g_xa2_data.noise_l);
+        g_xa2_data.noise_l = nullptr;
+    }
+    if (g_xa2_data.noise_s) {
+        g_xa2_data.noise_s->source->DestroyVoice();
+        std::free(g_xa2_data.noise_s);
+        g_xa2_data.noise_s = nullptr;
     }
     if (g_xa2_data.triangle) {
         g_xa2_data.triangle->source->DestroyVoice();

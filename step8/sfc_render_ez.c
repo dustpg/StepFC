@@ -726,6 +726,8 @@ void sfc_render_frame_easy(sfc_famicom_t* famicom, uint8_t* buffer) {
     // 关闭渲染则输出背景色?
     if (!(famicom->ppu.mask & (uint8_t)SFC_PPU2001_Back))
         memset(buffer, 0, SFC_WIDTH * SFC_HEIGHT);
+    // 第1次触发
+    sfc_trigger_frame_counter(&famicom->apu);
     // 渲染
     for (uint16_t i = 0; i != (uint16_t)SCAN_LINE_COUNT; ++i) {
         end_cycle_count += per_scanline;
@@ -791,6 +793,4 @@ void sfc_render_frame_easy(sfc_famicom_t* famicom, uint8_t* buffer) {
     // 重置计数器(32位整数太短了)
     famicom->cpu_cycle_count -= end_cycle_count_last_round;
 
-    // 第四次触发
-    sfc_trigger_frame_counter(&famicom->apu);
 }
