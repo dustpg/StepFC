@@ -26,3 +26,4 @@ SFC_EXTERN_C int sub_render(void* bgrx) SFC_NOEXCEPT {
     return 0;
 }
 #endif
+

@@ -68,31 +68,59 @@ void sfc_famicom_uninit(sfc_famicom_t* famicom) {
 
 
 /// <summary>
-/// StepFC: 设置名词表用仓库
+/// SFCs the switch nametable mirroring.
 /// </summary>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_setup_nametable_bank(sfc_famicom_t* famicom) {
-    // 4屏
-    if (famicom->rom_info.four_screen) {
+/// <param name="mode">The mode.</param>
+void sfc_switch_nametable_mirroring(sfc_famicom_t* famicom, sfc_nametable_mirroring_mode mode) {
+    switch (mode)
+    {
+    case SFC_NT_MIR_SingleLow:
         famicom->ppu.banks[0x8] = famicom->video_memory + 0x400 * 0;
+        famicom->ppu.banks[0x9] = famicom->video_memory + 0x400 * 0;
+        famicom->ppu.banks[0xa] = famicom->video_memory + 0x400 * 0;
+        famicom->ppu.banks[0xb] = famicom->video_memory + 0x400 * 0;
+        break;
+    case SFC_NT_MIR_SingleHigh:
+        famicom->ppu.banks[0x8] = famicom->video_memory + 0x400 * 1;
         famicom->ppu.banks[0x9] = famicom->video_memory + 0x400 * 1;
-        famicom->ppu.banks[0xa] = famicom->video_memory_ex + 0x400 * 0;
-        famicom->ppu.banks[0xb] = famicom->video_memory_ex + 0x400 * 1;
-    }
-    // 横版
-    else if (famicom->rom_info.vmirroring) {
+        famicom->ppu.banks[0xa] = famicom->video_memory + 0x400 * 1;
+        famicom->ppu.banks[0xb] = famicom->video_memory + 0x400 * 1;
+        break;
+    case SFC_NT_MIR_Vertical:
         famicom->ppu.banks[0x8] = famicom->video_memory + 0x400 * 0;
         famicom->ppu.banks[0x9] = famicom->video_memory + 0x400 * 1;
         famicom->ppu.banks[0xa] = famicom->video_memory + 0x400 * 0;
         famicom->ppu.banks[0xb] = famicom->video_memory + 0x400 * 1;
-    }
-    // 纵版
-    else {
+        break;
+    case SFC_NT_MIR_Horizontal:
         famicom->ppu.banks[0x8] = famicom->video_memory + 0x400 * 0;
         famicom->ppu.banks[0x9] = famicom->video_memory + 0x400 * 0;
         famicom->ppu.banks[0xa] = famicom->video_memory + 0x400 * 1;
         famicom->ppu.banks[0xb] = famicom->video_memory + 0x400 * 1;
+        break;
+    case SFC_NT_MIR_FourScreen:
+        famicom->ppu.banks[0x8] = famicom->video_memory + 0x400 * 0;
+        famicom->ppu.banks[0x9] = famicom->video_memory + 0x400 * 1;
+        famicom->ppu.banks[0xa] = famicom->video_memory_ex + 0x400 * 0;
+        famicom->ppu.banks[0xb] = famicom->video_memory_ex + 0x400 * 1;
+        break;
+    default:
+        assert(!"BAD ACTION");
     }
+}
+
+
+
+/// <summary>
+/// StepFC: 设置名词表用仓库
+/// </summary>
+/// <param name="famicom">The famicom.</param>
+static inline void sfc_setup_nametable_bank(sfc_famicom_t* famicom) {
+    sfc_switch_nametable_mirroring(famicom,
+        famicom->rom_info.four_screen ? (SFC_NT_MIR_FourScreen) :
+        (famicom->rom_info.vmirroring ? SFC_NT_MIR_Vertical : SFC_NT_MIR_Horizontal)
+    );
 }
 
 /// <summary>
@@ -142,9 +170,9 @@ sfc_ecode sfc_famicom_reset(sfc_famicom_t* famicom) {
 /// <returns></returns>
 sfc_ecode sfc_load_default_rom(void* arg, sfc_rom_info_t* info) {
     assert(info->data_prgrom == NULL && "FREE FIRST");
-    FILE* const file = fopen("spritecans.nes", "rb");
-    //FILE* const file = fopen("testrom/08.irq_timing.nes", "rb");
-    //FILE* const file = fopen("D:/doc/fcrom/smb.nes", "rb");
+    //FILE* const file = fopen("spritecans.nes", "rb");
+    FILE* const file = fopen("D:/doc/fcrom/7000527.nes", "rb");
+
 
     // 文本未找到
     if (!file) return SFC_ERROR_FILE_NOT_FOUND;

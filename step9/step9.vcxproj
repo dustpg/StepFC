@@ -20,36 +20,36 @@
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>
-    <ProjectGuid>{C00980FF-B85A-4D12-AC78-40A9EC404184}</ProjectGuid>
-    <RootNamespace>step8</RootNamespace>
+    <ProjectGuid>{456C003F-1EC8-40CA-831F-A20AB0F29426}</ProjectGuid>
+    <RootNamespace>step9</RootNamespace>
     <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <CharacterSet>MultiByte</CharacterSet>
     <PlatformToolset>v141</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v141</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>MultiByte</CharacterSet>
-    <PlatformToolset>v141</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <CharacterSet>MultiByte</CharacterSet>
     <PlatformToolset>v141</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v141</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>MultiByte</CharacterSet>
-    <PlatformToolset>v141</PlatformToolset>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -119,20 +119,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\common\d2d_draw.cpp" />
-    <ClCompile Include="..\common\xa2_play.cpp" />
-    <ClCompile Include="main.c" />
-    <ClCompile Include="sfc_6502.c" />
-    <ClCompile Include="sfc_addr4020.c" />
-    <ClCompile Include="sfc_config.c" />
-    <ClCompile Include="sfc_cpu.c" />
-    <ClCompile Include="sfc_famicom.c" />
-    <ClCompile Include="sfc_mapper.c" />
-    <ClCompile Include="sfc_play_ez.c" />
-    <ClCompile Include="sfc_ppu.c" />
-    <ClCompile Include="sfc_render_ez.c" />
-  </ItemGroup>
-  <ItemGroup>
     <ClInclude Include="..\common\d2d_interface.h" />
     <ClInclude Include="..\common\p_XAudio2_7.h" />
     <ClInclude Include="..\common\p_XAudio2_base.h" />
@@ -143,9 +129,25 @@
     <ClInclude Include="sfc_config.h" />
     <ClInclude Include="sfc_cpu.h" />
     <ClInclude Include="sfc_famicom.h" />
+    <ClInclude Include="sfc_mapper.h" />
     <ClInclude Include="sfc_play.h" />
     <ClInclude Include="sfc_ppu.h" />
     <ClInclude Include="sfc_rom.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\common\d2d_draw.cpp" />
+    <ClCompile Include="..\common\xa2_play.cpp" />
+    <ClCompile Include="main.c" />
+    <ClCompile Include="sfc_6502.c" />
+    <ClCompile Include="sfc_addr4020.c" />
+    <ClCompile Include="sfc_config.c" />
+    <ClCompile Include="sfc_cpu.c" />
+    <ClCompile Include="sfc_famicom.c" />
+    <ClCompile Include="sfc_mapper.c" />
+    <ClCompile Include="sfc_mapper_001_mmc1.c" />
+    <ClCompile Include="sfc_play_ez.c" />
+    <ClCompile Include="sfc_ppu.c" />
+    <ClCompile Include="sfc_render_ez.c" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
