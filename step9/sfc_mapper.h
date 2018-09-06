@@ -6,18 +6,18 @@
 
 
 enum {
-    SFC_MAPPER_00_SIZE = 1,
     SFC_MAPPER_01_SIZE = 4,
+    SFC_MAPPER_04_SIZE = 16,
 };
 
 // Mapper用缓存
 typedef union {
     // 对齐用指针
     void*           unused;
-    // Mapper 00
-    uint8_t         mapper00[SFC_MAPPER_00_SIZE];
     // Mapper 01
-    uint8_t         mapper01[2];
+    uint8_t         mapper01[SFC_MAPPER_01_SIZE];
+    // Mapper 04
+    uint8_t         mapper04[SFC_MAPPER_04_SIZE];
 
 } sfc_mapper_buffer_t;
 

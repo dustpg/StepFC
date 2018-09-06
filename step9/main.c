@@ -242,7 +242,7 @@ void sfc_log_exec(void* arg, sfc_famicom_t* famicom) {
     const uint32_t cycle = famicom->cpu_cycle_count;
     const uint16_t pc = famicom->registers.program_counter;
     static int line = 0;  line++;
-    //if (pc == 0xc83d) {
+    //if (pc == 0xa826) {
     //}
     //else if (pc == 0xc82f) {
     //}
@@ -261,8 +261,8 @@ void sfc_log_exec(void* arg, sfc_famicom_t* famicom) {
     char buf[SFC_DISASSEMBLY_BUF_LEN2];
     sfc_fc_disassembly(pc, famicom, buf);
     printf(
-        "%4d - %s   A:%02X X:%02X Y:%02X P:%02X SP:%02X\n",
-        line, buf,
+        "%4d[%5d] - %s   A:%02X X:%02X Y:%02X P:%02X SP:%02X\n",
+        line, famicom->cpu_cycle_count ,buf,
         (int)famicom->registers.accumulator,
         (int)famicom->registers.x_index,
         (int)famicom->registers.y_index,

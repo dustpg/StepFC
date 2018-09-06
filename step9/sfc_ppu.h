@@ -59,6 +59,8 @@ enum sfc_ppu_flag_sprite_attr {
 typedef struct {
     // 内存地址库
     uint8_t*        banks[0x4000 / 0x0400];
+    // 内存地址库 - 对比用
+    //uint8_t*        banks_backup[0x4000 / 0x0400];
 #if 0
     // VRAM 地址 15bit [调试用]
     uint16_t        vdebug;
@@ -92,6 +94,8 @@ typedef struct {
     };
 } sfc_ppu_t;
 
+// backup banks
+//extern inline void sfc_ppu_bankup_banks(sfc_ppu_t* ppu);
 
 // read ppu register via cpu address space
 uint8_t sfc_read_ppu_register_via_cpu(uint16_t, sfc_ppu_t*);

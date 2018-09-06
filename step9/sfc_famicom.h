@@ -73,6 +73,8 @@ typedef struct {
     sfc_ecode(*reset)(sfc_famicom_t*);
     // 写入高地址
     void (*write_high)(sfc_famicom_t*, uint16_t, uint8_t);
+    // 水平同步
+    void(*hsync)(sfc_famicom_t*);
 
 } sfc_mapper_t;
 

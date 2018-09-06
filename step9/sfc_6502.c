@@ -1057,6 +1057,7 @@ static inline void sfc_operation_CLI(uint16_t address, sfc_famicom_t* famicom, u
     famicom->registers.apu_frame_interrupt_counter =
         famicom->registers.apu_frame_interrupt << 1;
     //famicom->registers.apu_frame_interrupt = 0;
+
 }
 
 SFC_FORCEINLINE
@@ -1536,6 +1537,21 @@ extern void sfc_operation_IRQ(sfc_famicom_t * famicom) {
     famicom->registers.program_counter = (uint16_t)pcl2 | (uint16_t)pch2 << 8;
 
     famicom->cpu_cycle_count += 7;
+}
+
+
+/// <summary>
+/// SFCs the operation irq try.
+/// </summary>
+/// <param name="famicom">The famicom.</param>
+extern inline void sfc_operation_IRQ_try(sfc_famicom_t* famicom) {
+    if (SFC_IF) return;
+    sfc_operation_IRQ(famicom);
+    // 暂时借用APU的帧中断
+    //if (SFC_IF)
+    //    famicom->registers.apu_frame_interrupt = 1;
+    //else 
+    //    famicom->registers.apu_frame_interrupt_counter = 1;
 }
 
 /// <summary>

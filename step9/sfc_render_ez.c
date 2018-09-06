@@ -287,7 +287,7 @@ static void sfc_render_background_scanline(
     const uint16_t scrolly_offset = scrolly % (uint16_t)240;
 
     // 计算背景所使用的图样表
-    const uint8_t* const pattern = famicom->ppu.banks[famicom->ppu.ctrl & SFC_PPU2000_BgTabl ? 4 : 0];
+    const uint8_t** const ppattern = &famicom->ppu.banks[famicom->ppu.ctrl & SFC_PPU2000_BgTabl ? 4 : 0];
     // 检测垂直偏移量确定使用图案表的前一半[8-9]还是后一半[10-11]
     const uint8_t* table[2];
 
@@ -312,12 +312,14 @@ static void sfc_render_background_scanline(
             // 计算图样表位置
             const uint8_t* too_young = nt + ((uint16_t)xunit << 1) + (uint16_t)(realy >> 3 << 5);
             const uint8_t too_young0 = too_young[0];
+            const uint8_t* const pattern0 = ppattern[too_young0 >> 6];
             const uint8_t too_young1 = too_young[1];
+            const uint8_t* const pattern1 = ppattern[too_young1 >> 6];
             // 渲染16个像素
             sfc_render_background_pixel16(
                 high,
-                pattern + too_young0 * 16 + (realy & 7),
-                pattern + too_young1 * 16 + (realy & 7),
+                pattern0 + (too_young0 & 0x3F) * 16 + (realy & 7),
+                pattern1 + (too_young1 & 0x3F) * 16 + (realy & 7),
                 aligned_buffer + (i << 4)
             );
         }
@@ -576,6 +578,16 @@ static inline void sfc_sprite_expand_8_rp(uint8_t p0, uint8_t p1, uint8_t high, 
     if ((~output[7-7] & 1) && low7) output[7-7] = high | low7 | 1;
 }
 
+
+/// <summary>
+/// SFCs the read ppu pa.
+/// </summary>
+/// <param name="famicom">The famicom.</param>
+/// <param name="index">The index.</param>
+static inline void sfc_read_ppu_via_id(sfc_famicom_t* famicom, uint8_t index) {
+
+}
+
 /// <summary>
 /// SFCs the render sprites.
 /// </summary>
@@ -584,11 +596,26 @@ static inline void sfc_sprite_expand_8_rp(uint8_t p0, uint8_t p1, uint8_t high, 
 static inline void sfc_render_sprites(sfc_famicom_t* famicom, uint8_t* buffer) {
     // 8 x 16
     const uint8_t sp8x16 = (famicom->ppu.ctrl & (uint8_t)SFC_PPU2000_Sp8x16) >> 2;
+    //assert(sp8x16 == 0);
     // 精灵用图样
-    const uint8_t* sppbuffer[2];
-    sppbuffer[0] = famicom->ppu.banks[
-        (sp8x16) ? 0 : (famicom->ppu.ctrl & SFC_PPU2000_SpTabl ? 4 : 0)];
-    sppbuffer[1] = sp8x16 ? famicom->ppu.banks[4] : sppbuffer[0] + 16;
+    const size_t offset1 = (sp8x16) ? 0 : (famicom->ppu.ctrl & SFC_PPU2000_SpTabl ? 4 : 0);
+    const size_t offset2 = (sp8x16) ? 4 : offset1;
+    const size_t offset3 = (sp8x16) ? 0 : 16;
+
+    const uint8_t* banks[8];
+    banks[0] = famicom->ppu.banks[offset1 + 0];
+    banks[1] = famicom->ppu.banks[offset1 + 1];
+    banks[2] = famicom->ppu.banks[offset1 + 2];
+    banks[3] = famicom->ppu.banks[offset1 + 3];
+    banks[4] = famicom->ppu.banks[offset2 + 0] + offset3;
+    banks[5] = famicom->ppu.banks[offset2 + 1] + offset3;
+    banks[6] = famicom->ppu.banks[offset2 + 2] + offset3;
+    banks[7] = famicom->ppu.banks[offset2 + 3] + offset3;
+
+    //const uint8_t* sppbuffer[2];
+    //sppbuffer[0] = famicom->ppu.banks[
+    //    (sp8x16) ? 0 : (famicom->ppu.ctrl & SFC_PPU2000_SpTabl ? 4 : 0)];
+    //sppbuffer[1] = sp8x16 ? famicom->ppu.banks[4] : sppbuffer[0] + 16;
 
     // 遍历所有精灵
     for (int index = 0; index != SFC_SPRITE_COUNT; ++index) {
@@ -601,8 +628,10 @@ static inline void sfc_render_sprites(sfc_famicom_t* famicom, uint8_t* buffer) {
         const uint8_t aaaa = base[2];
         const uint8_t xxxx = base[3];
         const uint8_t high = ((aaaa & 3) | 4) << 3;
-
-        const uint8_t* const nowp0 = sppbuffer[iiii & 1] + (iiii & (uint8_t)0xFE) * 16;
+        // 计算BANK
+        const uint8_t* const bank = banks[(iiii >> 6) | (iiii & 1) << 2];
+        const uint8_t* const nowp0 = bank + ((int)(iiii & (uint8_t)0x3e)) * 16;
+        //const uint8_t* const nowp0 = sppbuffer[iiii & 1] + (iiii & (uint8_t)0xFE) * 16;
         const uint8_t* const nowp1 = nowp0 + 8;
         uint8_t* const write = buffer + xxxx + (yyyy + 1) * SFC_WIDTH;
         // hVHP
@@ -750,16 +779,17 @@ void sfc_render_frame_easy(sfc_famicom_t* famicom, uint8_t* buffer) {
             sfc_ppu_do_under_cycle256(&famicom->ppu);
             sfc_ppu_do_under_cycle257(&famicom->ppu);
         }
+        // 水平同步
+        famicom->mapper.hsync(famicom);
+        // 执行HBlank
 
         buffer += SFC_WIDTH;
-        // 执行HBlank
+
         // 每65.5(这里就66)行进行一次帧计数
         if (i % 66 == 65)
             sfc_trigger_frame_counter(famicom);
     }
-    // 渲染精灵
-    if (famicom->ppu.mask & (uint8_t)SFC_PPU2001_Sprite)
-        sfc_render_sprites(famicom, data);
+
     
     // 后渲染
     {
@@ -768,6 +798,8 @@ void sfc_render_frame_easy(sfc_famicom_t* famicom, uint8_t* buffer) {
         uint32_t* const count = &famicom->cpu_cycle_count;
         for (; *count < end_cycle_count_this_round;)
             sfc_cpu_execute_one(famicom);
+        // 水平同步
+        famicom->mapper.hsync(famicom);
     }
     // 垂直空白期间
 
@@ -807,4 +839,8 @@ void sfc_render_frame_easy(sfc_famicom_t* famicom, uint8_t* buffer) {
     // 重置计数器(32位整数太短了)
     famicom->cpu_cycle_count -= end_cycle_count_last_round;
 
+
+    // 最后渲染精灵
+    if (famicom->ppu.mask & (uint8_t)SFC_PPU2001_Sprite)
+        sfc_render_sprites(famicom, data);
 }

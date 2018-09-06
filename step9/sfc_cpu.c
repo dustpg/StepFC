@@ -20,6 +20,11 @@ extern inline uint8_t sfc_read_prgdata(uint16_t address, const sfc_famicom_t* fa
     assert(((address & (uint16_t)0x8000) == (uint16_t)0x8000) || (address>>13) == 0);
     const uint16_t prgaddr = address;
     return famicom->prg_banks[prgaddr >> 13][prgaddr & (uint16_t)0x1fff];
+    //const uint16_t id = prgaddr >> 13;
+    //if (id)
+    //    return famicom->prg_banks[id][prgaddr & (uint16_t)0x1fff];
+    //else
+    //    return famicom->prg_banks[0][prgaddr & (uint16_t)0x7ff];
 }
 
 /// <summary>

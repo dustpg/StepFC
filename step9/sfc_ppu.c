@@ -80,7 +80,7 @@ uint8_t sfc_read_ppu_register_via_cpu(uint16_t address, sfc_ppu_t* ppu) {
     case 1:
         // 0x2001: Mask ($2001) > write
         // 只写寄存器
-        assert(!"write only!");
+        //assert(!"write only!");
         break;
     case 2:
         // 0x2002: Status ($2002) < read
@@ -124,6 +124,14 @@ uint8_t sfc_read_ppu_register_via_cpu(uint16_t address, sfc_ppu_t* ppu) {
     return data;
 }
 
+
+/// <summary>
+/// SFCs the pp bankup banks.
+/// </summary>
+/// <param name="ppu">The ppu.</param>
+//extern inline void sfc_ppu_bankup_banks(sfc_ppu_t* ppu) {
+//    memcpy(ppu->banks_backup, ppu->banks, sizeof(ppu->banks));
+//}
 
 /// <summary>
 /// StepFC: 使用CPU地址空间写入PPU寄存器

@@ -11,8 +11,22 @@ static inline sfc_ecode sfc_load_mapper_00(sfc_famicom_t* famicom);
 extern inline sfc_ecode sfc_load_mapper_01(sfc_famicom_t* famicom);
 // mapper002 - UxROM
 extern inline sfc_ecode sfc_load_mapper_02(sfc_famicom_t* famicom);
+// mapper003 - CNROM
+extern inline sfc_ecode sfc_load_mapper_03(sfc_famicom_t* famicom);
+// mapper004 - TxROM
+extern inline sfc_ecode sfc_load_mapper_04(sfc_famicom_t* famicom);
 
 #define SFC_CASE_LOAD_MAPPER(id) case 0x##id: return sfc_load_mapper_##id(famicom);
+// 山寨版
+#define SFC_CASE_LOAD_MAPPER_SHANZHAI(id1, id2) case 0x##id1: return sfc_load_mapper_##id2(famicom);
+
+
+/// <summary>
+/// SFCs the mapper hsync defualt.
+/// </summary>
+/// <param name="famicom">The famicom.</param>
+static void sfc_mapper_hsync_defualt(sfc_famicom_t* famicom) {
+}
 
 /// <summary>
 /// StepFC: 加载Mapper
@@ -22,12 +36,16 @@ extern inline sfc_ecode sfc_load_mapper_02(sfc_famicom_t* famicom);
 /// <returns></returns>
 extern sfc_ecode sfc_load_mapper(sfc_famicom_t* famicom, uint8_t id) {
     memset(&famicom->mapper, 0, sizeof(famicom->mapper));
-
+    // 载入默认接口
+    famicom->mapper.hsync = sfc_mapper_hsync_defualt;
     switch (id)
     {
         SFC_CASE_LOAD_MAPPER(00);
         SFC_CASE_LOAD_MAPPER(01);
         SFC_CASE_LOAD_MAPPER(02);
+        SFC_CASE_LOAD_MAPPER(03);
+        SFC_CASE_LOAD_MAPPER(04);
+        SFC_CASE_LOAD_MAPPER_SHANZHAI(4A, 04);
     }
     assert(!"NO MAPPER");
     return SFC_ERROR_MAPPER_NOT_FOUND;
@@ -37,12 +55,13 @@ extern sfc_ecode sfc_load_mapper(sfc_famicom_t* famicom, uint8_t id) {
 
 // ------------------------------- MAPPER 000 - NROM
 
+
 /// <summary>
 /// StepFC: MAPPER 000 - NROM 重置
 /// </summary>
 /// <param name="famicom">The famicom.</param>
 /// <returns></returns>
-static sfc_ecode sfc_mapper_00_reset(sfc_famicom_t* famicom) {
+extern sfc_ecode sfc_mapper_00_reset(sfc_famicom_t* famicom) {
     assert(famicom->rom_info.count_prgrom16kb && "bad count");
     assert(famicom->rom_info.count_prgrom16kb <= 2 && "bad count");
     // PRG-ROM

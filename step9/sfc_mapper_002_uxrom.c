@@ -39,7 +39,7 @@ static sfc_ecode sfc_mapper_02_reset(sfc_famicom_t* famicom) {
 /// <param name="address">The address.</param>
 /// <param name="value">The value.</param>
 static void sfc_mapper_02_write_high(sfc_famicom_t* famicom, uint16_t address, uint8_t value) {
-    const int bank = value * 2;
+    const int bank = (value % famicom->rom_info.count_prgrom16kb) * 2;
     sfc_load_prgrom_8k(famicom, 0, bank + 0);
     sfc_load_prgrom_8k(famicom, 1, bank + 1);
 }
