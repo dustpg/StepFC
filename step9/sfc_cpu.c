@@ -99,7 +99,7 @@ uint8_t sfc_read_cpu_address(uint16_t address, sfc_famicom_t* famicom) {
         // 高三位为2, [$4000, $6000): pAPU寄存器 扩展ROM区
         if (address < 0x4020)
             return sfc_read_cpu_address4020(address, famicom);
-        else assert(!"NOT IMPL");
+        //else assert(!"NOT IMPL");
         return 0;
     case 3:
         // 高三位为3, [$6000, $8000): 存档 SRAM区

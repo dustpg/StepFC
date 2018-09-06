@@ -1,8 +1,12 @@
 ﻿#include "sfc_cpu.h"
 #include "sfc_famicom.h"
+#include "sfc_mapper_helper.h"
 #include <assert.h>
 #include <string.h>
 
+#ifndef NDEBUG
+#include <stdio.h>
+#endif
 
 /// <summary>
 /// 
@@ -14,9 +18,8 @@ typedef struct  {
     uint8_t     prmode;
     // CHR-ROM 切换模式
     uint8_t     crmode;
-
-    // 未使用
-    uint8_t     unused[1];
+    // 控制寄存器
+    uint8_t     control;
 
 } sfc_mapper01_t;
 
@@ -32,31 +35,6 @@ static inline sfc_mapper01_t* sfc_mapper(sfc_famicom_t* famicom) {
 
 #define MAPPER sfc_mapper01_t* const mapper = sfc_mapper(famicom);
 
-
-/// <summary>
-/// 实用函数-StepFC: 载入8k PRG-ROM
-/// </summary>
-/// <param name="famicom">The famicom.</param>
-/// <param name="des">The DES.</param>
-/// <param name="src">The source.</param>
-static inline void sfc_load_prgrom_8k(
-    sfc_famicom_t* famicom, int des, int src) {
-    famicom->prg_banks[4 + des] = famicom->rom_info.data_prgrom + 8 * 1024 * src;
-}
-
-
-/// <summary>
-/// 实用函数-StepFC: 载入1k CHR-ROM
-/// </summary>
-/// <param name="famicom">The famicom.</param>
-/// <param name="des">The DES.</param>
-/// <param name="src">The source.</param>
-static inline void sfc_load_chrrom_1k(
-    sfc_famicom_t* famicom, int des, int src) {
-    famicom->ppu.banks[des] = famicom->rom_info.data_chrrom + 1024 * src;
-}
-
-
 // ------------------------------- MAPPER 001 - MMC1 - SxROM
 
 
@@ -64,9 +42,9 @@ static inline void sfc_load_chrrom_1k(
 /// SFCs the mapper 01 write control.
 /// </summary>
 /// <param name="famicom">The famicom.</param>
-static void sfc_mapper_01_write_control(sfc_famicom_t* famicom) {
+static void sfc_mapper_01_write_control(sfc_famicom_t* famicom, uint8_t data) {
     MAPPER;
-    const uint8_t data = mapper->shifter;
+    mapper->control = data;
     // D0D1 - 镜像模式
     const sfc_nametable_mirroring_mode mode = data & (uint8_t)0x3;
     sfc_switch_nametable_mirroring(famicom, mode);
@@ -79,6 +57,110 @@ static void sfc_mapper_01_write_control(sfc_famicom_t* famicom) {
 }
 
 /// <summary>
+/// SFCs the mapper 01 write chrbank0.
+/// </summary>
+/// <param name="famicom">The famicom.</param>
+static void sfc_mapper_01_write_chrbank0(sfc_famicom_t* famicom) {
+    MAPPER;
+    const uint8_t data = mapper->shifter;
+    const uint8_t mode = mapper->crmode;
+    // 8KB模式?
+    if (!mode) {
+        const int bank = (data & (uint8_t)0x0E) * 4;
+        sfc_load_chrrom_1k(famicom, 0, bank + 0);
+        sfc_load_chrrom_1k(famicom, 1, bank + 1);
+        sfc_load_chrrom_1k(famicom, 2, bank + 2);
+        sfc_load_chrrom_1k(famicom, 3, bank + 3);
+        sfc_load_chrrom_1k(famicom, 4, bank + 4);
+        sfc_load_chrrom_1k(famicom, 5, bank + 5);
+        sfc_load_chrrom_1k(famicom, 6, bank + 6);
+        sfc_load_chrrom_1k(famicom, 7, bank + 7);
+    }
+    // 4KB模式
+    else {
+        const int bank = data * 4;
+        sfc_load_chrrom_1k(famicom, 0, bank + 0);
+        sfc_load_chrrom_1k(famicom, 1, bank + 1);
+        sfc_load_chrrom_1k(famicom, 2, bank + 2);
+        sfc_load_chrrom_1k(famicom, 3, bank + 3);
+    }
+}
+
+
+/// <summary>
+/// SFCs the mapper 01 write chrbank1.
+/// </summary>
+/// <param name="famicom">The famicom.</param>
+static void sfc_mapper_01_write_chrbank1(sfc_famicom_t* famicom) {
+    MAPPER;
+    const uint8_t data = mapper->shifter;
+    const uint8_t mode = mapper->crmode;
+    // 8KB模式?
+    if (!mode) return;
+    // 4KB模式
+    const int bank = data * 4;
+    sfc_load_chrrom_1k(famicom, 4, bank + 0);
+    sfc_load_chrrom_1k(famicom, 5, bank + 1);
+    sfc_load_chrrom_1k(famicom, 6, bank + 2);
+    sfc_load_chrrom_1k(famicom, 7, bank + 3);
+}
+
+
+/// <summary>
+/// SFCs the mapper 01 write prgbank.
+/// </summary>
+/// <param name="famicom">The famicom.</param>
+static void sfc_mapper_01_write_prgbank(sfc_famicom_t* famicom) {
+    MAPPER;
+    const uint8_t data = mapper->shifter;
+    const uint8_t mode = mapper->prmode;
+    // PRG RAM使能
+    // TODO: PRG-RAM
+    const uint8_t prgram = data & (uint8_t)0x10;
+    const uint8_t bankid = data & (uint8_t)0x0f;
+    switch (mode)
+    {
+        int bank;
+        int last;
+    case 0: case 1:
+        // 32KB 模式
+        bank = (bankid & (uint8_t)0xE) * 2;
+        sfc_load_prgrom_8k(famicom, 0, bank + 0);
+        sfc_load_prgrom_8k(famicom, 1, bank + 1);
+        sfc_load_prgrom_8k(famicom, 2, bank + 2);
+        sfc_load_prgrom_8k(famicom, 3, bank + 3);
+#ifndef NDEBUG
+        //printf("switch: PRG-ROM 32KB to:$%02X\n", bank / 2);
+#endif
+        break;
+    case 2:
+        // 固定低16KB到最后 切换高16KB
+        bank = bankid * 2;
+        sfc_load_prgrom_8k(famicom, 0, 0);
+        sfc_load_prgrom_8k(famicom, 1, 1);
+        sfc_load_prgrom_8k(famicom, 2, bank + 0);
+        sfc_load_prgrom_8k(famicom, 3, bank + 1);
+#ifndef NDEBUG
+        //printf("switch: HI-PRG-ROM 16KB to:$%02X\n", bank / 2);
+#endif
+        break;
+    case 3:
+        // 固定高16KB到最后 切换低16KB
+        bank = bankid * 2;
+        last = famicom->rom_info.count_prgrom16kb * 2;
+        sfc_load_prgrom_8k(famicom, 0, bank + 0);
+        sfc_load_prgrom_8k(famicom, 1, bank + 1);
+        sfc_load_prgrom_8k(famicom, 2, last - 2);
+        sfc_load_prgrom_8k(famicom, 3, last - 1);
+#ifndef NDEBUG
+        //printf("switch: LO-PRG-ROM 16KB to:$%02X\n", bank / 2);
+#endif
+        break;
+    }
+}
+
+
+/// <summary>
 /// SFCs the mapper 01 write register.
 /// </summary>
 /// <param name="famicom">The famicom.</param>
@@ -88,25 +170,25 @@ static void sfc_mapper_01_write_register(sfc_famicom_t* famicom, uint16_t addres
     {
     case 0:
         // $8000-$9FFF Control
-        sfc_mapper_01_write_control(famicom);
+        sfc_mapper_01_write_control(famicom, sfc_mapper(famicom)->shifter);
         break;
     case 1:
         // $A000-$BFFF CHR bank 0
-        assert(!"NOT IMPL");
+        sfc_mapper_01_write_chrbank0(famicom);
         break;
     case 2:
         // $C000-$DFFF CHR bank 1
-        assert(!"NOT IMPL");
+        sfc_mapper_01_write_chrbank1(famicom);
         break;
     case 3:
         // $E000-$FFFF PRG bank
-        assert(!"NOT IMPL");
+        sfc_mapper_01_write_prgbank(famicom);
         break;
     }
 }
 
 /// <summary>
-/// StepFC: MAPPER 001 - NROM 重置
+/// StepFC: MAPPER 001 - SxROM 重置
 /// </summary>
 /// <param name="famicom">The famicom.</param>
 /// <returns></returns>
@@ -137,13 +219,17 @@ static void sfc_mapper_01_write_high(sfc_famicom_t* famicom, uint16_t address, u
     // D7 = 1 -> 重置移位寄存器
     if (value & (uint8_t)0x80) {
         mapper->shifter = 0x10;
+        sfc_mapper_01_write_control(famicom, mapper->control | (uint8_t)0x0C);
     }
     // D7 = 0 -> 写入D0到移位寄存器
     else {
         const uint8_t finished = mapper->shifter & 1;
         mapper->shifter >>= 1;
         mapper->shifter |= (value & 1) << 4;
-        if (finished) sfc_mapper_01_write_register(famicom, address);
+        if (finished) {
+            sfc_mapper_01_write_register(famicom, address);
+            mapper->shifter = 0x10;
+        }
     }
 }
 

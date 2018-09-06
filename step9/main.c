@@ -158,7 +158,38 @@ void user_input(int index, unsigned char data) {
 void qsave() {
     FILE* const file = fopen("save.sfc", "wb");
     if (!file) return;
-    fwrite(g_famicom, 1, sizeof(*g_famicom), file);
+    sfc_famicom_t buf;
+    buf = *g_famicom;
+    // BANK保存为偏移量
+    /*for (int i = 0; i != 4; ++i) {
+        buf.prg_banks[i]
+            = buf.prg_banks[i]
+            - buf.rom_info.data_prgrom
+            ;
+    }*/
+    // BANK保存为偏移量
+    for (int i = 4; i != 8; ++i) {
+        buf.prg_banks[i] 
+            = (size_t)(buf.prg_banks[i] 
+            - buf.rom_info.data_prgrom)
+            ;
+    }
+    // BANK保存为偏移量
+    for (int i = 0; i != 8; ++i) {
+        buf.ppu.banks[i]
+            = (size_t)(buf.ppu.banks[i]
+                - buf.rom_info.data_chrrom)
+            ;
+    }
+    // BANK保存为偏移量
+    for (int i = 8; i != 16; ++i) {
+        buf.ppu.banks[i]
+            = (size_t)(buf.ppu.banks[i]
+                - g_famicom->video_memory)
+            ;
+    }
+
+    fwrite(&buf, 1, sizeof(buf), file);
     fclose(file);
 }
 
@@ -170,36 +201,61 @@ void qload() {
     g_famicom->registers = buf.registers;
     g_famicom->cpu_cycle_count = buf.cpu_cycle_count;
     g_famicom->apu = buf.apu;
+    g_famicom->mapper_buffer = buf.mapper_buffer;
 
-    char banks[sizeof(g_famicom->ppu.banks)];
-    memcpy(banks, g_famicom->ppu.banks, sizeof(banks));
     g_famicom->ppu = buf.ppu;
-    memcpy(g_famicom->ppu.banks, banks, sizeof(banks));
 
 
     memcpy(g_famicom->main_memory, buf.main_memory, sizeof(buf.main_memory));
     memcpy(g_famicom->video_memory, buf.video_memory, sizeof(buf.main_memory));
     //memcpy(g_famicom->video_memory_ex, buf.video_memory_ex, sizeof(buf.main_memory));
+    // TODO: 保存CHR-RAM
+
+    // BANK保存为偏移量
+    for (int i = 4; i != 8; ++i) {
+        g_famicom->prg_banks[i]
+            = (size_t)buf.prg_banks[i]
+            + g_famicom->rom_info.data_prgrom
+            ;
+    }
+    // BANK保存为偏移量
+    for (int i = 0; i != 8; ++i) {
+        g_famicom->ppu.banks[i]
+            = (size_t)g_famicom->ppu.banks[i]
+            + g_famicom->rom_info.data_chrrom
+            ;
+    }
+    // BANK保存为偏移量
+    for (int i = 8; i != 16; ++i) {
+        g_famicom->ppu.banks[i]
+            = (size_t)g_famicom->ppu.banks[i]
+            + g_famicom->video_memory
+            ;
+    }
 
     fclose(file);
 }
 
-
+uint8_t g_seach[0x800] = { 0 };
 
 void sfc_log_exec(void* arg, sfc_famicom_t* famicom) {
     const uint32_t cycle = famicom->cpu_cycle_count;
     const uint16_t pc = famicom->registers.program_counter;
     static int line = 0;  line++;
-    if (pc == 0xe05a) {
-        int bk = 8;
-    }
-    if (pc == 0xe02d) {
-        int bk = 8;
-    }
-    if (pc == 0xe02a) {
-        int bk = 8;
-    }
+    //if (pc == 0xc83d) {
+    //}
+    //else if (pc == 0xc82f) {
+    //}
+    //else 
     return;
+    uint8_t search = 0;
+    if (search) {
+
+        for (int i = 0; i != 0x800; ++i) {
+            if (g_famicom->main_memory[i] == search)
+                g_seach[i]++;
+        }
+    }
     //if (line < 230297) return;
 
     char buf[SFC_DISASSEMBLY_BUF_LEN2];

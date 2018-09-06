@@ -254,7 +254,6 @@ static inline void sfc_render_background_pixel16(
 #endif
 }
 
-
 /// <summary>
 /// SFCs the render background scanline.
 /// </summary>
@@ -262,7 +261,7 @@ static inline void sfc_render_background_pixel16(
 /// <param name="line">The line.</param>
 /// <param name="spp">The SPP.</param>
 /// <param name="buffer">The buffer.</param>
-static inline void sfc_render_background_scanline(
+static void sfc_render_background_scanline(
     sfc_famicom_t* famicom,
     uint16_t line,
     const uint8_t sp0[SFC_HEIGHT + (16)],
@@ -270,13 +269,19 @@ static inline void sfc_render_background_scanline(
     // 取消背景显示
     if (!(famicom->ppu.mask & (uint8_t)SFC_PPU2001_Back)) return;
 
-    // 计算当前偏移量
-    const uint16_t scrollx = (uint16_t)famicom->ppu.scroll[0] +
-        (uint16_t)((famicom->ppu.nametable_select & 1) << 8);
-
-    const uint16_t scrolly = line + (uint16_t)famicom->ppu.now_scrolly +
-        (uint16_t)((famicom->ppu.nametable_select & 2) ? 240 : 0);
-
+    // 计算当前水平偏移量
+    const uint16_t scrollx
+        = (uint16_t)((famicom->ppu.v & (uint16_t)0x0400) ? 256 : 0)
+        + (uint16_t)((famicom->ppu.v & (uint16_t)0x1f) << 3)
+        + (uint16_t)famicom->ppu.x
+        ;
+    // 计算当前垂直偏移量
+    const uint16_t scrolly
+        = (uint16_t)((famicom->ppu.v & (uint16_t)0x0800) ? 240 : 0)
+        + (uint16_t)(((famicom->ppu.v >> 5) & (uint16_t)0x1f) << 3)
+        + (uint16_t)(famicom->ppu.v >> 12)
+        ;
+    //const uint16_t scrolly = line + 240;
     // 由于Y是240一换, 需要膜计算
     const uint16_t scrolly_index0 = scrolly / (uint16_t)240;
     const uint16_t scrolly_offset = scrolly % (uint16_t)240;
@@ -725,8 +730,6 @@ void sfc_render_frame_easy(sfc_famicom_t* famicom, uint8_t* buffer) {
     // 关闭渲染则输出背景色?
     if (!(famicom->ppu.mask & (uint8_t)SFC_PPU2001_Back))
         memset(buffer, 0, SFC_WIDTH * SFC_HEIGHT);
-    // 第1次触发
-    sfc_trigger_frame_counter(famicom);
     // 渲染
     for (uint16_t i = 0; i != (uint16_t)SCAN_LINE_COUNT; ++i) {
         end_cycle_count += per_scanline;
@@ -740,6 +743,14 @@ void sfc_render_frame_easy(sfc_famicom_t* famicom, uint8_t* buffer) {
         // 执行CPU
         for (; *count < end_cycle_count_this_round;)
             sfc_cpu_execute_one(famicom);
+        // 执行换行
+
+        // 取消背景显示
+        if (famicom->ppu.mask & (uint8_t)SFC_PPU2001_Back) {
+            sfc_ppu_do_under_cycle256(&famicom->ppu);
+            sfc_ppu_do_under_cycle257(&famicom->ppu);
+        }
+
         buffer += SFC_WIDTH;
         // 执行HBlank
         // 每65.5(这里就66)行进行一次帧计数
@@ -775,8 +786,12 @@ void sfc_render_frame_easy(sfc_famicom_t* famicom, uint8_t* buffer) {
     }
     // 结束
     famicom->ppu.status = 0;
-    // 垂直滚动仅对下帧有效
-    famicom->ppu.now_scrolly = famicom->ppu.scroll[1];
+    // 垂直空白结束
+    if (famicom->ppu.mask & (uint8_t)SFC_PPU2001_Back) {
+        sfc_ppu_do_end_of_vblank(&famicom->ppu);
+    }
+    // 第4次触发
+    sfc_trigger_frame_counter(famicom);
 
     // 预渲染
     end_cycle_count += per_scanline * 2;

@@ -132,12 +132,12 @@ LRESULT CALLBACK ThisWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
                 const int index = itr - std::begin(sc_key_map);
                 ::user_input(index, msg == WM_KEYDOWN);
             }
-            //else if (unsigned(wParam) == VK_F1) {
-            //    qsave();
-            //}
-            //else if (unsigned(wParam) == VK_F2) {
-            //    qload();
-            //}
+            else if (unsigned(wParam) == VK_F1) {
+                qsave();
+            }
+            else if (unsigned(wParam) == VK_F2) {
+                qload();
+            }
 
         }
         return 0;

@@ -108,6 +108,11 @@ void sfc_switch_nametable_mirroring(sfc_famicom_t* famicom, sfc_nametable_mirror
     default:
         assert(!"BAD ACTION");
     }
+    // 镜像
+    famicom->ppu.banks[0xc] = famicom->ppu.banks[0x8];
+    famicom->ppu.banks[0xd] = famicom->ppu.banks[0x9];
+    famicom->ppu.banks[0xe] = famicom->ppu.banks[0xa];
+    famicom->ppu.banks[0xf] = famicom->ppu.banks[0xb];
 }
 
 
@@ -148,11 +153,6 @@ sfc_ecode sfc_famicom_reset(sfc_famicom_t* famicom) {
     // 调色板
     // 名称表
     sfc_setup_nametable_bank(famicom);
-    // 镜像
-    famicom->ppu.banks[0xc] = famicom->ppu.banks[0x8];
-    famicom->ppu.banks[0xd] = famicom->ppu.banks[0x9];
-    famicom->ppu.banks[0xe] = famicom->ppu.banks[0xa];
-    famicom->ppu.banks[0xf] = famicom->ppu.banks[0xb];
     // 重置APU
     sfc_apu_on_reset(&famicom->apu);
     return SFC_ERROR_OK;
@@ -170,9 +170,10 @@ sfc_ecode sfc_famicom_reset(sfc_famicom_t* famicom) {
 /// <returns></returns>
 sfc_ecode sfc_load_default_rom(void* arg, sfc_rom_info_t* info) {
     assert(info->data_prgrom == NULL && "FREE FIRST");
-    //FILE* const file = fopen("spritecans.nes", "rb");
-    FILE* const file = fopen("D:/doc/fcrom/7000527.nes", "rb");
-
+    FILE* const file = fopen("cpu_interrupts.nes", "rb");
+    //FILE* const file = fopen("D:/doc/fcrom/CONTRA.NES", "rb");
+    //FILE* const file = fopen("D:/doc/fcrom/Higurashi.nes", "rb");
+    
 
     // 文本未找到
     if (!file) return SFC_ERROR_FILE_NOT_FOUND;
@@ -188,10 +189,18 @@ sfc_ecode sfc_load_default_rom(void* arg, sfc_rom_info_t* info) {
         this_union.id[3] = '\x1A';
         // 比较这四字节
         if (this_union.u32 == nes_header.id) {
-            const size_t size1 = 16 * 1024 * nes_header.count_prgrom16kb;
+            const uint32_t prgrom16
+                = (uint32_t)nes_header.count_prgrom16kb
+                | (((uint32_t)nes_header.upper_rom_size & 0x0F) << 8)
+                ;
+            const uint32_t chrrom8
+                = (uint32_t)nes_header.count_chrrom_8kb
+                | (((uint32_t)nes_header.upper_rom_size & 0xF0) << 4)
+                ;
+            const size_t size1 = 16 * 1024 * prgrom16;
             // 允许没有CHR-ROM(使用CHR-RAM代替)
-            const size_t size2 = 8 * 1024 * (nes_header.count_chrrom_8kb | 1);
-            const size_t size3 = 8 * 1024 * nes_header.count_chrrom_8kb;
+            const size_t size2 = 8 * 1024 * (chrrom8 | 1);
+            const size_t size3 = 8 * 1024 * chrrom8;
             // 计算实际长度
             const size_t malloc_len = size1 + size2;
             const size_t fread_len = size1 + size3;
@@ -211,8 +220,8 @@ sfc_ecode sfc_load_default_rom(void* arg, sfc_rom_info_t* info) {
                 // 填写info数据表格
                 info->data_prgrom = ptr;
                 info->data_chrrom = ptr + size1;
-                info->count_prgrom16kb = nes_header.count_prgrom16kb;
-                info->count_chrrom_8kb = nes_header.count_chrrom_8kb;
+                info->count_prgrom16kb = prgrom16;
+                info->count_chrrom_8kb = chrrom8;
                 info->mapper_number 
                     = (nes_header.control1 >> 4) 
                     | (nes_header.control2 & 0xF0)

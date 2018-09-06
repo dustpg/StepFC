@@ -59,12 +59,18 @@ enum sfc_ppu_flag_sprite_attr {
 typedef struct {
     // 内存地址库
     uint8_t*        banks[0x4000 / 0x0400];
-    // 名称表选择(PPUCTRL低2位, 以及渲染中VRAM指针AB位)
-    uint8_t         nametable_select;
-    // 当前允许使用的垂直滚动偏移
-    uint8_t         now_scrolly;
-    // VRAM 地址
-    uint16_t        vramaddr;
+#if 0
+    // VRAM 地址 15bit [调试用]
+    uint16_t        vdebug;
+#endif
+    // VRAM 地址 15bit
+    uint16_t        v;
+    // 临时 VRAM 地址 15bit
+    uint16_t        t;
+    // 微调X滚动偏移 3bit
+    uint8_t         x;
+    // 写入切换 1bit
+    uint8_t         w;
     // 寄存器 PPUCTRL      @$2000
     uint8_t         ctrl;
     // 寄存器 PPUMASK      @$2001
@@ -73,10 +79,6 @@ typedef struct {
     uint8_t         status;
     // 寄存器 OAMADDR      @$2003
     uint8_t         oamaddr;
-    // 滚动偏移
-    uint8_t         scroll[2];
-    // 滚动偏移双写位置记录
-    uint8_t         writex2;
     // 显存读取缓冲值
     uint8_t         pseudo;
     // 精灵调色板索引
@@ -95,4 +97,10 @@ typedef struct {
 uint8_t sfc_read_ppu_register_via_cpu(uint16_t, sfc_ppu_t*);
 // write ppu register via cpu address space
 void sfc_write_ppu_register_via_cpu(uint16_t, uint8_t, sfc_ppu_t*);
+// do ppu under 256
+void sfc_ppu_do_under_cycle256(sfc_ppu_t*);
+// do ppu under 256
+void sfc_ppu_do_under_cycle257(sfc_ppu_t*);
+// do ppu under 256
+void sfc_ppu_do_end_of_vblank(sfc_ppu_t*);
 

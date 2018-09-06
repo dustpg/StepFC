@@ -763,7 +763,7 @@ extern "C" void xa2_play_noise(uint16_t data, uint16_t volume) noexcept {
         ;
 
     const auto noise = ez_wave->source;
-    std::printf("NIS: 0x%02X  - @ %d\n", data, volume);
+    //std::printf("NIS: 0x%02X  - @ %d\n", data, volume);
 
     const float ratio = SAMPLE_PER_SEC;
     const float f = NOSIE_FLIST[data & (uint16_t)0xF] / ratio;

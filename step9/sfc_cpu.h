@@ -48,8 +48,12 @@ typedef struct {
     uint8_t     y_index;
     // 栈指针  Stack Pointer
     uint8_t     stack_pointer;
-    // 保留对齐用
-    uint8_t     unused;
+    // 来自APU的帧中断
+    uint8_t     apu_frame_interrupt;
+    // 帧中断计数器
+    uint8_t     apu_frame_interrupt_counter;
+    // 保留对齐
+    uint8_t     unused[2];
 
 } sfc_cpu_register_t;
 

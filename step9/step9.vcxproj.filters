@@ -43,6 +43,9 @@
     <ClInclude Include="sfc_mapper.h">
       <Filter>header</Filter>
     </ClInclude>
+    <ClInclude Include="sfc_mapper_helper.h">
+      <Filter>header</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.c">
@@ -82,6 +85,9 @@
       <Filter>cpp</Filter>
     </ClCompile>
     <ClCompile Include="sfc_mapper_001_mmc1.c">
+      <Filter>mapper</Filter>
+    </ClCompile>
+    <ClCompile Include="sfc_mapper_002_uxrom.c">
       <Filter>mapper</Filter>
     </ClCompile>
   </ItemGroup>

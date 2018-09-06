@@ -43,8 +43,14 @@ typedef struct {
     uint8_t     control1;
     // 控制信息2
     uint8_t     control2;
+    // MAPPER变种
+    uint8_t     mapper_variant;
+    // 高位ROM大小
+    uint8_t     upper_rom_size;
+    // RAM大小
+    uint8_t     ram_size;
     // 保留数据
-    uint8_t     reserved[8];
+    uint8_t     reserved[5];
 
 } sfc_nes_header_t;
 

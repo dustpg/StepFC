@@ -27,7 +27,6 @@ typedef union {
 struct sfc_famicom;
 typedef struct sfc_famicom sfc_famicom_t;
 
-// 切换名称表模式
 
 typedef enum {
     SFC_NT_MIR_SingleLow = 0,
@@ -37,4 +36,5 @@ typedef enum {
     SFC_NT_MIR_FourScreen,
 } sfc_nametable_mirroring_mode;
 
+// 切换名称表模式
 void sfc_switch_nametable_mirroring(sfc_famicom_t*, sfc_nametable_mirroring_mode);

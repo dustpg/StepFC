@@ -1,35 +1,16 @@
 ﻿#include "sfc_cpu.h"
 #include "sfc_famicom.h"
+#include "sfc_mapper_helper.h"
 #include <assert.h>
 #include <string.h>
 
-/// <summary>
-/// 实用函数-StepFC: 载入8k PRG-ROM
-/// </summary>
-/// <param name="famicom">The famicom.</param>
-/// <param name="des">The DES.</param>
-/// <param name="src">The source.</param>
-static inline void sfc_load_prgrom_8k(
-    sfc_famicom_t* famicom, int des, int src) {
-    famicom->prg_banks[4 + des] = famicom->rom_info.data_prgrom + 8 * 1024 * src;
-}
-
-
-/// <summary>
-/// 实用函数-StepFC: 载入1k CHR-ROM
-/// </summary>
-/// <param name="famicom">The famicom.</param>
-/// <param name="des">The DES.</param>
-/// <param name="src">The source.</param>
-static inline void sfc_load_chrrom_1k(
-    sfc_famicom_t* famicom, int des, int src) {
-    famicom->ppu.banks[des] = famicom->rom_info.data_chrrom + 1024 * src;
-}
 
 // mapper000 - NROM
 static inline sfc_ecode sfc_load_mapper_00(sfc_famicom_t* famicom);
 // mapper001 - SxROM
 extern inline sfc_ecode sfc_load_mapper_01(sfc_famicom_t* famicom);
+// mapper002 - UxROM
+extern inline sfc_ecode sfc_load_mapper_02(sfc_famicom_t* famicom);
 
 #define SFC_CASE_LOAD_MAPPER(id) case 0x##id: return sfc_load_mapper_##id(famicom);
 
@@ -46,6 +27,7 @@ extern sfc_ecode sfc_load_mapper(sfc_famicom_t* famicom, uint8_t id) {
     {
         SFC_CASE_LOAD_MAPPER(00);
         SFC_CASE_LOAD_MAPPER(01);
+        SFC_CASE_LOAD_MAPPER(02);
     }
     assert(!"NO MAPPER");
     return SFC_ERROR_MAPPER_NOT_FOUND;

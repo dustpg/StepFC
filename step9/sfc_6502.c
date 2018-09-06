@@ -80,6 +80,9 @@ case 0x##n:\
 }
 
 
+// IRQ
+extern void sfc_operation_IRQ(sfc_famicom_t * famicom);
+
 // ---------------------------------- 寻址
 
 SFC_FORCEINLINE
@@ -658,6 +661,8 @@ static inline void sfc_operation_RTI(uint16_t address, sfc_famicom_t* famicom, u
         = (uint16_t)pcl
         | (uint16_t)pch << 8
         ;
+    // 清除计数
+    famicom->registers.apu_frame_interrupt_counter = 0;
 }
 
 SFC_FORCEINLINE
@@ -832,6 +837,9 @@ static inline void sfc_operation_PLP(uint16_t address, sfc_famicom_t* famicom, u
     SFC_P = SFC_POP();
     SFC_RF_SE;
     SFC_BF_CL;
+    if (!SFC_IF)
+        famicom->registers.apu_frame_interrupt_counter =
+        famicom->registers.apu_frame_interrupt << 1;
 }
 
 SFC_FORCEINLINE
@@ -1046,6 +1054,9 @@ SFC_FORCEINLINE
 /// <param name="famicom">The famicom.</param>
 static inline void sfc_operation_CLI(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     SFC_IF_CL;
+    famicom->registers.apu_frame_interrupt_counter =
+        famicom->registers.apu_frame_interrupt << 1;
+    //famicom->registers.apu_frame_interrupt = 0;
 }
 
 SFC_FORCEINLINE
@@ -1441,6 +1452,15 @@ enum sfc_basic_cycle_data {
 /// <param name="famicom">The famicom.</param>
 void sfc_cpu_execute_one(sfc_famicom_t* famicom) {
     famicom->interfaces.before_execute(famicom->argument, famicom);
+    // APU 帧中断 处理
+    if (famicom->registers.apu_frame_interrupt_counter) {
+        --famicom->registers.apu_frame_interrupt_counter;
+        if (!famicom->registers.apu_frame_interrupt_counter) {
+            sfc_operation_IRQ(famicom);
+            return;
+        }
+    }
+    // 正常处理
     const uint8_t opcode = SFC_READ_PC(SFC_PC++);
     uint32_t cycle_add = 0;
     switch (opcode)
@@ -1504,9 +1524,7 @@ extern inline void sfc_operation_NMI(sfc_famicom_t* famicom, uint32_t* const cyc
 /// SFCs the operation irq try.
 /// </summary>
 /// <param name="famicom">The famicom.</param>
-extern void sfc_operation_IRQ_try(sfc_famicom_t * famicom) {
-    if (SFC_IF) return;
-
+extern void sfc_operation_IRQ(sfc_famicom_t * famicom) {
     const uint8_t pch = (uint8_t)((SFC_PC) >> 8);
     const uint8_t pcl = (uint8_t)SFC_PC;
     SFC_PUSH(pch);
