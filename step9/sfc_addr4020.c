@@ -20,8 +20,8 @@ static const LENGTH_COUNTER_TABLE[] = {
 };
 
 
-// IRQ - 中断请求 - 尝试
-//extern void sfc_operation_IRQ_try(sfc_famicom_t* famicom);
+// IRQ - 中断请求 - 确认
+extern inline void sfc_operation_IRQ_acknowledge(sfc_famicom_t* famicom);
 
 /// <summary>
 /// SFCs the read apu status.
@@ -41,11 +41,12 @@ static inline uint8_t sfc_read_apu_status(sfc_famicom_t* famicom) {
         state |= SFC_APU4015_READ_NoiseLength;
     // TODO: DMC
 
-    if (famicom->registers.apu_frame_interrupt)
+    if (famicom->apu.frame_interrupt)
         state |= SFC_APU4015_READ_Frameinterrupt;
 
     // 清除中断标记
-    famicom->registers.apu_frame_interrupt = 0;
+    famicom->apu.frame_interrupt = 0;
+    sfc_operation_IRQ_acknowledge(famicom);
 
     // TODO: DMC
     return state;
@@ -272,8 +273,9 @@ extern inline void sfc_write_cpu_address4020(uint16_t address, uint8_t data, sfc
         // 帧计数器
         // $4014:  MI-- ----
         famicom->apu.frame_counter = data;
-        if (data & (uint8_t)SFC_APU4017_IRQDisable)
-            famicom->registers.apu_frame_interrupt = 0;
+        if (data & (uint8_t)SFC_APU4017_IRQDisable) {
+            famicom->apu.frame_interrupt = 0;
+        }
         // 5步模式会立刻产生一个1/2和1/4时钟信号
         if (data & (uint8_t)SFC_APU4017_ModeStep5) {
             sfc_clock_length_counter_and_sweep_unit(&famicom->apu);
@@ -409,15 +411,17 @@ void sfc_clock_envelopes_and_linear_counter(sfc_apu_register_t* apu) {
 }
 
 
+// IRQ - 中断请求 - 尝试
+extern inline void sfc_operation_IRQ_try(sfc_famicom_t* famicom);
+
 /// <summary>
 /// SFCs the apu set interrupt.
 /// </summary>
 /// <param name="famicom">The famicom.</param>
 void sfc_apu_set_interrupt(sfc_famicom_t* famicom) {
     if (famicom->apu.frame_counter & (uint8_t)SFC_APU4017_IRQDisable) return;
-    famicom->registers.apu_frame_interrupt = 1;
-    // TODO: 正确触发IRQ 
-    //sfc_operation_IRQ_try(famicom);
+    famicom->apu.frame_interrupt = 1;
+    sfc_operation_IRQ_try(famicom);
 }
 
 

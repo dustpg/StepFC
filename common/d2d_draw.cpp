@@ -107,9 +107,6 @@ static const unsigned sc_key_map[16] = {
     VK_NUMPAD2, VK_NUMPAD3, VK_NUMPAD5, VK_NUMPAD6, 
     VK_UP, VK_DOWN, VK_LEFT, VK_RIGHT,
 };
-extern "C" void qsave() noexcept;
-extern "C" void qload() noexcept;
-
 
 LRESULT CALLBACK ThisWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) noexcept {
     switch (msg)

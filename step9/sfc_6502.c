@@ -662,7 +662,14 @@ static inline void sfc_operation_RTI(uint16_t address, sfc_famicom_t* famicom, u
         | (uint16_t)pch << 8
         ;
     // 清除计数
-    famicom->registers.apu_frame_interrupt_counter = 0;
+    famicom->registers.irq_counter 
+        = famicom->registers.irq_in_process
+        & famicom->registers.irq_flag
+        & (~(SFC_P) >> SFC_INDEX_I) 
+        //& famicom->registers.nmi_in_process
+        ;
+    famicom->registers.irq_in_process = 0;
+    //famicom->registers.nmi_in_process = 1;
 }
 
 SFC_FORCEINLINE
@@ -838,8 +845,7 @@ static inline void sfc_operation_PLP(uint16_t address, sfc_famicom_t* famicom, u
     SFC_RF_SE;
     SFC_BF_CL;
     if (!SFC_IF)
-        famicom->registers.apu_frame_interrupt_counter =
-        famicom->registers.apu_frame_interrupt << 1;
+        famicom->registers.irq_counter = famicom->registers.irq_flag << 1;
 }
 
 SFC_FORCEINLINE
@@ -1054,10 +1060,7 @@ SFC_FORCEINLINE
 /// <param name="famicom">The famicom.</param>
 static inline void sfc_operation_CLI(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
     SFC_IF_CL;
-    famicom->registers.apu_frame_interrupt_counter =
-        famicom->registers.apu_frame_interrupt << 1;
-    //famicom->registers.apu_frame_interrupt = 0;
-
+    famicom->registers.irq_counter = famicom->registers.irq_flag << 1;
 }
 
 SFC_FORCEINLINE
@@ -1453,10 +1456,11 @@ enum sfc_basic_cycle_data {
 /// <param name="famicom">The famicom.</param>
 void sfc_cpu_execute_one(sfc_famicom_t* famicom) {
     famicom->interfaces.before_execute(famicom->argument, famicom);
-    // APU 帧中断 处理
-    if (famicom->registers.apu_frame_interrupt_counter) {
-        --famicom->registers.apu_frame_interrupt_counter;
-        if (!famicom->registers.apu_frame_interrupt_counter) {
+    // IRQ 处理
+    if (famicom->registers.irq_counter) {
+        --famicom->registers.irq_counter;
+        if (famicom->registers.irq_counter == 0) {
+            famicom->registers.irq_in_process = 1;
             sfc_operation_IRQ(famicom);
             return;
         }
@@ -1519,6 +1523,7 @@ extern inline void sfc_operation_NMI(sfc_famicom_t* famicom, uint32_t* const cyc
     famicom->registers.program_counter = (uint16_t)pcl2 | (uint16_t)pch2 << 8;
 
     famicom->cpu_cycle_count += 7;
+    //famicom->registers.nmi_in_process = 0;
 }
 
 /// <summary>
@@ -1541,12 +1546,26 @@ extern void sfc_operation_IRQ(sfc_famicom_t * famicom) {
 
 
 /// <summary>
+/// SFCs the operation irq acknowledge.
+/// </summary>
+/// <param name="famicom">The famicom.</param>
+extern inline void sfc_operation_IRQ_acknowledge(sfc_famicom_t* famicom) {
+    famicom->registers.irq_flag = 0;
+    famicom->registers.irq_counter = 0;
+}
+
+/// <summary>
 /// SFCs the operation irq try.
 /// </summary>
 /// <param name="famicom">The famicom.</param>
 extern inline void sfc_operation_IRQ_try(sfc_famicom_t* famicom) {
-    if (SFC_IF) return;
-    sfc_operation_IRQ(famicom);
+    // 禁用中断
+    if (SFC_IF)
+        famicom->registers.irq_flag = 1;
+    // 直接中断
+    else
+        famicom->registers.irq_counter = 1;
+
     // 暂时借用APU的帧中断
     //if (SFC_IF)
     //    famicom->registers.apu_frame_interrupt = 1;

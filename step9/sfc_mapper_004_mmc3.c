@@ -205,6 +205,10 @@ static inline void sfc_mapper_04_write_irq_reload(sfc_famicom_t* famicom, uint8_
     mapper->counter = 0;
 }
 
+
+// IRQ - 中断请求 - 确认
+extern inline void sfc_operation_IRQ_acknowledge(sfc_famicom_t* famicom);
+
 /// <summary>
 /// SFCs the mapper 04 write irq disable.
 /// </summary>
@@ -213,6 +217,7 @@ static inline void sfc_mapper_04_write_irq_reload(sfc_famicom_t* famicom, uint8_
 static inline void sfc_mapper_04_write_irq_disable(sfc_famicom_t* famicom, uint8_t value) {
     MAPPER;
     mapper->irq_enable = 0;
+    sfc_operation_IRQ_acknowledge(famicom);
     //mapper->counter = mapper->reload;
     //printf("[IRQ-D]@%d\n", famicom->cpu_cycle_count);
 }

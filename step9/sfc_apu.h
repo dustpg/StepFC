@@ -152,7 +152,7 @@ typedef struct {
     // 帧计数器写入寄存器
     uint8_t                     frame_counter;
     // 帧中断标志
-    //uint8_t                     frame_interrupt;
+    uint8_t                     frame_interrupt;
     // 步数计数
     uint8_t                     frame_step;
 
