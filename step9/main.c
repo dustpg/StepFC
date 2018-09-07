@@ -128,6 +128,7 @@ int main() {
     sfc_famicom_t famicom;
     g_famicom = &famicom;
     if (sfc_famicom_init(&famicom, NULL, &interfaces)) return 1;
+    //qload();
 
     printf(
         "ROM: PRG-RPM: %d x 16kb   CHR-ROM %d x 8kb   Mapper: %03d\n",
@@ -190,6 +191,21 @@ void qsave() {
     }
 
     fwrite(&buf, 1, sizeof(buf), file);
+    // 保存ROM数据以免有CHR-RAM
+    //fwrite(
+    //    g_famicom->rom_info.data_prgrom,
+    //    16 * 1024,
+    //    g_famicom->rom_info.count_prgrom16kb,
+    //    file
+    //);
+    fwrite(
+        g_famicom->rom_info.data_chrrom,
+        8 * 1024,
+        g_famicom->rom_info.count_chrrom_8kb | 1,
+        file
+    );
+    // 额外保存一次save memory
+    fwrite(buf.save_memory, 1, sizeof(buf.save_memory), file);
     fclose(file);
 }
 
@@ -198,6 +214,36 @@ void qload() {
     if (!file) return;
     sfc_famicom_t buf;
     fread(&buf, 1, sizeof(buf), file);
+
+    int load_save_memory = 0;
+    if (load_save_memory) {
+        memcpy(g_famicom->save_memory, buf.save_memory, sizeof(buf.save_memory));
+        fclose(file);
+        return;
+    }
+
+
+    memcpy(&buf.interfaces, &g_famicom->interfaces, sizeof(buf.interfaces));
+    memcpy(&buf.mapper, &g_famicom->mapper, sizeof(buf.mapper));
+    //memcpy(&buf.prg_banks, &g_famicom->prg_banks, sizeof(buf.prg_banks[0]) * 4);
+
+    for (int i = 0; i != 4; ++i) {
+        buf.prg_banks[i] = g_famicom->prg_banks[i];
+    }
+
+    buf.rom_info.data_prgrom = g_famicom->rom_info.data_prgrom;
+    buf.rom_info.data_chrrom = g_famicom->rom_info.data_chrrom;
+
+    memcpy(g_famicom, &buf, sizeof(buf));
+#if 0
+
+    //if (0) {
+    //    memcpy(g_famicom->save_memory, buf.save_memory, sizeof(buf.save_memory));
+    //    fclose(file);
+    //    return;
+    //}
+
+
     g_famicom->registers = buf.registers;
     g_famicom->cpu_cycle_count = buf.cpu_cycle_count;
     g_famicom->apu = buf.apu;
@@ -208,7 +254,9 @@ void qload() {
 
     memcpy(g_famicom->main_memory, buf.main_memory, sizeof(buf.main_memory));
     memcpy(g_famicom->video_memory, buf.video_memory, sizeof(buf.main_memory));
-    //memcpy(g_famicom->video_memory_ex, buf.video_memory_ex, sizeof(buf.main_memory));
+    memcpy(g_famicom->video_memory_ex, buf.video_memory_ex, sizeof(buf.main_memory));
+    memcpy(g_famicom->save_memory, buf.save_memory, sizeof(buf.save_memory));
+#endif
     // TODO: 保存CHR-RAM
 
     // BANK保存为偏移量
@@ -232,6 +280,20 @@ void qload() {
             + g_famicom->video_memory
             ;
     }
+    //fread(
+    //    g_famicom->rom_info.data_prgrom,
+    //    16 * 1024,
+    //    g_famicom->rom_info.count_prgrom16kb,
+    //    file
+    //);
+    // 读取保存ROM数据以免有CHR-RAM
+
+    fread(
+        g_famicom->rom_info.data_chrrom,
+        8 * 1024,
+        g_famicom->rom_info.count_chrrom_8kb | 1,
+        file
+    );
 
     fclose(file);
 }

@@ -49,6 +49,7 @@ inline void SafeRelease(Interface *&pInterfaceToRelease) {
     }
 }
 
+uint32_t g_sync = 1;
 uint32_t g_bg_data[256 * 256 + 256];
 
 extern "C" void main_cpp() noexcept {
@@ -93,7 +94,7 @@ extern "C" void main_cpp() noexcept {
                 ::TranslateMessage(&msg);
                 ::DispatchMessageW(&msg);
             }
-            else DoRender(1);
+            else DoRender(g_sync);
         }
     }
     ::ClearD3D();
@@ -134,6 +135,9 @@ LRESULT CALLBACK ThisWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
             }
             else if (unsigned(wParam) == VK_F2) {
                 qload();
+            }
+            else if (unsigned(wParam) == VK_SPACE) {
+                g_sync = msg != WM_KEYDOWN;
             }
 
         }
