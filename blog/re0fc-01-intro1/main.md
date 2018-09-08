@@ -1,3 +1,5 @@
+本博客github[备份地址](https://github.com/dustpg/BlogFM/issues/5)
+
 ### 任天堂 Family Computer
 ![fc](./Nintendo-Famicom-Console-Set-FL.jpg)
 &nbsp;&nbsp;在国内因为外观被称为红白机的任天堂FC(欧美版叫NES), 或者说Famicom(典型的日式英语缩写), 可谓是自己走向编程开发道路上不可缺少的一环. 可能有许多和我类似的因为玩上游戏, 就想开发一款自己的游戏, 而踏进这个圈子的(然后在开发的道路越走越远).
