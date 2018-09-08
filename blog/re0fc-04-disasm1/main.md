@@ -1,3 +1,5 @@
+本文github[备份地址](https://github.com/dustpg/BlogFM/issues/8)
+
 ### STEP2: 6502汇编
 写模拟器当然要了解使用到的汇编, 不管是调试模拟器还是模拟器调试都需要.
 
