@@ -170,11 +170,11 @@ sfc_ecode sfc_famicom_reset(sfc_famicom_t* famicom) {
 /// <returns></returns>
 sfc_ecode sfc_load_default_rom(void* arg, sfc_rom_info_t* info) {
     assert(info->data_prgrom == NULL && "FREE FIRST");
-    //FILE* const file = fopen("cpu_interrupts.nes", "rb");
+    FILE* const file = fopen("cpu_interrupts.nes", "rb");
     //FILE* const file = fopen("D:/doc/fcrom/7002539.NES", "rb");
     //FILE* const file = fopen("D:/doc/fcrom/Super_mario_brothers3.nes", "rb");
     //FILE* const file = fopen("D:/doc/fcrom/Double Dragon 2 (Chs).NES", "rb");
-    FILE* const file = fopen("D:/doc/fcrom/MetalMax.NES", "rb");
+    //FILE* const file = fopen("D:/doc/fcrom/MetalMax.NES", "rb");
     //FILE* const file = fopen("D:/doc/fcrom/Metal Max (J).NES", "rb");
     //FILE* const file = fopen("D:/doc/fcrom/CONTRA.NES", "rb");
     //FILE* const file = fopen("D:/doc/fcrom/Higurashi.nes", "rb");
@@ -219,7 +219,7 @@ sfc_ecode sfc_load_default_rom(void* arg, sfc_rom_info_t* info) {
                 // TODO: 实现Trainer
                 // 跳过Trainer数据
                 if (nes_header.control1 & SFC_NES_TRAINER) fseek(file, 512, SEEK_CUR);
-                // 这都错了就不管我的事情了
+                // 这都错了就不关我的事情了
                 fread(ptr, fread_len, 1, file);
 
                 // 填写info数据表格
