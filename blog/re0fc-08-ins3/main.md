@@ -1,13 +1,16 @@
 ### STEP3: CPU 指令实现 - 扩展指令
+本文github[备份地址](https://github.com/dustpg/BlogFM/issues/12)
 
 这节是指令介绍的最后一节.
 
 扩展指令, 或者说非法/未被记录的指令: 一般是组合指令. 由于非官方记录, 所以指令名称可能不一致.
 
-本节很多指令并没有在STEP3中实现, 原因是因为使用的测试ROM并没有测试这些指令, 所以'忘记'实现了, 这些指令直到测试了'blargg's CPU test rom v5'才实现.
+本节很多指令并没有在STEP3中实现, 原因是因为使用的测试ROM并没有测试这些指令, 所以'忘记'实现了, 这些指令直到测试了'blOperg's CPU test rom v5'才实现.
 
 ### NOP - No OP
 除了基本的NOP, 还有高级的NOP. 一般来讲6502指令是根据寻址方式排序的(偏移), 所以在其他寻址方式对应NOP的地方还有
+
+详细的请到引用链接了解
 
 ### ALR[ASR] - 'And' then Logical Shift Right - AND+LSR
 助记符号: A &= M; C = A & 1; A >>= 1;
@@ -87,14 +90,14 @@ SET_CF((tmp & 0x8000) == 0);
 
 | 寻址模式| 汇编格式| OP代码 |指令字节|指令周期|
 |--------|-----------|----|---------|----------| 
-|  立即    | ADC #Oper      |  69  |    2    |    2     |
-|  零页    | ADC Oper       |  65  |    2    |    3     |
-|  零页,X  | ADC Oper,X     |  75  |    2    |    4     |
-|  绝对    | ADC Oper       |  60  |    3    |    4     |
-|  绝对,X  | ADC Oper,X     |  70  |    3    |    4*    |
-|  绝对,Y  | ADC Oper,Y     |  79  |    3    |    4*    |
-| (间接,X) | LAX (Oper,X)   | A3  |    2    |    6     |
-| (间接),Y | ADC (Oper),Y   |  71  |    2    |    5*    |
+零页    |LAX Oper    |$A7| 2 | 3
+零页 ,Y |LAX Oper,Y  |$B7| 2 | 4
+绝对    |LAX Oper    |$AF| 3 | 4
+绝对,Y  |LAX Oper,Y  |$BF| 3 | 4 *
+(间接,X)|LAX (Oper,X)|$A3| 2 | 6
+(间接),Y|LAX (Oper),Y|$B3| 2 | 5 *
+
+\* 在页面边界交叉时 +1s
 
 将储存器数据载入A, 然后传给X.
 影响FLAG:  S(ign), Z(ero), 伪C代码:
@@ -108,6 +111,10 @@ CHECK_ZSFLAG(X);
 
 | 寻址模式| 汇编格式| OP代码 |指令字节|指令周期|
 |--------|-----------|----|---------|----------| 
+零页    |AAX Oper    |$87| 2 | 3
+零页 ,Y |AAX Oper,Y  |$97| 2 | 4
+(间接,X)|AAX (Oper,X)|$83| 2 | 6
+绝对    |AAX Oper    |$8F| 3 | 4
 
 将累加器A和变址寄存器X '与' 的结果保留在储存器上. 影响FLAG: (无), 伪C代码:
 ```c
@@ -119,6 +126,13 @@ WRITE(address, A & X);
 
 | 寻址模式| 汇编格式| OP代码 |指令字节|指令周期|
 |--------|-----------|----|---------|----------| 
+零页    |DCP Oper    |$C7| 2 | 5
+零页 ,X |DCP Oper,X  |$D7| 2 | 6
+绝对    |DCP Oper    |$CF| 3 | 6
+绝对,X  |DCP Oper,X  |$DF| 3 | 7
+绝对,Y  |DCP Oper,Y  |$DB| 3 | 7
+(间接,X)|DCP (Oper,X)|$C3| 2 | 8
+(间接),Y|DCP (Oper),Y|$D3| 2 | 8
 
 读改写(RMW)指令, 存储器值-1再与累加器比较.
 影响FLAG: C(arry), Z(ero), S(ign). 伪C代码:
@@ -135,6 +149,13 @@ CHECK_ZSFLAG((uint8_t)result16);
 ### ISC(ISB) - Increment memory then Subtract with Carry - INC + SBC
 | 寻址模式| 汇编格式| OP代码 |指令字节|指令周期|
 |--------|-----------|----|---------|----------| 
+零页    |ISC Oper    |$E7| 2 | 5
+零页 ,X |ISC Oper,X  |$F7| 2 | 6
+绝对    |ISC Oper    |$EF| 3 | 6
+绝对,X  |ISC Oper,X  |$FF| 3 | 7
+绝对,Y  |ISC Oper,Y  |$FB| 3 | 7
+(间接,X)|ISC (Oper,X)|$E3| 2 | 8
+(间接),Y|ISC (Oper),Y|$F3| 2 | 8
 
 读改写(RMW)指令, 存储器值+1再用累加器减.
 影响FLAG: C(arry), (o)V(erflow), Z(ero), S(ign). 伪C代码:
@@ -157,6 +178,13 @@ CHECK_ZSFLAG(A);
 ### RLA - Rotate Left then 'And' - ROL + AND
 | 寻址模式| 汇编格式| OP代码 |指令字节|指令周期|
 |--------|-----------|----|---------|----------| 
+零页    |RLA Oper    |$27| 2 | 5
+零页 ,X |RLA Oper,X  |$37| 2 | 6
+绝对    |RLA Oper    |$2F| 3 | 6
+绝对,X  |RLA Oper,X  |$3F| 3 | 7
+绝对,Y  |RLA Oper,Y  |$3B| 3 | 7
+(间接,X)|RLA (Oper,X)|$23| 2 | 8
+(间接),Y|RLA (Oper),Y|$33| 2 | 8
 
 
 读改写(RMW)指令, 储存器数据循环左移再与累加器A做'与'运算.
@@ -177,6 +205,13 @@ CHECK_ZSFLAG(A);
 ### RRA - Rotate Right then Add with Carry - ROR + ADC
 | 寻址模式| 汇编格式| OP代码 |指令字节|指令周期|
 |--------|-----------|----|---------|----------| 
+零页    |RRA Oper    |$67| 2 | 5
+零页 ,X |RRA Oper,X  |$77| 2 | 6
+绝对    |RRA Oper    |$6F| 3 | 6
+绝对,X  |RRA Oper,X  |$7F| 3 | 7
+绝对,Y  |RRA Oper,Y  |$7B| 3 | 7
+(间接,X)|RRA (Oper,X)|$63| 2 | 8
+(间接),Y|RRA (Oper),Y|$73| 2 | 8
 
 
 读改写(RMW)指令, 储存器数据循环右移再加上累加器A和进位标记.
@@ -215,7 +250,14 @@ uint16_t result16 = A + src + tmp_CF;
 助记符号: A |= (M <<= 1)
 
 | 寻址模式| 汇编格式| OP代码 |指令字节|指令周期|
-|--------|-----------|----|---------|----------| 
+|--------|-----------|----|---------|----------|
+零页    |SLO Oper    |$07| 2 | 5
+零页 ,X |SLO Oper,X  |$17| 2 | 6
+绝对    |SLO Oper    |$0F| 3 | 6
+绝对,X  |SLO Oper,X  |$1F| 3 | 7
+绝对,Y  |SLO Oper,Y  |$1B| 3 | 7
+(间接,X)|SLO (Oper,X)|$03| 2 | 8
+(间接),Y|SLO (Oper),Y|$13| 2 | 8 
 
 
 读改写(RMW)指令, 储存器数据算术左移一位然后和累加器A做'或'运算, 
@@ -234,6 +276,13 @@ CHECK_ZSFLAG(A);
 ### SRE - Shift Right then "Exclusive-Or" - LSR + EOR
 | 寻址模式| 汇编格式| OP代码 |指令字节|指令周期|
 |--------|-----------|----|---------|----------|
+零页    |SRE Oper    |$47| 2 | 5
+零页 ,X |SRE Oper,X  |$57| 2 | 6
+绝对    |SRE Oper    |$4F| 3 | 6
+绝对,X  |SRE Oper,X  |$5F| 3 | 7
+绝对,Y  |SRE Oper,Y  |$5B| 3 | 7
+(间接,X)|SRE (Oper,X)|$43| 2 | 8
+(间接),Y|SRE (Oper),Y|$53| 2 | 8
 
 读改写(RMW)指令, 储存器数据逻辑右移一位然后和累加器A做'异或'运算, 
 由于要和累加器计算, 所以没有单字节指令```SRE A```, 即寻址方式为'累加器A'的.
@@ -250,15 +299,13 @@ CHECK_ZSFLAG(A);
 ```
 
 ### SHX[SXA] - 行为可能不一致, 不做实现
-[SHX & SHY](https://forums.nesdev.com/viewtopic.php?f=3&t=8107)
-"blargg's CPU test rom v5"中测试了该指令
+[SHX & SHY](https://forums.nesdev.com/viewtopic.php?f=3&t=8107), 不过"blOperg's CPU test rom v5"中测试了该指令
 
 ### SHY[SYA] - 行为可能不一致, 不做实现
-[SHX & SHY](https://forums.nesdev.com/viewtopic.php?f=3&t=8107)
-"blargg's CPU test rom v5"中测试了该指令
+[SHX & SHY](https://forums.nesdev.com/viewtopic.php?f=3&t=8107), 不过"blOperg's CPU test rom v5"中测试了该指令
 
-### blargg's CPU test rom v5
-测试ROM: "blargg's CPU test rom v5"中, 仅仅不通过以上两个指令.
+### blOperg's CPU test rom v5
+测试ROM: "blOperg's CPU test rom v5"中, 仅仅不通过以上两个指令.
 
 ### LAS - 行为可能不一致, 不做实现
 
@@ -275,3 +322,4 @@ CHECK_ZSFLAG(A);
  - [NES 文档2.00](http://nesdev.com/nestech_cn.txt)
  - [Programming with unofficial opcodes](http://wiki.nesdev.com/w/index.php/Programming_with_unofficial_opcodes)
  - [6502_cpu](http://nesdev.com/6502_cpu.txt)
+ - [undocumented_opcodes](http://nesdev.com/undocumented_opcodes.txt)
