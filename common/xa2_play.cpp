@@ -705,6 +705,7 @@ extern "C" void xa2_play_square2(float frequency, uint16_t duty, uint16_t volume
 extern "C" void xa2_play_triangle(float frequency) noexcept {
     if (frequency == g_xa2_data.triangle_frequency) return;
     g_xa2_data.triangle_frequency = frequency;
+    //std::printf("TRI: %f\n", frequency);
 
     const auto ez_wave = g_xa2_data.triangle;
     const auto triangle = ez_wave->source;
@@ -715,7 +716,7 @@ extern "C" void xa2_play_triangle(float frequency) noexcept {
         return;
     }
 
-    //std::printf("TRI: %f\n", frequency);
+
 
     if (g_xa2_data.triangle_stop) {
         g_xa2_data.triangle_stop = false;
@@ -725,13 +726,11 @@ extern "C" void xa2_play_triangle(float frequency) noexcept {
         xbuffer.pAudioData = ez_wave->wave;
         xbuffer.AudioBytes = length_unit;
         xbuffer.LoopCount = XAudio2::XAUDIO2_LOOP_INFINITE;
+        triangle->FlushSourceBuffers();
         triangle->SubmitSourceBuffer(&xbuffer);
     }
-
-    //triangle->Discontinuity();
     triangle->SetFrequencyRatio(frequency / (float)BASE_FREQUENCY);
     triangle->Start();
-
 }
 
 extern "C" void xa2_play_noise(uint16_t data, uint16_t volume) noexcept {
