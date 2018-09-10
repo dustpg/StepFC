@@ -52,9 +52,9 @@ uint32_t get_pixel(unsigned x, unsigned y, const uint8_t* nt, const uint8_t* bg)
 /// <summary>
 /// 主渲染
 /// </summary>
-/// <param name="bgrx">The BGRX.</param>
-extern void main_render(void* bgrx) {
-    uint32_t* data = bgrx;
+/// <param name="rgba">The RGBA.</param>
+extern void main_render(void* rgba) {
+    uint32_t* data = rgba;
 
     for (int i = 0; i != 5000; ++i) {
         sfc_cpu_execute_one(g_famicom);

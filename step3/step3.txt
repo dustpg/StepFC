@@ -1,0 +1,1 @@
+./Debug/sfc_mapper.c.o ./Debug/sfc_famicom.c.o ./Debug/sfc_cpu.c.o ./Debug/sfc_6502.c.o ./Debug/main.c.o   

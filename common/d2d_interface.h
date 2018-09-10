@@ -11,9 +11,9 @@
 #endif
 
 SFC_EXTERN_C void main_cpp() SFC_NOEXCEPT;
-SFC_EXTERN_C void main_render(void* bgrx) SFC_NOEXCEPT;
+SFC_EXTERN_C void main_render(void* rgba) SFC_NOEXCEPT;
 SFC_EXTERN_C void user_input(int index, unsigned char data) SFC_NOEXCEPT;
-SFC_EXTERN_C int sub_render(void* bgrx) SFC_NOEXCEPT;
+SFC_EXTERN_C int sub_render(void* rgba) SFC_NOEXCEPT;
 SFC_EXTERN_C void qsave() SFC_NOEXCEPT;
 SFC_EXTERN_C void qload() SFC_NOEXCEPT;
 
@@ -25,7 +25,7 @@ SFC_EXTERN_C void user_input(int index, unsigned char data) SFC_NOEXCEPT {
 #endif
 
 #ifdef SFC_NO_SUBRENDER
-SFC_EXTERN_C int sub_render(void* bgrx) SFC_NOEXCEPT {
+SFC_EXTERN_C int sub_render(void* rgba) SFC_NOEXCEPT {
     return 0;
 }
 #endif

@@ -2,19 +2,22 @@
 <CodeLite_Workspace Name="StepFC" Database="" Version="10.0.0">
   <Project Name="step0" Path="step0/step0.project" Active="No"/>
   <Project Name="step1" Path="step1/step1.project" Active="No"/>
-  <Project Name="step2" Path="step2/step2.project" Active="Yes"/>
+  <Project Name="step2" Path="step2/step2.project" Active="No"/>
+  <Project Name="step3" Path="step3/step3.project" Active="Yes"/>
   <BuildMatrix>
     <WorkspaceConfiguration Name="Debug" Selected="yes">
       <Environment/>
       <Project Name="step0" ConfigName="Debug"/>
       <Project Name="step1" ConfigName="Debug"/>
       <Project Name="step2" ConfigName="Debug"/>
+      <Project Name="step3" ConfigName="Debug"/>
     </WorkspaceConfiguration>
     <WorkspaceConfiguration Name="Release" Selected="yes">
       <Environment/>
       <Project Name="step0" ConfigName="Debug"/>
       <Project Name="step1" ConfigName="Debug"/>
       <Project Name="step2" ConfigName="Debug"/>
+      <Project Name="step3" ConfigName="Debug"/>
     </WorkspaceConfiguration>
   </BuildMatrix>
 </CodeLite_Workspace>

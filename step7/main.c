@@ -128,9 +128,9 @@ void expand_line_8_r(uint8_t p0, uint8_t p1, uint8_t high, uint32_t* output) {
 //enum { SAMPLE_COUNT = 128 };
 //double samples[SAMPLE_COUNT];
 
-extern int sub_render(void* bgrx) {
+extern int sub_render(void* rgba) {
     return 0;
-    uint32_t* const data = bgrx;
+    uint32_t* const data = rgba;
     // 生成调色板颜色
     //memset(data, 0, 256 * 240 * 4);
     {
@@ -190,9 +190,9 @@ extern int sub_render(void* bgrx) {
 /// <summary>
 /// 主渲染
 /// </summary>
-/// <param name="bgrx">The BGRX.</param>
-extern void main_render(void* bgrx) {
-    uint32_t* const data = bgrx;
+/// <param name="rgba">The RGBA.</param>
+extern void main_render(void* rgba) {
+    uint32_t* const data = rgba;
 
     uint8_t buffer[256 * 256];
 

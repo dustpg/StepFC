@@ -19,7 +19,7 @@ extern void sfc_render_frame_easy(
     uint8_t* buffer
 );
 
-extern int sub_render(void* bgrx) {
+extern int sub_render(void* rgba) {
     return 0;
 }
 
@@ -61,9 +61,9 @@ void play_audio() {
 /// <summary>
 /// 主渲染
 /// </summary>
-/// <param name="bgrx">The BGRX.</param>
-extern void main_render(void* bgrx) {
-    uint32_t* const data = bgrx;
+/// <param name="rgba">The RGBA.</param>
+extern void main_render(void* rgba) {
+    uint32_t* const data = rgba;
 
     uint8_t buffer[256 * 256];
 
