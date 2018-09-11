@@ -10,6 +10,7 @@
 #include <cstring>
 #include <cmath>
 #include <cassert>
+#include <iterator>
 #include <algorithm>
 #include "d2d_interface.h"
 

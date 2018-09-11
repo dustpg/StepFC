@@ -273,7 +273,7 @@ void sfc_ppu_do_end_of_vblank(sfc_ppu_t* ppu) {
 /// 调色板数据
 /// </summary>
 const union sfc_palette_data {
-    struct { uint8_t r, g, a, x; };
+    struct { uint8_t r, g, b, a; };
     uint32_t    data;
 } sfc_stdpalette[64] = {
     { 0x7F, 0x7F, 0x7F, 0xFF }, { 0x20, 0x00, 0xB0, 0xFF }, { 0x28, 0x00, 0xB8, 0xFF }, { 0x60, 0x10, 0xA0, 0xFF },
