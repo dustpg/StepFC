@@ -1,0 +1,1 @@
+./Debug/sfc_famicom.c.o ./Debug/sfc_ppu.c.o ./Debug/up_common_d2d_draw.cpp.o ./Debug/sfc_cpu.c.o ./Debug/main.c.o ./Debug/sfc_config.c.o ./Debug/sfc_addr4020.c.o ./Debug/sfc_6502.c.o ./Debug/sfc_mapper.c.o ./Debug/sfc_render_ez.c.o   

@@ -1,5 +1,7 @@
 ### STEP6: 精灵渲染
 
+本文github[备份地址](https://github.com/dustpg/BlogFM/issues/17)
+
 这一步就进入关于精灵的渲染, 精灵(Sprite)是2D游戏中一个通用概念, 一般来说是指一个单独的图块, 控制播放动画什么的. 很多2D游戏引擎甚至2D图形API都会提供叫做"精灵"的接口.
  
 ### 精灵显示
@@ -17,16 +19,16 @@
 
 每个精灵共4字节的属性, 共计64个:
 
-字节 | 位 | 描述
-----|----|-----
-0 | YYYY YYYY | 精灵Y坐标-1
-- | - | 以显示的角度来看则+1s. 换句话说, 不能显示在第一行
-1 | IIII IIII | Tile索引号(类似于名称表)
-2 | v--- ---- | v 1-垂直翻转
-- | -h-- ---- | h 1-水平翻转
-- | --p- ---- | p 优先级(0-在背景前 1-在背景后)
-- | ---- --pp | pp 调色板高两位(类似于属性表)
-3 | XXXXXXXX | 精灵X坐标
+|字节 | 位 | 描述
+|----|----|-----
+|0 | YYYY YYYY | 精灵Y坐标-1
+|- | - | 以显示的角度来看则+1s. 换句话说, 不能显示在第一行
+|1 | IIII IIII | Tile索引号(类似于名称表)
+|2 | v--- ---- | v 1-垂直翻转
+|- | -h-- ---- | h 1-水平翻转
+|- | --p- ---- | p 优先级(0-在背景前 1-在背景后)
+|- | ---- --pp | pp 调色板高两位(类似于属性表)
+|3 | XXXXXXXX | 精灵X坐标
 
 要点:
 
@@ -81,7 +83,9 @@ output[0] = palette_data[high | low0];
 
 ![output](./output.png)
 
-项目地址[Github-StepFC-Step6](https://github.com/dustpg/StepFC/tree/master/step6
+当然, 这个ROM也测试了加强颜色位, 个人认为这个算是特殊效果应该由高层渲染实现, 而不是核心层实现, 所以这里没有去实现
+
+项目地址[Github-StepFC-Step6](https://github.com/dustpg/StepFC/tree/master/step6)
 
 ### 作业
  - 基础: 尝试实现DEMO里面没有实现的垂直翻转
