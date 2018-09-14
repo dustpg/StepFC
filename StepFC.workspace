@@ -7,7 +7,8 @@
   <Project Name="step4" Path="step4/step4.project" Active="No"/>
   <Project Name="step5" Path="step5/step5.project" Active="No"/>
   <Project Name="step6" Path="step6/step6.project" Active="No"/>
-  <Project Name="step7" Path="step7/step7.project" Active="Yes"/>
+  <Project Name="step7" Path="step7/step7.project" Active="No"/>
+  <Project Name="step8" Path="step8/step8.project" Active="Yes"/>
   <BuildMatrix>
     <WorkspaceConfiguration Name="Debug" Selected="yes">
       <Environment/>
@@ -19,6 +20,7 @@
       <Project Name="step5" ConfigName="Debug"/>
       <Project Name="step6" ConfigName="Debug"/>
       <Project Name="step7" ConfigName="Debug"/>
+      <Project Name="step8" ConfigName="Debug"/>
     </WorkspaceConfiguration>
     <WorkspaceConfiguration Name="Release" Selected="yes">
       <Environment/>
@@ -30,6 +32,7 @@
       <Project Name="step5" ConfigName="Debug"/>
       <Project Name="step6" ConfigName="Debug"/>
       <Project Name="step7" ConfigName="Debug"/>
+      <Project Name="step8" ConfigName="Debug"/>
     </WorkspaceConfiguration>
   </BuildMatrix>
 </CodeLite_Workspace>
