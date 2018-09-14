@@ -1,12 +1,13 @@
 ### STEP8: 基本音频播放
 
-本文github[备份地址](https://github.com/dustpg/BlogFM/issues/19)
+本文github[备份地址](https://github.com/dustpg/BlogFM/issues/20)
 
 上节简单介绍了基本概念, 下面, 介绍相关[寄存器](https://wiki.nesdev.com/w/index.php/APU_registers)
 
 
 ### 分频器(Divider)
 这里特指时钟分频器(或者叫做'分时器'?), 分频器会利用一个值(P)输出时钟, 内部持有一个计数器, 计数器到0就输出然后重置为P值, 比如P为5:
+
  - 2 -> 1
  - 1 -> 0
  - 0 -> 5 =>输出
@@ -26,11 +27,12 @@
 
 
 ### 帧计数器(Frame Counter) / 帧序列器(Frame Sequencer)
+```
 地址|位|功能
 ----|--|---
 $4017|M--- ----|模式(0:4步 1:5步)
 $4017|-I-- ----|IRQ禁止标志位
-
+```
 
 
 地址$4017, 问: 读取的话是用来干什么的?
@@ -45,11 +47,11 @@ $4017|-I-- ----|IRQ禁止标志位
 
 模式|序列|实际频率|说明
 ----|---|--------|---
-模式0|---f| 60Hz | 设置中断标志
-模式0|-l-l| 120Hz | 为长度计数器与扫描单元提供时钟信号
-模式0|eeee| 240Hz | 为包络以及三角波的线性计数器提供时钟信号
-模式1|-----|  0Hz | 不会设置中断标志
-模式1|l-l--| 96Hz | 为长度计数器与扫描单提供时钟信号
+模式0|---f |  60Hz | 设置中断标志
+模式0|-l-l | 120Hz | 为长度计数器与扫描单元提供时钟信号
+模式0|eeee | 240Hz | 为包络以及三角波的线性计数器提供时钟信号
+模式1|-----|   0Hz | 不会设置中断标志
+模式1|l-l--|  96Hz | 为长度计数器与扫描单提供时钟信号
 模式1|eeee-| 192Hz | 为包络以及三角波的线性计数器提供时钟信号
 
 这个帧计数器的频率和垂直空白不是完全同步的, 是独立运行的, 只能说几乎是4倍. 接下来的内容, **如果没有特殊说明, 则假定在模式0(四步模式)下**.
@@ -131,9 +133,10 @@ IRQ:
 ### 状态寄存器(Status Register)
 $4015是APU相关寄存器唯一一个可读的寄存器.
 
-**读**
-位|作用
---|---
+**读**:
+
+  位     |    作用
+---------|------------
 i--- ----| DMC的IRQ标志
 -f-- ----| 帧中断标志, 如果为1, 会确认IRQ, 返回1置为0
 ---d ----| DMC还有剩余样本(剩余字节>0)
@@ -142,9 +145,10 @@ i--- ----| DMC的IRQ标志
 ---- --2-| 方波2长度计数器>0
 ---- ---1| 方波1长度计数器>0
 
-**写**
-位|作用
---|---
+**写**:
+
+  位     |    作用
+---------|------------
 ---d ----| DMC声道使能位
 ---- n---| 噪声声道使能位
 ---- -t--| 三角波声道使能位
@@ -154,7 +158,8 @@ i--- ----| DMC的IRQ标志
 写入0对应的声道就会静音, 同时长度计数器**归零**. 一定注意要归零, 自己之前忘记归零导致玩马里奥第二关才发现有音效问题, 找了很久才发现是这个原因
 
 
-### 方波#1#2 寄存器
+### 方波1/2 寄存器
+
 地址|位|功能
 ----|--|---
 $4000/$4004|DD-- ----|占空比 
@@ -237,11 +242,7 @@ EPPP NSSS  使能标志, 分频器周期(需要+1), 负向标志位, 位移数�
 
 1. APU的频率是CPU频率的一半, 也就是说2个CPU周期等于1个APU周期
 2. 之前说到了方波的占空比, 是一个8个数, 组成的数列
-3. 比如[0 1 1 1 1 0 0 0]
-    - 第一个APU周期方波输出0
-    - 第二: 1
-    - ...
-    - 第八: 0
+3. 比如[0 1 1 1 1 0 0 0]: 第一个APU周期方波输出0, 然后第二周期输出1...第八个周期输出0
 4. 这样上限频率是CPU/16
 5. 之前说到了11bit的周期, 就像其他周期一样, N表示每N+1触发一次
 6. 每N+1次APU周期 -> 推进这8个数列的索引
@@ -294,18 +295,17 @@ $4008包括了一个控制标志位以及一个7位的重载值: ```crrr rrrr ``
 
 7bit, 240Hz可以看出还是挺细腻的.
 
-### 三角波
+### 频率
 同之前的方波, 三角波也有一个数列(32):
 > F E D C B A 9 8 7 6 5 4 3 2 1 0 0 1 2 3 4 5 6 7 8 9 A B C D E F
 
-所以理论上最高频率是CPU/64? 实际上与方波不同的是, 三角波采用的是CPU的频率(搞事!), 也就是最高CPU/32. 计算公式: ```f = CPU/(32*(t + 1))```
+所以理论上最高频率是CPU/64? 实际上与方波不同的是, 三角波采用的是CPU的频率, 也就是最高CPU/32. 计算公式: ```f = CPU/(32*(t + 1))```
 
-等等, CPU/32太高了吧? 硬件上的确没有限制, 实现上我们可以让t小于一个阈值让它实现上'静音'(反正听不到), 这个阈值当然就是当前输出采样率的一半或者说人耳上限20kHz再换算到t. 2?
+等等, CPU/32太高了吧? 硬件上的确没有限制, 实现上我们可以让t小于一个阈值让它实现上'静音'(反正听不到), 这个阈值当然就是人耳上限20kHz, 再换算到t...emm... 2?
 
-模拟器可以这么实现, 但是如果是游戏开发就不能这么干, 单独的确是静音, (实机或者高精度模拟器)混起来就可能产生爆裂声 - 除非就想这么干.
+模拟器可以这么实现, 但是如果是游戏开发就不能这么干, 单独的确是静音(听不到), (实机或者高精度模拟器)混起来就可能产生爆裂声 -- 除非就想这么干(搞事).
 
 ### 具体实现
-
 没有包络控制音量, 没有扫描器控制频率, 对于模拟器实现来说——爽. 同样由于这些问题, 三角波要么循环要么就短时间放一下.
 
 > NES的三角波没有音量设定, 但是有一种特殊的调节其音量的方法(DAC法)
@@ -330,7 +330,9 @@ $400F   llll l---   length index
 ```
 
 ### 线性反馈移位寄存器
+```
 $400E S--- ---- S: 短模式
+```
 
 噪声声道有一个15bit的LFSR, 每次输出最低的bit位.算法如下:
 
@@ -338,12 +340,12 @@ $400E S--- ---- S: 短模式
  2. 如果是短模式则是D0位和D6位做异或运算
  3. LFSR右移一位, 并将之前运算结果作为最高位(D14)
 
-如果是长模式(S=0), 这个LFSR的周期是32767(如果初始0则一直为0), 短模式的周期是93(还有可能是31?)
-
-为了避免一直为0, 初始化应该为1.
+如果是长模式(S=0), 这个LFSR的周期是32767(如果初始0则一直为0), 短模式的周期是93(还有可能是31?). 为了避免一直为0, 应该初始化为1.
 
 ### 周期索引
+```
 $400E ---- pppp 周期索引值
+```
 周期是一个4bit的值, 理所当然是一个索引值:
 ```
 Rate  $0 $1  $2  $3  $4  $5   $6   $7   $8   $9   $A   $B   $C    $D    $E    $F
@@ -358,21 +360,27 @@ PAL    4, 8, 14, 30, 60, 88, 118, 148, 188, 236, 354, 472, 708,  944, 1890, 3778
 理论频率计算公式应该是```CPU / P```, 或者```APU / P```. 不用加1, 是因为直接给出了周期. 不过因为是噪音, 不是真正的频率, 这个频率只是LFSR的更新频率.
 
 至于是```CPU / P```还是```APU / P```, 感觉上有歧义:
- - [APU REF](http://nesdev.com/apu_ref.txt)
-    > All channels use a timer which is a divider driven by the ~1.79 MHz clock.
-    > 
-    > The noise channel and DMC use lookup tables to set the timer's period. For the square and triangle channels, the third and fourth registers form an 11-bit value and the divider's period is set to this value *plus one*.
-    - 这篇文档提到全部计时器是以CPU1.79MHz驱动
-    > Timer with
+
+#### [APU REF](http://nesdev.com/apu_ref.txt)
+> All channels use a timer which is a divider driven by the ~1.79 MHz clock.
+> 
+> The noise channel and DMC use lookup tables to set the timer's period. For the square and triangle channels, the third and fourth registers form an 11-bit value and the divider's period is set to this value *plus one*.
+
+- 这篇文档提到全部计时器是以CPU1.79MHz驱动
+
+> Timer with
 divide-by-two on the output
-    - 但是方波计时器会除以2
- - [NESDEV APU](https://wiki.nesdev.com/w/index.php/APU)
-    - 这个当然是主要参考的
-    > A timer is used in each of the five channels to control the sound frequency. It contains a divider which is clocked by the CPU clock. The triangle channel's timer is clocked on every CPU cycle, but the pulse, noise, and DMC timers are clocked only on every second CPU cycle and thus produce only even periods.
-    - 这个文档就说只有三角波是特例, 是以CPU周期为单位, 其他都是每两个CPU周期计算一次
 
+- 但是方波计时器会除以2
 
-然后自己用马里奥反复对比了其他的模拟器, 发现计算公式感觉上应该是```CPU/P```(当然没有比较源代码, 毕竟世界上最痛苦的事情莫过于看别人写的代码), 有一个比较低的$0C音, 区别较大. 这个也需要求证. **不排除自己的实现有问题**.
+#### [NESDEV APU](https://wiki.nesdev.com/w/index.php/APU)
+- 这个当然是主要参考的
+
+> A timer is used in each of the five channels to control the sound frequency. It contains a divider which is clocked by the CPU clock. The triangle channel's timer is clocked on every CPU cycle, but the pulse, noise, and DMC timers are clocked only on every second CPU cycle and thus produce only even periods.
+
+- 这个文档就说只有三角波是特例, 是以CPU周期为单位, 其他都是每两个CPU周期计算一次
+
+然后自己用马里奥反复对比了其他的模拟器, 发现计算公式感觉上应该是```CPU/P```(没有比较源代码, 毕竟世界上最痛苦的事情, 莫过于看别人写的代码还没有文档), 有一个比较低的$0C音, 区别较大. 这个也需要求证. **不排除自己的实现有问题**.
 
 也就是说噪音生成的逻辑:
 
@@ -387,7 +395,7 @@ divide-by-two on the output
 ### 具体实现
 EZ模式实现就比较困难了, 因为实际上有一个LFSR状态机. 但是回归本质, 这是一种白噪声的实现手段, 实际上只有$400E中的5bit控制音色, 即实际上只有32种音色, 16种频率乘上2种模式. 反正是噪音(EZ模式嘛, 听个响, 要啥自行车).
 
-再简化, 频率可以通过音频API调整, 也就是说只需要实现两个模式即可. 不过, 即使是白噪声, 短时间播放一段时间还是有差别的, 记录当前播放状态反而实现了一个伪状态机, 换句话说, 也就是每次播放不要从头播放, 从上次的地方继续.
+再简化, 频率可以通过音频API调整, 也就是说只需要实现两个模式即可. 不过, 即使是白噪声, 短时间播放一段时间还是有差别的, 记录当前播放状态反而实现了一个伪状态机. 换句话说, 也就是每次播放不要从头播放, 从上次的地方继续.
 
 实现:
 
@@ -396,6 +404,7 @@ EZ模式实现就比较困难了, 因为实际上有一个LFSR状态机. 但是�
  3. 根据周期索引切换播放速度(调整频率)
     - 可以看出NTSC和PAL的LFSR修改频率, 理论上应该一致, 可以独立于CPU频率实现(方便但是会丢失精度, 理论一致但是实际上有误差)
     
+...
 
  - 我是谁?
  - 噪音
@@ -408,17 +417,18 @@ EZ模式实现就比较困难了, 因为实际上有一个LFSR状态机. 但是�
  - 置空状态寄存器对应的使能位能让声道静音
  - 长度计数器归零也会导致静音
 
- ### DMC 声道
- DMC可以用来播放ΔPCM, 不过用的游戏很少, 原因当然是对于当时用kb作为单位的游戏来说太奢侈了. 2A03的DMC声道的采样深度是7bit的, 我们现在使用CD音质是16bit的, 差了不是一星半点. 甚至DEMO中自己是图方便, 直接用的32bit浮点. 
+### DMC 声道
 
- 寄存器地址|位|说明
- ---------|--|---
- $4010|I--- ----|IRQ 使能位
- $4010|-L-- ----|循环标志位
- $4010|---- PPPP|周期索引
- $4011|-DDD DDDD|DAC绑定计数器
- $4012|AAAA AAAA|样本地址
- $4013|LLLL LLLL|样本长度
+DMC可以用来播放ΔPCM, 不过用的游戏很少, 原因当然是对于当时用kb作为单位的游戏来说太奢侈了. 2A03的DMC声道的采样深度是7bit的, 我们现在使用CD音质是16bit的, 差了不是一星半点. 甚至DEMO中自己是图方便, 直接用的32bit浮点. 
+
+寄存器地址|位|说明
+---------|--|---
+$4010|I--- ----|IRQ 使能位
+$4010|-L-- ----|循环标志位
+$4010|---- PPPP|周期索引
+$4011|-DDD DDDD|DAC绑定计数器
+$4012|AAAA AAAA|样本地址
+$4013|LLLL LLLL|样本长度
 
 
 不论是否被禁止(状态寄存器对应使能位), DMC都会向DAC输出数据, 一开始是0, 或者向$4011写入的7bit数据. 状态寄存器的使能位是用来控制样本播放的.
@@ -505,8 +515,8 @@ MMC5甚至带了一个类似的寄存器不过是8bit的了, 是鼓励用PCM吗?
 ### 具体实现
 解码输出可以算是很简单, 但是对于EZ模式几乎是一个不可能的任务:
 
-  - 允许直接写$4011, 可以让ΔPCM以[PCM方式工作](https://forums.nesdev.com/viewtopic.php?f=6&t=16117)([搞事](https://www.youtube.com/watch?v=v0dBXuZtbos)啊)
-  - 读取CPU地址空间会消耗CPU周期, 会失去同步
+  - 允许直接写$4011, 可以让ΔPCM以[PCM方式](https://forums.nesdev.com/viewtopic.php?f=6&t=16117)工作([搞事](https://www.youtube.com/watch?v=v0dBXuZtbos)啊)
+  - 读取CPU地址空间会消耗CPU周期, 失去同步
 
 至于7bit的PCM, 很难实现也很容易实现:
 
@@ -526,12 +536,12 @@ MMC5甚至带了一个类似的寄存器不过是8bit的了, 是鼓励用PCM吗?
  - EZ模式下, 把这些周期塞在哪里?
  - (一帧最多才浪费60+周期, 无视掉?)
  - 有些搞事的会利用DMC中断来设置'分割滚动'效果
- - 还有的会利用DMC中断实现锯齿波(仅仅需要17字节+中断函数, 很不错的6bit锯齿波)
+ - 还有的会利用DMC中断实现锯齿波(仅仅需要17字节+中断函数, 很不错的锯齿波)
  - 如何同步?
  - 嗯......?
 
 
-综上所述, 模拟DMC声道在状态机模式是比较困难的事情了(如果模拟精度精确到周期, 那就相当方便了, 真正的'仿真'), 我们先放置一下, 暂不实现.
+综上所述, 模拟DMC声道在状态机模式是比较困难的事情了(如果模拟精度精确到周期, 那就相当方便了, 真正的'仿真'). 我们先放置一下, 暂不实现.
 
 ![image](./download.jpg)
 
@@ -573,7 +583,9 @@ void xa2_play_triangle(float frequency);
 void xa2_play_noise(uint16_t data, uint16_t volume);
 ```
 
-感觉都不用解释. 这次测试ROM同上次的拉罐, 是的这个拉罐ROM实际是带来BGM的!
+感觉都不用解释. 这次测试ROM同上次的拉罐, 是的这个拉罐ROM实际是带BGM的!
+
+![output](./output.png)
 
 项目地址[Github-StepFC-Step8](https://github.com/dustpg/StepFC/tree/master/step8)
 
@@ -581,7 +593,7 @@ void xa2_play_noise(uint16_t data, uint16_t volume);
 终于可以完整地游玩马里奥了, 就着这个劲儿准备把马里奥通关了!
 ![mario-clear](./mario-clear.png)
 
-然后自己加入了非常暴力膜幻的即时存档功能. 
+然后自己加入了非常暴力膜幻的即时存档功能, 通关了. 
 
 ### 作业
  - 基础: 文中提到了ΔPCM解码练习, 试试吧
@@ -591,5 +603,4 @@ void xa2_play_noise(uint16_t data, uint16_t volume);
 ### REF
  - [APU REF](http://nesdev.com/apu_ref.txt)
  - [APU registers](https://wiki.nesdev.com/w/index.php/APU_registers)
- - [反则音源PCM DEMO](https://www.bilibili.com/video/av1173993/?p=7)
  - [FC音源普及篇](https://www.bilibili.com/video/av1211223/?p=3)

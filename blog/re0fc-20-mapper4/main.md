@@ -1,12 +1,14 @@
+### STEP⑨: 实现部分Mapper
+
 ### Mapper004: [MMC3](https://wiki.nesdev.com/w/index.php/MMC3) - TxROM
 
 MMC3 可谓是最开始几个Mapper中相当占分量的Mapper. MMC3是少数可以触发[IRQ](https://wiki.nesdev.com/w/index.php/IRQ)的Mapper之一.
 
 MMC6也是用同一个mapper编号, 内部逻辑大致相同.
 
-根据数据库,MMC3(在我看来)比较有名的游戏, 比如:
+根据数据库,MMC3(在自己看来)比较有名的游戏, 比如:
  - 这就比较多了
- - 这次计划的主角: [Metal Max](http://bootgod.dyndns.org:7777/profile.php?id=3991)
+ - 这次企划的主角: [Metal Max](http://bootgod.dyndns.org:7777/profile.php?id=3991)
  - 本次测试用的[双截龙2: 复仇](http://bootgod.dyndns.org:7777/profile.php?id=126)
  - [洛克人3](http://bootgod.dyndns.org:7777/profile.php?id=46), [4](http://bootgod.dyndns.org:7777/profile.php?id=35), [5](http://bootgod.dyndns.org:7777/profile.php?id=1114), [6](http://bootgod.dyndns.org:7777/profile.php?id=891)
  - [高桥名人的冒险岛2](http://bootgod.dyndns.org:7777/profile.php?id=269), [3](http://bootgod.dyndns.org:7777/profile.php?id=177)
@@ -145,7 +147,7 @@ IRQ使能, 写入任意值标记使能
  - 这次CHR窗口的单位是1KB, 之前是用4KB的逻辑, 导致背景/精灵渲染出现问题
  - ![dd2](./dd2.png)
  - 第一次出现的可不是你啊, 是尖头发的
- - 这样我发现了: 同屏只能有一种敌人. 小时候居然没有注意到
+ - 这样自己发现了: 同屏只能有一种敌人. 小时候居然没有注意到
  - 由于NTSC是隐藏上下8条扫描线的, 很多游戏利用这一点用来更新图块
  - 大陆用的PAL, 能够完整的显示240线, 所以经常上下8线会出现问题, 小时候以为是卡带花了
 
@@ -161,3 +163,7 @@ IRQ使能, 写入任意值标记使能
  - 这种情况可以写专门对付的代码, 触发IRQ记录BANK
  - 或者精灵和背景同步渲染
  - 游戏愉快!
+
+### REF
+ - [NESDEV-IRQ](https://wiki.nesdev.com/w/index.php/IRQ)
+ - [MMC3](https://wiki.nesdev.com/w/index.php/MMC3)

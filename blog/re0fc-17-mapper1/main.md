@@ -1,9 +1,11 @@
-### Mapper 
-上一节很遗憾地没有实现DMC声道, 原因有一个: 使用Mapper0的游戏会用ΔPCM吗? 很少吧? 
+### STEP⑨: 实现部分Mapper
 
-现在先实现
+上一节很遗憾地没有实现DMC声道, 原因有一个: 使用Mapper0的游戏会用ΔPCM吗? 毕竟又没办法提前知道ROM到底用没用DMC
+
+现在先实现:
+
  - MMC1 (1)
- - UNROM (2)
+ - UxROM (2)
  - CNROM (3)
  - MMC3 (4)
 
@@ -11,7 +13,7 @@
 
 MMCx是任天堂自己开发的MMC, 任天堂自己开发的MMC是海外版(即NES)能够使用的MMC, 日本本土可以使用厂商自己生产的.
 
-根据数据库, MMC1(在我看来)比较有名的游戏, 比如:
+根据数据库, MMC1(在自己看来)比较有名的游戏, 比如:
  - [恶魔城II 诅咒的封印](http://bootgod.dyndns.org:7777/profile.php?id=61)
  - [双截龙](http://bootgod.dyndns.org:7777/profile.php?id=22)
  - [马里奥医生](http://bootgod.dyndns.org:7777/profile.php?id=174)
@@ -127,16 +129,18 @@ RPPPP
 
 16KB为BANK, 可以支持16个, 也就是最多256KB的PRG-ROM? 
 
- ### 变种
+### 变种
  变种就不谈了, 懒的实现...
 
-### 双截龙模拟中出现的BUG
+### 双截龙模拟中出现的问题
  - 有时会读取无效的地址($4XXX)
  - 下面的分数版显示有时会错位也就是'分割滚动'没有完全实现
  - ![dd-scroll](./dd-scroll.png)
  - 上面这个问题实际是自己没有吃透滚动的的原理
- - 我干脆按照PPU本身原理(就是vtxw寄存器)
+ - 自己干脆按照PPU本身原理(就是vtxw寄存器, 香就一个字)
  - 然后就没有这个问题了
  - ![dd-clear](./dd-clear.png)
  - 游戏愉快!
 
+### REF
+ - [MMC1](https://wiki.nesdev.com/w/index.php/MMC1)
