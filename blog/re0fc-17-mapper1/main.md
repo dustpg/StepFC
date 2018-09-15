@@ -1,5 +1,7 @@
 ### STEP⑨: 实现部分Mapper
 
+本文github[备份地址](https://github.com/dustpg/BlogFM/issues/21)
+
 上一节很遗憾地没有实现DMC声道, 原因有一个: 使用Mapper0的游戏会用ΔPCM吗? 毕竟又没办法提前知道ROM到底用没用DMC
 
 现在先实现:
@@ -14,12 +16,13 @@
 MMCx是任天堂自己开发的MMC, 任天堂自己开发的MMC是海外版(即NES)能够使用的MMC, 日本本土可以使用厂商自己生产的.
 
 根据数据库, MMC1(在自己看来)比较有名的游戏, 比如:
+
  - [恶魔城II 诅咒的封印](http://bootgod.dyndns.org:7777/profile.php?id=61)
  - [双截龙](http://bootgod.dyndns.org:7777/profile.php?id=22)
  - [马里奥医生](http://bootgod.dyndns.org:7777/profile.php?id=174)
  - 算了, 看到D就好了
 
-其中当然是双截龙比较适合测试Mapper, 流程还行. 我才不知道什么修改\$0505 \$0506可以修改时间呢.
+其中当然是双截龙比较适合测试Mapper, 流程还行. 我才不知道什么修改$0505, $0506可以修改时间呢.
 
 
 ### Banks
@@ -28,7 +31,7 @@ MMCx是任天堂自己开发的MMC, 任天堂自己开发的MMC是海外版(即N
  - CPU $C000-$FFFF: 16 KB PRG ROM bank, either fixed to the last bank or switchable
  - PPU $0000-$0FFF: 4 KB switchable CHR bank
  - PPU $1000-$1FFF: 4 KB switchable CHR bank
-
+ - ...
  - 居然搭载了额外的PRG-RAM
  - MMC1的PRG-ROM Bank单位是16KB
  - $8000-$BFFF初始化为第一个Bank
@@ -75,7 +78,7 @@ Rxxx xxxD
 +--------- 1: Reset shift register and write Control with (Control OR $0C),
               locking PRG ROM at $C000-$FFFF to the last bank.
 ```
-D7位写入1会让写入Control寄存器自己, 为之前的值'与'上\$C, 让PRG-ROM切换模式至模式3(固定最后的bank至高地址, 切换16KB BANK至低地址)
+D7位写入1会让写入Control寄存器自己, 为之前的值'与'上$C, 让PRG-ROM切换模式至模式3(固定最后的bank至高地址, 切换16KB BANK至低地址)
 
 
 ### Control ($8000-$9FFF)
@@ -130,17 +133,28 @@ RPPPP
 16KB为BANK, 可以支持16个, 也就是最多256KB的PRG-ROM? 
 
 ### 变种
- 变种就不谈了, 懒的实现...
+ 变种就不谈了, 懒得实现...
+
+### 新的Mapper接口 
+可以看出这次Mapper会对高地址进行写入:
+```c
+// 写入高地址
+void (*write_high)(sfc_famicom_t* fc, uint16_t addr, uint8_t data);
+```
+由于Mapper也需要数据储存, C++实现可以delete掉之前的Mapper再new一个新的Mapper. 稍微复杂可以利用现有的缓冲空间进行Mapper的placement new. 这里的实现就是模拟placement new, 利用公共缓冲空间创建新的Mapper接口.
+
+具体实现根据说明实现很简单: [STEP9-MAPPER001.c](https://github.com/dustpg/StepFC/blob/master/step9/sfc_mapper_001_mmc1.c)
 
 ### 双截龙模拟中出现的问题
  - 有时会读取无效的地址($4XXX)
+ - 不知道是实现有问题还是本身会读(倾向于实现有问题)
  - 下面的分数版显示有时会错位也就是'分割滚动'没有完全实现
  - ![dd-scroll](./dd-scroll.png)
  - 上面这个问题实际是自己没有吃透滚动的的原理
  - 自己干脆按照PPU本身原理(就是vtxw寄存器, 香就一个字)
  - 然后就没有这个问题了
  - ![dd-clear](./dd-clear.png)
- - 游戏愉快!
+ - 单身狗(桌子下面)成吨的伤害! 游戏愉快!
 
 ### REF
  - [MMC1](https://wiki.nesdev.com/w/index.php/MMC1)

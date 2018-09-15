@@ -1,5 +1,7 @@
 ### STEP⑨: 实现部分Mapper
 
+接下来进入本次的主角 Mapper004:
+
 ### Mapper004: [MMC3](https://wiki.nesdev.com/w/index.php/MMC3) - TxROM
 
 MMC3 可谓是最开始几个Mapper中相当占分量的Mapper. MMC3是少数可以触发[IRQ](https://wiki.nesdev.com/w/index.php/IRQ)的Mapper之一.

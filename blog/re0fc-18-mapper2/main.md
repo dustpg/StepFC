@@ -1,12 +1,17 @@
 ### STEP⑨: 实现部分Mapper
 
+本文github[备份地址](https://github.com/dustpg/BlogFM/issues/22)
+
+这一次继续吧: Mapper02.
+
 ### Mapper002: [UxROM](https://wiki.nesdev.com/w/index.php/UxROM)
 
 UxROM这就比较厉害了, 能够用到最高用到4MB的RPG-ROM.
 
-但是没有CHR-ROM, 需要自己写入CHR-RAM.
+但是**没有CHR-ROM**, 需要自己写入CHR-RAM.
 
 根据数据库,UxROM(在自己看来)比较有名的游戏, 比如:
+
  - [恶魔城](http://bootgod.dyndns.org:7777/profile.php?id=57)
  - (不被小岛承认的)[合金装备](http://bootgod.dyndns.org:7777/profile.php?id=79)
  - [洛克人](http://bootgod.dyndns.org:7777/profile.php?id=608)
@@ -30,16 +35,19 @@ xxxx pPPP
 ```
 完全可以实现为使用全部的8bit.
 
-要使用全部8bit, 即4MB, 需要 NES 2.0的文件头, 为此自己特地更新了文件头让其支持4MB. 之前有一个搞事的就是用的4MB的Mapper002(自制的所以没有物理板子)
+要使用全部8bit, 即4MB, 需要 NES 2.0的文件头, 为此自己特地更新了文件头让其支持4MB. 之前有一个搞事的就是用的4MB的Mapper002(自制ROM, 没有物理板子)
 
 有些会有总线冲突, 需要使用副-Mapper来解决, 这里就不讨论了
 
-这个Mapper简单暴力. 避免溢出, 可以这样: ```value % count_prgrom16kb```
+这个Mapper简单暴力. 避免溢出, 可以膜一下: ```value % count_prgrom16kb```
+
+### 实现
+这次感觉是Mapper上最简单的: [STEP9-MAPPER002.c](https://github.com/dustpg/StepFC/blob/master/step9/sfc_mapper_002_uxrom.c) 
 
 ### 魂斗罗模拟出现的问题
  - 魂斗罗使用的精灵是8x16模式
  - 魂斗罗使用了DMC声道增强音效
- - 下次测试DMC就靠你了
+ - 上面决定了, 下次测试DMC就靠你了
  - BGM还行, SE表现力实在太差.
  - 主要就是声音播放有点问题
  - 上上下下左右左右BA!
