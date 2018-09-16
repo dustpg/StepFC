@@ -631,7 +631,7 @@ extern "C" void xa2_play_square1(float frequency, uint16_t duty, uint16_t volume
 
     if (now64 == old64) return;
 
-    //std::printf("%f - %d - %d\n", frequency, duty, volume);
+    std::printf("%f - %d - %d\n", frequency, duty, volume);
     old64 = now64;
 
 
@@ -655,8 +655,6 @@ extern "C" void xa2_play_square1(float frequency, uint16_t duty, uint16_t volume
         square->FlushSourceBuffers();
         square->SubmitSourceBuffer(&xbuffer);
     }
-
-    //square->SetOutputVoices()
 
     square->SetVolume((float)volume / 15.f);
     square->SetFrequencyRatio(frequency / (float)BASE_FREQUENCY);
@@ -849,10 +847,12 @@ extern "C" int xa2_init() noexcept {
     // 创建方波#1
     if (SUCCEEDED(hr)) {
        hr = xa2_create_clip(&g_xa2_data.square1);
+       g_xa2_data.square1_stop = true;
     }
     // 创建方波#2
     if (SUCCEEDED(hr)) {
         hr = xa2_create_clip(&g_xa2_data.square2);
+        g_xa2_data.square2_stop = true;
     }
     // 创建三角波
     if (SUCCEEDED(hr)) {
@@ -872,6 +872,7 @@ extern "C" int xa2_init() noexcept {
     if (SUCCEEDED(hr)) {
         hr = xa2_create_clip_dmc(&g_xa2_data.dmc);
     }
+    ::Sleep(1000);
     return !!SUCCEEDED(hr);
 }
 
