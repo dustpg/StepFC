@@ -872,7 +872,7 @@ extern "C" int xa2_init() noexcept {
     if (SUCCEEDED(hr)) {
         hr = xa2_create_clip_dmc(&g_xa2_data.dmc);
     }
-    ::Sleep(1000);
+    //::Sleep(1000);
     return !!SUCCEEDED(hr);
 }
 
