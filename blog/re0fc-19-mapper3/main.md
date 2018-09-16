@@ -33,6 +33,9 @@ cccc ccCC
 ```
 和上一个一样的逻辑, 最多支持256*8, 2MB的CHR-ROM. 为了避免溢出, 可以进行一次膜运算: ```value % count_chrrom_8kb```
 
+### 实现
+这次也是非常简单: [STEP9-MAPPER003.c](https://github.com/dustpg/StepFC/blob/master/step9/sfc_mapper_003_cnrom.c) 
+
 ### 高桥名人的冒险岛
  - 流程有点长
  - ![island](./island.png)

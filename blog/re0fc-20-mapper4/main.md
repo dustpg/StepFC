@@ -9,6 +9,7 @@ MMC3 可谓是最开始几个Mapper中相当占分量的Mapper. MMC3是少数可
 MMC6也是用同一个mapper编号, 内部逻辑大致相同.
 
 根据数据库,MMC3(在自己看来)比较有名的游戏, 比如:
+
  - 这就比较多了
  - 这次企划的主角: [Metal Max](http://bootgod.dyndns.org:7777/profile.php?id=3991)
  - 本次测试用的[双截龙2: 复仇](http://bootgod.dyndns.org:7777/profile.php?id=126)
@@ -31,6 +32,7 @@ MMC3的IRQ最大的用处, 就是处理的分割滚动效果(状态栏在下面)
  - 细节请参考测试ROM: cpu_interrupts_v2
  - ![test](./test.png)
  - 目前实现到第一个测试的测试12: "RTI RTI不允许执行主线代码" ... 我™... 这些测试ROM就是搞事
+ - 本步骤自带的ROM就是这个"cpu_interrupts.nes"了
 
 ### Banks
  - CPU $6000-$7FFF: 8 KB PRG RAM bank
@@ -130,36 +132,52 @@ IRQ闩锁, 用于指定一个重载值. 当计数器归零后, 计数器会重�
 IRQ重载, 写入任意值会让计数器归0
 
 
-### IRQ disable ($E000-$FFFE, even))
+### IRQ disable ($E000-$FFFE, 偶数)
 IRQ禁止, 写入任意值标记禁止并且确认挂起的中断
 
-### IRQ enable ($E001-$FFFF, odd)
+### IRQ enable ($E001-$FFFF, 奇数)
 IRQ使能, 写入任意值标记使能
 
 
 ### Mapper接口: 水平同步
+这次功能就需要新的一个接口, 需要在每条扫描行进行一次同步, 我们就把它叫水平同步好了
+```c
+// 水平同步
+void(*hsync)(sfc_famicom_t*);
+```
 由于目前的是EZ模式, 我们在每次可见扫描线结束后进行一次同步, 即水平同步. 计数器减到0就触发一次IRQ.
 
 关于IRQ触发更为详细的细节请查看原文.
 
+### 实现
+本次的实现比较重要, 也明显比前面几个代码量更大.
+
+[STEP9-MAPPER004.c](https://github.com/dustpg/StepFC/blob/master/step9/sfc_mapper_004_mmc3.c) 
+
 ### 结束?
 本次先介绍的4种mapper就介绍完毕
 
-### 双截龙2: 复仇 模拟出现的BUG
+项目地址[Github-StepFC-Step9](https://github.com/dustpg/StepFC/tree/master/step9)
+
+### 作业
+ - 基础: 文中提到了4个Mapper, 重新实现吧
+ - 扩展: 试试实现其他Mapper!
+ - 从零开始: 从零开始实现自己的模拟器吧
+
+### 双截龙2: 复仇 模拟出现的问题
  - 这次CHR窗口的单位是1KB, 之前是用4KB的逻辑, 导致背景/精灵渲染出现问题
  - ![dd2](./dd2.png)
  - 第一次出现的可不是你啊, 是尖头发的
  - 这样自己发现了: 同屏只能有一种敌人. 小时候居然没有注意到
  - 由于NTSC是隐藏上下8条扫描线的, 很多游戏利用这一点用来更新图块
- - 大陆用的PAL, 能够完整的显示240线, 所以经常上下8线会出现问题, 小时候以为是卡带花了
 
 
-### 重装机兵模拟出现的BUG
+### 重装机兵模拟出现的问题
  - MM会在显示对话框的时候触发IRQ切换CHR-ROM BANK
- - 因为目前精灵显示并不是和同步的(方便以后用shader渲染)
+ - 因为目前精灵显示并不是和同步的(方便以后用着色器渲染)
  - 导致渲染时用的是切换后的
  - 解决方案: 延迟精灵渲染到所有工作结束后(即开始新的一帧, MM会在VBlank时把BANK换回来)
- - 这种方案只能应急用, 这样会导致菜单里面的东西出现问题:
+ - 这种方案只能应急用, 这样又会导致菜单里面的东西出现问题:
  - ![mm1](./mm1.png)
  - 手指和菜单选择项渲染
  - 这种情况可以写专门对付的代码, 触发IRQ记录BANK
