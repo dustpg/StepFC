@@ -857,6 +857,7 @@ extern "C" int xa2_init() noexcept {
     // 创建三角波
     if (SUCCEEDED(hr)) {
         hr = xa2_create_clip_tri(&g_xa2_data.triangle);
+        g_xa2_data.triangle_stop = true;
     }
     // 创建噪音 Long模式
     if (SUCCEEDED(hr)) {
