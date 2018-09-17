@@ -330,6 +330,8 @@ HRESULT xa2_create_clip(sfc_ez_wave** output) noexcept {
             make_square_wave_ex(ptr + length_unit * 1, length_unit, 0.750f, base_quare_vol);
             make_square_wave_ex(ptr + length_unit * 2, length_unit, 0.500f, base_quare_vol);
             make_square_wave_ex(ptr + length_unit * 3, length_unit, 0.250f, base_quare_vol);
+
+            //std::memset(ptr + length_unit * 1, 0, length_unit * sizeof(float));
         }
         else hr = E_OUTOFMEMORY;
     }
@@ -629,31 +631,41 @@ extern "C" void xa2_play_square1(float frequency, uint16_t duty, uint16_t volume
     auto& now64 = reinterpret_cast<uint64_t&>(state);
     auto& old64 = reinterpret_cast<uint64_t&>(g_xa2_data.square1_state);
 
+    const auto old_duty = g_xa2_data.square1_state.duty;
+
     if (now64 == old64) return;
 
     //std::printf("%f - %d - %d\n", frequency, duty, volume);
     old64 = now64;
 
-
-
     const auto ez_wave = g_xa2_data.square1;
     const auto square = ez_wave->source;
-    if (!volume) {
-        square->ExitLoop();
-        g_xa2_data.square1_stop = true;
+
+    if (frequency == 0.f) {
+        square->Stop();
         return;
     }
 
-    if (g_xa2_data.square1_stop) {
-        g_xa2_data.square1_stop = false;
+
+    if (old_duty != duty) {
         constexpr uint32_t length_unit = BASE_FREQUENCY * sizeof(float);
         XAudio2::XAUDIO2_BUFFER xbuffer = {};
         xbuffer.Flags = XAudio2::XAUDIO2_END_OF_STREAM;
         xbuffer.pAudioData = ez_wave->wave + length_unit * duty;
         xbuffer.AudioBytes = length_unit;
         xbuffer.LoopCount = XAudio2::XAUDIO2_LOOP_INFINITE;
+        square->ExitLoop();
         square->FlushSourceBuffers();
         square->SubmitSourceBuffer(&xbuffer);
+    }
+
+
+    if (!volume) {
+        //square->ExitLoop();
+        //g_xa2_data.square1_stop = true;
+        square->ExitLoop();
+        //g_xa2_data.square1_stop = true;
+        return;
     }
 
     square->SetVolume((float)volume / 15.f);
