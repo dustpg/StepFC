@@ -280,9 +280,9 @@ enum {
 
 */
 
-constexpr float base_quare_vol = 95.88f / (8128.f/15.f+100.f);
-constexpr float base_triangle_vol = 159.79f / (100.f+1.f/(15.f/8227.f));
-constexpr float base_noise_vol = 159.79f / (100.f + 1.f / (15.f / 12241.f));
+constexpr float base_quare_vol = 0.15f;
+constexpr float base_triangle_vol = 0.25f;
+constexpr float base_noise_vol = 0.20f;
 
 //extern "C" void play_240() noexcept;
 
@@ -631,7 +631,7 @@ extern "C" void xa2_play_square1(float frequency, uint16_t duty, uint16_t volume
 
     if (now64 == old64) return;
 
-    std::printf("%f - %d - %d\n", frequency, duty, volume);
+    //std::printf("%f - %d - %d\n", frequency, duty, volume);
     old64 = now64;
 
 
@@ -657,7 +657,7 @@ extern "C" void xa2_play_square1(float frequency, uint16_t duty, uint16_t volume
     }
 
     square->SetVolume((float)volume / 15.f);
-    square->SetFrequencyRatio(frequency / (float)BASE_FREQUENCY);
+    square->SetFrequencyRatio(frequency / ((float)SAMPLE_PER_SEC / (float)BASE_FREQUENCY));
     square->Start();
 }
 
@@ -695,7 +695,7 @@ extern "C" void xa2_play_square2(float frequency, uint16_t duty, uint16_t volume
     }
 
     square->SetVolume((float)volume / 15.f);
-    square->SetFrequencyRatio(frequency / (float)BASE_FREQUENCY);
+    square->SetFrequencyRatio(frequency / ((float)SAMPLE_PER_SEC / (float)BASE_FREQUENCY));
     square->Start();
 }
 
@@ -727,7 +727,7 @@ extern "C" void xa2_play_triangle(float frequency) noexcept {
         triangle->FlushSourceBuffers();
         triangle->SubmitSourceBuffer(&xbuffer);
     }
-    triangle->SetFrequencyRatio(frequency / (float)BASE_FREQUENCY);
+    triangle->SetFrequencyRatio(frequency / ((float)SAMPLE_PER_SEC / (float)BASE_FREQUENCY));
     triangle->Start();
 }
 
@@ -783,7 +783,6 @@ extern "C" void xa2_play_noise(uint16_t data, uint16_t volume) noexcept {
 //        std::free(wave);
 //    }
 //}
-
 
 
 
