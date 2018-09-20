@@ -13,6 +13,10 @@ static sfc_ecode sfc_load_new_rom(sfc_famicom_t* famicom);
 // 加载mapper
 extern sfc_ecode sfc_load_mapper(sfc_famicom_t* famicom, uint8_t);
 
+// 默认音频事件
+static void sfc_audio_changed(void*a, uint32_t b, int c) {}
+// 默认SRAM读写事件
+static void sfc_save_load_sram(void*a, const sfc_rom_info_t*b, const uint8_t*c) {}
 
 // 声明一个随便(SB)的函数指针类型
 typedef void(*sfc_funcptr_t)();
@@ -37,6 +41,9 @@ sfc_ecode sfc_famicom_init(
     famicom->interfaces.load_rom = sfc_load_default_rom;
     famicom->interfaces.free_rom = sfc_free_default_rom;
     famicom->interfaces.before_execute = sfc_before_execute;
+    famicom->interfaces.audio_changed = sfc_audio_changed;
+    famicom->interfaces.load_sram = sfc_save_load_sram;
+    famicom->interfaces.save_sram = sfc_save_load_sram;
     // 初步BANK
     famicom->prg_banks[0] = famicom->main_memory;
     famicom->prg_banks[3] = famicom->save_memory;
@@ -58,13 +65,93 @@ sfc_ecode sfc_famicom_init(
 }
 
 /// <summary>
+/// SFCs the check save sram.
+/// </summary>
+/// <param name="famicom">The famicom.</param>
+static inline void sfc_check_save_sram(sfc_famicom_t* famicom) {
+    if (famicom->rom_info.save_ram) {
+        famicom->interfaces.save_sram(
+            famicom->argument,
+            &famicom->rom_info,
+            famicom->save_memory
+        );
+    }
+}
+
+/// <summary>
+/// SFCs the check save sram.
+/// </summary>
+/// <param name="famicom">The famicom.</param>
+static inline void sfc_check_load_sram(sfc_famicom_t* famicom) {
+    if (famicom->rom_info.save_ram) {
+        famicom->interfaces.load_sram(
+            famicom->argument,
+            &famicom->rom_info,
+            famicom->save_memory
+        );
+    }
+}
+
+/// <summary>
 /// StepFC: 反初始化famicom
 /// </summary>
 /// <param name="famicom">The famicom.</param>
 void sfc_famicom_uninit(sfc_famicom_t* famicom) {
+    // 检测SRAM
+    sfc_check_save_sram(famicom);
     // 释放ROM
     famicom->interfaces.free_rom(famicom->argument, &famicom->rom_info);
 }
+
+
+/// <summary>
+/// SFCs the switch nametable mirroring.
+/// </summary>
+/// <param name="famicom">The famicom.</param>
+/// <param name="mode">The mode.</param>
+void sfc_switch_nametable_mirroring(sfc_famicom_t* famicom, sfc_nametable_mirroring_mode mode) {
+    switch (mode)
+    {
+    case SFC_NT_MIR_SingleLow:
+        famicom->ppu.banks[0x8] = famicom->video_memory + 0x400 * 0;
+        famicom->ppu.banks[0x9] = famicom->video_memory + 0x400 * 0;
+        famicom->ppu.banks[0xa] = famicom->video_memory + 0x400 * 0;
+        famicom->ppu.banks[0xb] = famicom->video_memory + 0x400 * 0;
+        break;
+    case SFC_NT_MIR_SingleHigh:
+        famicom->ppu.banks[0x8] = famicom->video_memory + 0x400 * 1;
+        famicom->ppu.banks[0x9] = famicom->video_memory + 0x400 * 1;
+        famicom->ppu.banks[0xa] = famicom->video_memory + 0x400 * 1;
+        famicom->ppu.banks[0xb] = famicom->video_memory + 0x400 * 1;
+        break;
+    case SFC_NT_MIR_Vertical:
+        famicom->ppu.banks[0x8] = famicom->video_memory + 0x400 * 0;
+        famicom->ppu.banks[0x9] = famicom->video_memory + 0x400 * 1;
+        famicom->ppu.banks[0xa] = famicom->video_memory + 0x400 * 0;
+        famicom->ppu.banks[0xb] = famicom->video_memory + 0x400 * 1;
+        break;
+    case SFC_NT_MIR_Horizontal:
+        famicom->ppu.banks[0x8] = famicom->video_memory + 0x400 * 0;
+        famicom->ppu.banks[0x9] = famicom->video_memory + 0x400 * 0;
+        famicom->ppu.banks[0xa] = famicom->video_memory + 0x400 * 1;
+        famicom->ppu.banks[0xb] = famicom->video_memory + 0x400 * 1;
+        break;
+    case SFC_NT_MIR_FourScreen:
+        famicom->ppu.banks[0x8] = famicom->video_memory + 0x400 * 0;
+        famicom->ppu.banks[0x9] = famicom->video_memory + 0x400 * 1;
+        famicom->ppu.banks[0xa] = famicom->video_memory_ex + 0x400 * 0;
+        famicom->ppu.banks[0xb] = famicom->video_memory_ex + 0x400 * 1;
+        break;
+    default:
+        assert(!"BAD ACTION");
+    }
+    // 镜像
+    famicom->ppu.banks[0xc] = famicom->ppu.banks[0x8];
+    famicom->ppu.banks[0xd] = famicom->ppu.banks[0x9];
+    famicom->ppu.banks[0xe] = famicom->ppu.banks[0xa];
+    famicom->ppu.banks[0xf] = famicom->ppu.banks[0xb];
+}
+
 
 
 /// <summary>
@@ -72,27 +159,10 @@ void sfc_famicom_uninit(sfc_famicom_t* famicom) {
 /// </summary>
 /// <param name="famicom">The famicom.</param>
 static inline void sfc_setup_nametable_bank(sfc_famicom_t* famicom) {
-    // 4屏
-    if (famicom->rom_info.four_screen) {
-        famicom->ppu.banks[0x8] = famicom->video_memory + 0x400 * 0;
-        famicom->ppu.banks[0x9] = famicom->video_memory + 0x400 * 1;
-        famicom->ppu.banks[0xa] = famicom->video_memory_ex + 0x400 * 0;
-        famicom->ppu.banks[0xb] = famicom->video_memory_ex + 0x400 * 1;
-    }
-    // 横版
-    else if (famicom->rom_info.vmirroring) {
-        famicom->ppu.banks[0x8] = famicom->video_memory + 0x400 * 0;
-        famicom->ppu.banks[0x9] = famicom->video_memory + 0x400 * 1;
-        famicom->ppu.banks[0xa] = famicom->video_memory + 0x400 * 0;
-        famicom->ppu.banks[0xb] = famicom->video_memory + 0x400 * 1;
-    }
-    // 纵版
-    else {
-        famicom->ppu.banks[0x8] = famicom->video_memory + 0x400 * 0;
-        famicom->ppu.banks[0x9] = famicom->video_memory + 0x400 * 0;
-        famicom->ppu.banks[0xa] = famicom->video_memory + 0x400 * 1;
-        famicom->ppu.banks[0xb] = famicom->video_memory + 0x400 * 1;
-    }
+    sfc_switch_nametable_mirroring(famicom,
+        famicom->rom_info.four_screen ? (SFC_NT_MIR_FourScreen) :
+        (famicom->rom_info.vmirroring ? SFC_NT_MIR_Vertical : SFC_NT_MIR_Horizontal)
+    );
 }
 
 /// <summary>
@@ -120,16 +190,13 @@ sfc_ecode sfc_famicom_reset(sfc_famicom_t* famicom) {
     // 调色板
     // 名称表
     sfc_setup_nametable_bank(famicom);
-    // 镜像
-    famicom->ppu.banks[0xc] = famicom->ppu.banks[0x8];
-    famicom->ppu.banks[0xd] = famicom->ppu.banks[0x9];
-    famicom->ppu.banks[0xe] = famicom->ppu.banks[0xa];
-    famicom->ppu.banks[0xf] = famicom->ppu.banks[0xb];
     // 重置APU
     sfc_apu_on_reset(&famicom->apu);
     return SFC_ERROR_OK;
 }
 
+// CRC32-b 哈希
+extern uint32_t sfc_crc32b(uint32_t input, const void *buf, size_t bufLen);
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -142,10 +209,8 @@ sfc_ecode sfc_famicom_reset(sfc_famicom_t* famicom) {
 /// <returns></returns>
 sfc_ecode sfc_load_default_rom(void* arg, sfc_rom_info_t* info) {
     assert(info->data_prgrom == NULL && "FREE FIRST");
-    FILE* const file = fopen("spritecans.nes", "rb");
-    //FILE* const file = fopen("testrom/08.irq_timing.nes", "rb");
-    //FILE* const file = fopen("D:/doc/fcrom/smb.nes", "rb");
-
+    FILE * const file = fopen("D:/doc/fcrom/CONTRA.NES", "rb");
+    //FILE* const file = fopen("cpu_interrupts.nes", "rb");
     // 文本未找到
     if (!file) return SFC_ERROR_FILE_NOT_FOUND;
     sfc_ecode code = SFC_ERROR_ILLEGAL_FILE;
@@ -160,10 +225,18 @@ sfc_ecode sfc_load_default_rom(void* arg, sfc_rom_info_t* info) {
         this_union.id[3] = '\x1A';
         // 比较这四字节
         if (this_union.u32 == nes_header.id) {
-            const size_t size1 = 16 * 1024 * nes_header.count_prgrom16kb;
+            const uint32_t prgrom16
+                = (uint32_t)nes_header.count_prgrom16kb
+                | (((uint32_t)nes_header.upper_rom_size & 0x0F) << 8)
+                ;
+            const uint32_t chrrom8
+                = (uint32_t)nes_header.count_chrrom_8kb
+                | (((uint32_t)nes_header.upper_rom_size & 0xF0) << 4)
+                ;
+            const size_t size1 = 16 * 1024 * prgrom16;
             // 允许没有CHR-ROM(使用CHR-RAM代替)
-            const size_t size2 = 8 * 1024 * (nes_header.count_chrrom_8kb | 1);
-            const size_t size3 = 8 * 1024 * nes_header.count_chrrom_8kb;
+            const size_t size2 = 8 * 1024 * (chrrom8 | 1);
+            const size_t size3 = 8 * 1024 * chrrom8;
             // 计算实际长度
             const size_t malloc_len = size1 + size2;
             const size_t fread_len = size1 + size3;
@@ -183,8 +256,8 @@ sfc_ecode sfc_load_default_rom(void* arg, sfc_rom_info_t* info) {
                 // 填写info数据表格
                 info->data_prgrom = ptr;
                 info->data_chrrom = ptr + size1;
-                info->count_prgrom16kb = nes_header.count_prgrom16kb;
-                info->count_chrrom_8kb = nes_header.count_chrrom_8kb;
+                info->count_prgrom16kb = prgrom16;
+                info->count_chrrom_8kb = chrrom8;
                 info->mapper_number 
                     = (nes_header.control1 >> 4) 
                     | (nes_header.control2 & 0xF0)
@@ -230,7 +303,6 @@ void sfc_before_execute(void* arg, sfc_famicom_t* info) {
 
 }
 
-
 /// <summary>
 /// StepFC: 加载ROM
 /// </summary>
@@ -250,6 +322,15 @@ sfc_ecode sfc_load_new_rom(sfc_famicom_t* famicom) {
             famicom->argument,
             &famicom->rom_info
         );
+    }
+    // 载入ROM后处理
+    if (code == SFC_ERROR_OK) {
+        // 计算HASH
+        sfc_rom_info_t* const info = &famicom->rom_info;
+        info->prgrom_crc32b = sfc_crc32b(0, info->data_prgrom, info->count_prgrom16kb * 16 * 1024);
+        info->chrrom_crc32b = sfc_crc32b(0, info->data_chrrom, info->count_chrrom_8kb * 8 * 1024);
+        // 载入SRAM
+        sfc_check_load_sram(famicom);
     }
     // 载入新的Mapper
     if (code == SFC_ERROR_OK) {

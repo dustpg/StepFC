@@ -7,6 +7,8 @@
 #include <cstdio>
 #include <cmath>
 
+#include <atomic>
+
 
 
 
@@ -40,7 +42,15 @@ enum FormatWave : uint8_t {
     Wave_IEEEFloat,
 };
 
+
+struct SFC_XAudio2EngineCallback : XAudio2::Ver2_7::IXAudio2EngineCallback {
+    STDMETHOD_(void, OnProcessingPassStart) () noexcept override;
+    STDMETHOD_(void, OnProcessingPassEnd) () noexcept override;
+    STDMETHOD_(void, OnCriticalError) (HRESULT Error) noexcept override;
+};
+
 struct {
+
 
     HMODULE                                     dll_handle;
 
@@ -51,7 +61,14 @@ struct {
 
     uintptr_t                                   counter;
 
+    alignas(sizeof(uintptr_t)) char             callback[sizeof(SFC_XAudio2EngineCallback)];
+
+    std::atomic<bool>                           error;
+
 } g_xa2_data;
+
+
+
 
 
 HRESULT xa2_create_source(uint32_t nSamplesPerSec) noexcept {
@@ -90,7 +107,11 @@ void record_to_file(const float* buffer, uint32_t len) {
     std::fwrite(buffer, sizeof(float), len, g_record_file);
 }
 
+
+static void xa2_check_error() noexcept;
+
 extern "C" void xa2_submit_buffer(const float* buffer, uint32_t len) noexcept {
+    xa2_check_error();
     //record_to_file(buffer, len);
     ++g_xa2_data.counter;
     XAudio2::XAUDIO2_BUFFER xbuffer = {};
@@ -104,6 +125,7 @@ extern "C" void xa2_submit_buffer(const float* buffer, uint32_t len) noexcept {
 
 
 extern "C" void xa2_flush_buffer() noexcept {
+    xa2_check_error();
     //g_xa2_data.source->Stop();
     const auto hr = g_xa2_data.source->FlushSourceBuffers();
     //g_xa2_data.source->Start();
@@ -112,26 +134,20 @@ extern "C" void xa2_flush_buffer() noexcept {
 }
 
 SFC_EXTERN_C unsigned xa2_buffer_left() SFC_NOEXCEPT {
+    xa2_check_error();
     XAudio2::XAUDIO2_VOICE_STATE state = {};
     g_xa2_data.source->GetState(&state);
+    unsigned rv = 0;
     if (state.pCurrentBufferContext) {
         const auto counter = reinterpret_cast<uintptr_t>(state.pCurrentBufferContext);
-        return g_xa2_data.counter - counter;
+        rv = g_xa2_data.counter - counter;
     }
-    return 0;
+    return rv;
 }
 
 
-extern "C" int xa2_init(uint32_t sample) noexcept {
-    auto hr = ::CoInitialize(nullptr);
-    std::memset(&g_xa2_data, 0, sizeof(g_xa2_data));
-    // 载入 XAudio 2.7 的dll文件
-    if (SUCCEEDED(hr)) {
-        g_xa2_data.dll_handle = ::LoadLibraryW(L"XAudio2_7.dll");
-        assert(g_xa2_data.dll_handle && "XAudio2_7.dll not found");
-        if (!g_xa2_data.dll_handle)
-            hr = E_FAIL;
-    }
+static HRESULT recreate_xa2(uint32_t sample) noexcept {
+    HRESULT hr = S_OK;
     // 创建XAudio2 对象
     if (SUCCEEDED(hr)) {
         using namespace XAudio2;
@@ -162,21 +178,60 @@ extern "C" int xa2_init(uint32_t sample) noexcept {
 
         hr = create(&g_xa2_data.xaudio2_7, 0, XAUDIO2_DEFAULT_PROCESSOR);
     }
+    // 注册回调
+    if (SUCCEEDED(hr)) {
+        const auto callback = reinterpret_cast<SFC_XAudio2EngineCallback*>(g_xa2_data.callback);
+        hr = g_xa2_data.xaudio2_7->RegisterForCallbacks(callback);
+    }
     // 创建Mastering
     if (SUCCEEDED(hr)) {
-        using namespace XAudio2;
-        using namespace XAudio2::Ver2_7;
         hr = g_xa2_data.xaudio2_7->CreateMasteringVoice(
             &g_xa2_data.xa_master
         );
     }
     // 创建源
     if (SUCCEEDED(hr)) {
-       hr = xa2_create_source(sample);
+        hr = xa2_create_source(sample);
     }
     // 尝试开始
     if (SUCCEEDED(hr)) {
         hr = g_xa2_data.source->Start();
+    }
+    return hr;
+}
+
+
+static void release_xa2()  noexcept {
+    if (g_xa2_data.source) {
+        g_xa2_data.source->DestroyVoice();
+        g_xa2_data.source = nullptr;
+    }
+    if (g_xa2_data.xa_master) {
+        g_xa2_data.xa_master->DestroyVoice();
+        g_xa2_data.xa_master = nullptr;
+    }
+    ::SafeRelease(g_xa2_data.xaudio2_7);
+}
+
+#include <new>
+
+extern "C" int xa2_init(uint32_t sample) noexcept {
+    auto hr = ::CoInitialize(nullptr);
+    std::memset(&g_xa2_data, 0, sizeof(g_xa2_data));
+    // 临界区
+    if (SUCCEEDED(hr)) {
+        new(&g_xa2_data.callback) SFC_XAudio2EngineCallback;
+    }
+    // 载入 XAudio 2.7 的dll文件
+    if (SUCCEEDED(hr)) {
+        g_xa2_data.dll_handle = ::LoadLibraryW(L"XAudio2_7.dll");
+        assert(g_xa2_data.dll_handle && "XAudio2_7.dll not found");
+        if (!g_xa2_data.dll_handle)
+            hr = E_FAIL;
+    }
+    // 重建XA2
+    if (SUCCEEDED(hr)) {
+        hr = recreate_xa2(sample);
     }
     // 提交测试用缓存
 #if 0
@@ -216,16 +271,38 @@ extern "C" void xa2_clean() noexcept {
     if (g_record_file) {
         std::fclose(g_record_file);
     }
-    if (g_xa2_data.source) {
-        g_xa2_data.source->DestroyVoice();
-        g_xa2_data.source = nullptr;
-    }
-    if (g_xa2_data.xa_master) {
-        g_xa2_data.xa_master->DestroyVoice();
-        g_xa2_data.xa_master = nullptr;
-    }
-    ::SafeRelease(g_xa2_data.xaudio2_7);
+    ::release_xa2();
     ::FreeLibrary(g_xa2_data.dll_handle);
     ::CoUninitialize();
 }
 
+void STDMETHODCALLTYPE
+SFC_XAudio2EngineCallback::OnProcessingPassStart() noexcept {
+
+}
+
+void STDMETHODCALLTYPE
+SFC_XAudio2EngineCallback::OnProcessingPassEnd() noexcept {
+
+}
+
+void STDMETHODCALLTYPE
+SFC_XAudio2EngineCallback::OnCriticalError(HRESULT error) noexcept {
+    g_xa2_data.error = true;
+#ifndef NDEBUG
+    std::printf("<%s> 0x%08X\n", __FUNCTION__, error);
+#endif
+}
+
+void xa2_check_error() noexcept {
+    if (!g_xa2_data.error) return;
+    g_xa2_data.error = false;
+    
+    XAudio2::Ver2_7::XAUDIO2_VOICE_DETAILS details;
+    g_xa2_data.source->GetVoiceDetails(&details);
+
+    ::release_xa2();
+    const auto hr = ::recreate_xa2(details.InputSampleRate);
+    // TODO: 错误处理
+    assert(SUCCEEDED(hr));
+}

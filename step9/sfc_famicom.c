@@ -278,7 +278,7 @@ sfc_ecode sfc_load_new_rom(sfc_famicom_t* famicom) {
         &famicom->rom_info
     );
     // 清空数据
-    memset(&famicom->rom_info, 0, sizeof(famicom));
+    memset(&famicom->rom_info, 0, sizeof(famicom->rom_info));
     // 载入ROM
     if (code == SFC_ERROR_OK) {
         code = famicom->interfaces.load_rom(
