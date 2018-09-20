@@ -103,9 +103,9 @@ extern "C" void main_cpp() noexcept {
 
 static const unsigned sc_key_map[16] = {
     // A, B, Select, Start, Up, Down, Left, Right
-    'J', 'K', 'U', 'I', 'W', 'S', 'A', 'D',
+    'K', 'J', 'U', 'I', 'W', 'S', 'A', 'D',
     // A, B, Select, Start, Up, Down, Left, Right
-    VK_NUMPAD2, VK_NUMPAD3, VK_NUMPAD5, VK_NUMPAD6, 
+    VK_NUMPAD3, VK_NUMPAD2, VK_NUMPAD5, VK_NUMPAD6,
     VK_UP, VK_DOWN, VK_LEFT, VK_RIGHT,
 };
 
@@ -147,10 +147,27 @@ LRESULT CALLBACK ThisWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
 }
 
 
+SFC_EXTERN_C void d2d_submit_wave(const float* data, unsigned len) SFC_NOEXCEPT {
+    if (!len) return;
+    const unsigned end = len - 1;
+    const auto ctx = g_data.d2d_context;
+    const auto make_point = [=](unsigned i) {
+        D2D1_POINT_2F point;
+        point.x = float(i) * 0.5f;
+        point.y = (240.f + 100.f + 1.f) - (data[i] * 100.f);
+        return point;
+    };
+
+    for (unsigned i = 0; i != end; ++i) {
+        ctx->DrawLine(
+            make_point(i), make_point(i+1),
+            g_data.d2d_brush
+        );
+    }
+}
+
 void DoRender(uint32_t sync) noexcept {
-    main_render(g_bg_data);
-    const auto hr0 = g_data.d2d_bg->CopyFromMemory(nullptr, g_bg_data, 256 * 4);
-    assert(SUCCEEDED(hr0));
+
     // D2D
     {
         const auto ctx = g_data.d2d_context;
@@ -158,6 +175,9 @@ void DoRender(uint32_t sync) noexcept {
         ctx->Clear(D2D1::ColorF(1.f, 1.f, 1.f, 1.f));
         ctx->SetTransform(D2D1::Matrix3x2F::Scale({ 2.f, 2.f }));
         ctx->DrawBitmap(g_data.d2d_bg, nullptr, 1.f, D2D1_INTERPOLATION_MODE_NEAREST_NEIGHBOR);
+        main_render(g_bg_data);
+        const auto hr0 = g_data.d2d_bg->CopyFromMemory(nullptr, g_bg_data, 256 * 4);
+        assert(SUCCEEDED(hr0));
         if (sub_render(g_bg_data)) {
             const auto hr0 = g_data.d2d_bg->CopyFromMemory(nullptr, g_bg_data, 256 * 4);
             assert(SUCCEEDED(hr0));
