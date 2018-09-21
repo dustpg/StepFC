@@ -68,7 +68,10 @@ typedef struct {
     void(*save_sram)(void*, const sfc_rom_info_t*, const uint8_t*);
     // 读取SRAM 8KB
     void(*load_sram)(void*, const sfc_rom_info_t*, uint8_t*);
-
+    // 状态保存 写入流
+    void(*sl_write_stream)(void*, const uint8_t*, uint32_t len);
+    // 状态读取 读取流
+    void(*sl_read_stream)(void*, uint8_t*, uint32_t len);
 } sfc_interface_t;
 
 
@@ -82,7 +85,10 @@ typedef struct {
     void (*write_high)(sfc_famicom_t*, uint16_t, uint8_t);
     // 水平同步
     void(*hsync)(sfc_famicom_t*);
-
+    // 写入RAM到流
+    void(*write_ram_to_stream)(sfc_famicom_t*);
+    // 从流读取RAM
+    void(*read_ram_from_stream)(sfc_famicom_t*);
 } sfc_mapper_t;
 
 
@@ -146,6 +152,10 @@ sfc_ecode sfc_famicom_reset(sfc_famicom_t* famicom);
 // 反初始化
 void sfc_famicom_uninit(sfc_famicom_t*);
 
+// 保存状态
+void sfc_famicom_save_state(sfc_famicom_t*);
+// 读取状态
+sfc_ecode sfc_famicom_load_state(sfc_famicom_t*);
 
 
 

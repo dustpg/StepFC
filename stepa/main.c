@@ -347,8 +347,9 @@ static void play_audio() {
     else if (left > BUFFER_MAX) {
         printf("<buffer overflow[%d]>\n", left);
         // 可以让图像接口空等一两帧, 这里直接睡过去
-        Sleep(30);
+        //Sleep(30);
         // 这里还能直接return跳过该音频帧
+        return;
     }
     // 收尾
     const uint32_t old_index = g_states.last_cycle * SAMPLES_PER_SEC / NTSC_CPU_RATE;

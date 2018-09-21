@@ -99,6 +99,9 @@
     <ClCompile Include="sfc_crc32b.c">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="sfc_state_sl.c">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="src">

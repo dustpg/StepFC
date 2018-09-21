@@ -151,6 +151,7 @@
     <ClCompile Include="sfc_play_ez.c" />
     <ClCompile Include="sfc_ppu.c" />
     <ClCompile Include="sfc_render_ez.c" />
+    <ClCompile Include="sfc_state_sl.c" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

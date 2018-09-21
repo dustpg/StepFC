@@ -29,6 +29,23 @@ static void sfc_mapper_hsync_defualt(sfc_famicom_t* famicom) {
 }
 
 /// <summary>
+/// SFCs the mapper WRTS.
+/// </summary>
+/// <param name="famicom">The famicom.</param>
+static void sfc_mapper_wrts_defualt(sfc_famicom_t* famicom) {
+
+}
+
+/// <summary>
+/// SFCs the mapper WRTS.
+/// </summary>
+/// <param name="famicom">The famicom.</param>
+static void sfc_mapper_rrfs_defualt(sfc_famicom_t* famicom) {
+
+}
+
+
+/// <summary>
 /// StepFC: 加载Mapper
 /// </summary>
 /// <param name="famicom">The famicom.</param>
@@ -38,6 +55,8 @@ extern sfc_ecode sfc_load_mapper(sfc_famicom_t* famicom, uint8_t id) {
     memset(&famicom->mapper, 0, sizeof(famicom->mapper));
     // 载入默认接口
     famicom->mapper.hsync = sfc_mapper_hsync_defualt;
+    famicom->mapper.write_ram_to_stream = sfc_mapper_wrts_defualt;
+    famicom->mapper.read_ram_from_stream = sfc_mapper_rrfs_defualt;
     switch (id)
     {
         SFC_CASE_LOAD_MAPPER(00);
