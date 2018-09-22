@@ -267,19 +267,19 @@ static void sfc_render_background_scanline(
     const uint8_t sp0[SFC_HEIGHT + (16)],
     uint8_t* buffer) {
     // 取消背景显示
-    if (!(famicom->ppu.mask & (uint8_t)SFC_PPU2001_Back)) return;
+    if (!(famicom->ppu.data.mask & (uint8_t)SFC_PPU2001_Back)) return;
 
     // 计算当前水平偏移量
     const uint16_t scrollx
-        = (uint16_t)((famicom->ppu.v & (uint16_t)0x0400) ? 256 : 0)
-        + (uint16_t)((famicom->ppu.v & (uint16_t)0x1f) << 3)
-        + (uint16_t)famicom->ppu.x
+        = (uint16_t)((famicom->ppu.data.v & (uint16_t)0x0400) ? 256 : 0)
+        + (uint16_t)((famicom->ppu.data.v & (uint16_t)0x1f) << 3)
+        + (uint16_t)famicom->ppu.data.x
         ;
     // 计算当前垂直偏移量
     const uint16_t scrolly
-        = (uint16_t)((famicom->ppu.v & (uint16_t)0x0800) ? 240 : 0)
-        + (uint16_t)(((famicom->ppu.v >> 5) & (uint16_t)0x1f) << 3)
-        + (uint16_t)(famicom->ppu.v >> 12)
+        = (uint16_t)((famicom->ppu.data.v & (uint16_t)0x0800) ? 240 : 0)
+        + (uint16_t)(((famicom->ppu.data.v >> 5) & (uint16_t)0x1f) << 3)
+        + (uint16_t)(famicom->ppu.data.v >> 12)
         ;
     //const uint16_t scrolly = line + 240;
     // 由于Y是240一换, 需要膜计算
@@ -287,7 +287,7 @@ static void sfc_render_background_scanline(
     const uint16_t scrolly_offset = scrolly % (uint16_t)240;
 
     // 计算背景所使用的图样表
-    const uint8_t** const ppattern = &famicom->ppu.banks[famicom->ppu.ctrl & SFC_PPU2000_BgTabl ? 4 : 0];
+    const uint8_t** const ppattern = &famicom->ppu.banks[famicom->ppu.data.ctrl & SFC_PPU2000_BgTabl ? 4 : 0];
     // 检测垂直偏移量确定使用图案表的前一半[8-9]还是后一半[10-11]
     const uint8_t* table[2];
 
@@ -330,7 +330,7 @@ static void sfc_render_background_scanline(
     // 基于行的精灵0命中测试
 
     // 已经命中了
-    if (famicom->ppu.status & (uint8_t)SFC_PPU2002_Sp0Hit) return;
+    if (famicom->ppu.data.status & (uint8_t)SFC_PPU2002_Sp0Hit) return;
     // 没有必要测试
     const uint8_t hittest_data = sp0[line];
     if (!hittest_data) return;
@@ -338,10 +338,10 @@ static void sfc_render_background_scanline(
     uint8_t* const unaligned_buffer = aligned_buffer + (scrollx & 0x0f);
     memset(unaligned_buffer + SFC_WIDTH, 0, 16);
 
-    const uint8_t  xxxxx = famicom->ppu.sprites[3];
+    const uint8_t  xxxxx = famicom->ppu.data.sprites[3];
     const uint8_t hittest = sfc_pack_bool8_into_byte(unaligned_buffer + xxxxx);
     if (hittest_data & hittest)
-        famicom->ppu.status |= (uint8_t)SFC_PPU2002_Sp0Hit;
+        famicom->ppu.data.status |= (uint8_t)SFC_PPU2002_Sp0Hit;
 }
 
 /// <summary>
@@ -357,22 +357,22 @@ static inline void sfc_sprite0_hittest(
     memset(buffer, 0, SFC_WIDTH);
     // 关闭渲染
     enum { BOTH_BS = SFC_PPU2001_Back | SFC_PPU2001_Sprite };
-    if ((famicom->ppu.mask & (uint8_t)BOTH_BS) != (uint8_t)BOTH_BS) return;
+    if ((famicom->ppu.data.mask & (uint8_t)BOTH_BS) != (uint8_t)BOTH_BS) return;
     // 获取数据以填充
-    const uint8_t yyyyy = famicom->ppu.sprites[0];
+    const uint8_t yyyyy = famicom->ppu.data.sprites[0];
     // 0xef以上就算了
     if (yyyyy >= 0xEF) return;
     // 计算使用的图样板子
-    const uint8_t iiiii = famicom->ppu.sprites[1];
-    const uint8_t sp8x16 = famicom->ppu.ctrl & SFC_PPU2000_Sp8x16;
+    const uint8_t iiiii = famicom->ppu.data.sprites[1];
+    const uint8_t sp8x16 = famicom->ppu.data.ctrl & SFC_PPU2000_Sp8x16;
     const uint8_t* const spp = famicom->ppu.banks[sp8x16 ?
         // 偶数使用0000 奇数1000
         (iiiii & 1 ? 4 : 0) :
         // 检查SFC_PPU2000_SpTabl
-        (famicom->ppu.ctrl & SFC_PPU2000_SpTabl ? 4 : 0)
+        (famicom->ppu.data.ctrl & SFC_PPU2000_SpTabl ? 4 : 0)
     ];
     // 属性
-    const uint8_t aaaaa = famicom->ppu.sprites[2];
+    const uint8_t aaaaa = famicom->ppu.data.sprites[2];
     // 获取平面数据
     const uint8_t* const nowp0 = spp + iiiii * 16;
     const uint8_t* const nowp1 = nowp0 + 8;
@@ -422,14 +422,14 @@ static inline void sfc_sprite0_hittest(
 static inline uint16_t sfc_sprite_overflow_test(sfc_famicom_t* famicom) {
     // 完全关闭渲染
     enum { BOTH_BS = SFC_PPU2001_Back | SFC_PPU2001_Sprite };
-    if (!(famicom->ppu.mask & (uint8_t)BOTH_BS)) return SFC_HEIGHT;
+    if (!(famicom->ppu.data.mask & (uint8_t)BOTH_BS)) return SFC_HEIGHT;
     // 正式处理
     uint8_t buffer[256 + 16];
     memset(buffer, 0, 256);
     // 8 x 16
-    const int height = famicom->ppu.ctrl & SFC_PPU2000_Sp8x16 ? 16 : 8;
+    const int height = famicom->ppu.data.ctrl & SFC_PPU2000_Sp8x16 ? 16 : 8;
     for (int i = 0; i != SFC_SPRITE_COUNT; ++i) {
-        const uint8_t y = famicom->ppu.sprites[i * 4];
+        const uint8_t y = famicom->ppu.data.sprites[i * 4];
         for (int i = 0; i != height; ++i) buffer[y + i]++;
     }
     // 搜索第一个超过8的
@@ -590,10 +590,10 @@ enum {
 /// <param name="buffer">The buffer.</param>
 static inline void sfc_render_sprites(sfc_famicom_t* famicom, uint8_t* buffer) {
     // 8 x 16
-    const uint8_t sp8x16 = (famicom->ppu.ctrl & (uint8_t)SFC_PPU2000_Sp8x16) >> 2;
+    const uint8_t sp8x16 = (famicom->ppu.data.ctrl & (uint8_t)SFC_PPU2000_Sp8x16) >> 2;
     //assert(sp8x16 == 0);
     // 精灵用图样
-    const size_t offset1 = (sp8x16) ? 0 : (famicom->ppu.ctrl & SFC_PPU2000_SpTabl ? 4 : 0);
+    const size_t offset1 = (sp8x16) ? 0 : (famicom->ppu.data.ctrl & SFC_PPU2000_SpTabl ? 4 : 0);
     const size_t offset2 = (sp8x16) ? 4 : offset1;
     const size_t offset3 = (sp8x16) ? 0 : 16;
 
@@ -609,12 +609,12 @@ static inline void sfc_render_sprites(sfc_famicom_t* famicom, uint8_t* buffer) {
 
     //const uint8_t* sppbuffer[2];
     //sppbuffer[0] = famicom->ppu.banks[
-    //    (sp8x16) ? 0 : (famicom->ppu.ctrl & SFC_PPU2000_SpTabl ? 4 : 0)];
+    //    (sp8x16) ? 0 : (famicom->ppu.data.ctrl & SFC_PPU2000_SpTabl ? 4 : 0)];
     //sppbuffer[1] = sp8x16 ? famicom->ppu.banks[4] : sppbuffer[0] + 16;
 
     // 遍历所有精灵
     for (int index = 0; index != SFC_SPRITE_COUNT; ++index) {
-        const uint8_t* const base = famicom->ppu.sprites +
+        const uint8_t* const base = famicom->ppu.data.sprites +
             (SFC_SPRITE_COUNT - 1 - index) * 4;
         const uint8_t yyyy = base[0];
         // 显示不下
@@ -754,7 +754,7 @@ void sfc_render_frame_easy(sfc_famicom_t* famicom, uint8_t* buffer) {
     // 精灵溢出测试
     const uint16_t sp_overflow_line = sfc_sprite_overflow_test(famicom);
     // 关闭渲染则输出背景色?
-    if (!(famicom->ppu.mask & (uint8_t)SFC_PPU2001_Back))
+    if (!(famicom->ppu.data.mask & (uint8_t)SFC_PPU2001_Back))
         memset(buffer, 0, SFC_BUFFER_WIDTH * SFC_HEIGHT);
     // 渲染
     for (uint16_t i = 0; i != (uint16_t)SCAN_LINE_COUNT; ++i) {
@@ -765,14 +765,14 @@ void sfc_render_frame_easy(sfc_famicom_t* famicom, uint8_t* buffer) {
         sfc_render_background_scanline(famicom, i, sp0_hittest_buffer, buffer);
         // 溢出测试
         if (i == sp_overflow_line)
-            famicom->ppu.status |= (uint8_t)SFC_PPU2002_SpOver;
+            famicom->ppu.data.status |= (uint8_t)SFC_PPU2002_SpOver;
         // 执行CPU
         for (; *count < end_cycle_count_this_round;)
             sfc_cpu_execute_one(famicom);
         // 执行换行
 
         // 取消背景显示
-        if (famicom->ppu.mask & (uint8_t)SFC_PPU2001_Back) {
+        if (famicom->ppu.data.mask & (uint8_t)SFC_PPU2001_Back) {
             sfc_ppu_do_under_cycle256(&famicom->ppu);
             sfc_ppu_do_under_cycle257(&famicom->ppu);
         }
@@ -800,8 +800,8 @@ void sfc_render_frame_easy(sfc_famicom_t* famicom, uint8_t* buffer) {
     // 垂直空白期间
 
     // 开始
-    famicom->ppu.status |= (uint8_t)SFC_PPU2002_VBlank;
-    if (famicom->ppu.ctrl & (uint8_t)SFC_PPU2000_NMIGen) {
+    famicom->ppu.data.status |= (uint8_t)SFC_PPU2002_VBlank;
+    if (famicom->ppu.data.ctrl & (uint8_t)SFC_PPU2000_NMIGen) {
         sfc_operation_NMI(famicom);
     }
     // 执行
@@ -813,9 +813,9 @@ void sfc_render_frame_easy(sfc_famicom_t* famicom, uint8_t* buffer) {
             sfc_cpu_execute_one(famicom);
     }
     // 结束
-    famicom->ppu.status = 0;
+    famicom->ppu.data.status = 0;
     // 垂直空白结束
-    if (famicom->ppu.mask & (uint8_t)SFC_PPU2001_Back) {
+    if (famicom->ppu.data.mask & (uint8_t)SFC_PPU2001_Back) {
         sfc_ppu_do_end_of_vblank(&famicom->ppu);
     }
     // 第4次触发
@@ -840,6 +840,6 @@ void sfc_render_frame_easy(sfc_famicom_t* famicom, uint8_t* buffer) {
     famicom->cpu_cycle_count -= end_cycle_count_last_round;
 
     // 最后渲染精灵
-    if (famicom->ppu.mask & (uint8_t)SFC_PPU2001_Sprite)
+    if (famicom->ppu.data.mask & (uint8_t)SFC_PPU2001_Sprite)
         sfc_render_sprites(famicom, data);
 }

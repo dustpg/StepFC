@@ -375,7 +375,7 @@ extern void main_render(void* rgba) {
     uint32_t palette[32];
     
     for (int i = 0; i != 32; ++i)
-        palette[i] = sfc_stdpalette[g_famicom->ppu.spindexes[i]];
+        palette[i] = sfc_stdpalette[g_famicom->ppu.data.spindexes[i]];
     // 镜像数据
     palette[4 * 1] = palette[0];
     palette[4 * 2] = palette[0];
@@ -404,8 +404,11 @@ const char SFC_SRAM_THIS_HEADER[16] = "-StepFC-SRAMWRAM";
 /// 生成文件
 /// </summary>
 /// <param name="buffer">The buffer.</param>
-static void sfc_make_sram_file_name(const sfc_rom_info_t* info, char buffer[256]) {
-    snprintf(buffer, 256, "save/%08X.sfc", info->prgrom_crc32b);
+static void sfc_make_file_name(
+    const sfc_rom_info_t* info, 
+    const char* folder, 
+    char buffer[256]) {
+    snprintf(buffer, 256, "%s/%08X.sfc", folder, info->prgrom_crc32b);
 }
 
 /// <summary>
@@ -415,7 +418,7 @@ static void sfc_make_sram_file_name(const sfc_rom_info_t* info, char buffer[256]
 /// <param name="info">The information.</param>
 /// <param name="ptr">The PTR.</param>
 void this_load_sram(void*arg, const sfc_rom_info_t* info, uint8_t* ptr) {
-    char buffer[256]; sfc_make_sram_file_name(info, buffer);
+    char buffer[256]; sfc_make_file_name(info, "save", buffer);
     FILE* const file = fopen(buffer, "rb");
     if (!file) return;
     char header[sizeof(SFC_SRAM_THIS_HEADER)];
@@ -458,7 +461,7 @@ void sfc_create_dir(const char* dir) {
 /// <param name="ptr">The PTR.</param>
 void this_save_sram(void*arg, const sfc_rom_info_t* info, const uint8_t* ptr) {
     sfc_create_dir("save");
-    char buffer[256]; sfc_make_sram_file_name(info, buffer);
+    char buffer[256]; sfc_make_file_name(info, "save", buffer);
     FILE* const file = fopen(buffer, "wb");
     if (!file) return;
     const size_t len = sizeof(((sfc_famicom_t*)0)->save_memory);
@@ -466,6 +469,9 @@ void this_save_sram(void*arg, const sfc_rom_info_t* info, const uint8_t* ptr) {
     const size_t count = fwrite(ptr, len, 1, file);
     fclose(file);
 }
+
+void sfc_sl_write_stream(void*, const uint8_t*, uint32_t);
+void sfc_sl_read_stream(void*, uint8_t*, uint32_t);
 
 /// <summary>
 /// 应用程序入口
@@ -489,6 +495,8 @@ int main() {
     interfaces.audio_changed = this_audio_event;
     interfaces.load_sram = this_load_sram;
     interfaces.save_sram = this_save_sram;
+    interfaces.sl_write_stream = sfc_sl_write_stream;
+    interfaces.sl_read_stream = sfc_sl_read_stream;
 
     sfc_famicom_t famicom;
     g_famicom = &famicom;
@@ -496,7 +504,7 @@ int main() {
     //qload();
 
     printf(
-        "ROM: PRG-RPM: %d x 16kb   CHR-ROM %d x 8kb   Mapper: %03d\n",
+        "ROM: PRG-ROM: %d x 16kb   CHR-ROM %d x 8kb   Mapper: %03d\n",
         (int)famicom.rom_info.count_prgrom16kb,
         (int)famicom.rom_info.count_chrrom_8kb,
         (int)famicom.rom_info.mapper_number
@@ -521,146 +529,58 @@ void user_input(int index, unsigned char data) {
     g_famicom->button_states[index] = data;
 }
 
+/// <summary>
+/// 接口: 写入流
+/// </summary>
+/// <param name="arg">The argument.</param>
+/// <param name="data">The data.</param>
+/// <param name="len">The length.</param>
+void sfc_sl_write_stream(void* arg, const uint8_t* data, uint32_t len) {
+    FILE* const file = arg;
+    // TODO: 错误处理
+    fwrite(data, len, 1, file);
+}
 
+/// <summary>
+/// 接口: 从流读
+/// </summary>
+/// <param name="arg">The argument.</param>
+/// <param name="data">The data.</param>
+/// <param name="len">The length.</param>
+void sfc_sl_read_stream(void* arg, uint8_t* data, uint32_t len) {
+    FILE* const file = arg;
+    // TODO: 错误处理
+    fread(data, len, 1, file);
+}
+
+/// <summary>
+/// 快速存档
+/// </summary>
 void qsave() {
-    FILE* const file = fopen("save.sfc", "wb");
+    sfc_create_dir("qsave");
+    const sfc_rom_info_t* const info = &g_famicom->rom_info;
+    char buffer[256]; sfc_make_file_name(info, "qsave", buffer);
+    FILE* const file = fopen(buffer, "wb");
     if (!file) return;
-    sfc_famicom_t buf;
-    buf = *g_famicom;
-    // BANK保存为偏移量
-    /*for (int i = 0; i != 4; ++i) {
-        buf.prg_banks[i]
-            = buf.prg_banks[i]
-            - buf.rom_info.data_prgrom
-            ;
-    }*/
-    // BANK保存为偏移量
-    for (int i = 4; i != 8; ++i) {
-        buf.prg_banks[i] 
-            = (size_t)(buf.prg_banks[i] 
-            - buf.rom_info.data_prgrom)
-            ;
-    }
-    // BANK保存为偏移量
-    for (int i = 0; i != 8; ++i) {
-        buf.ppu.banks[i]
-            = (size_t)(buf.ppu.banks[i]
-                - buf.rom_info.data_chrrom)
-            ;
-    }
-    // BANK保存为偏移量
-    for (int i = 8; i != 16; ++i) {
-        buf.ppu.banks[i]
-            = (size_t)(buf.ppu.banks[i]
-                - g_famicom->video_memory)
-            ;
-    }
-
-    fwrite(&buf, 1, sizeof(buf), file);
-    // 保存ROM数据以免有CHR-RAM
-    //fwrite(
-    //    g_famicom->rom_info.data_prgrom,
-    //    16 * 1024,
-    //    g_famicom->rom_info.count_prgrom16kb,
-    //    file
-    //);
-    fwrite(
-        g_famicom->rom_info.data_chrrom,
-        8 * 1024,
-        g_famicom->rom_info.count_chrrom_8kb | 1,
-        file
-    );
-    // 额外保存一次save memory
-    fwrite(buf.save_memory, 1, sizeof(buf.save_memory), file);
+    void* const old_arg = g_famicom->argument;
+    g_famicom->argument = file;
+    sfc_famicom_save_state(g_famicom);
+    g_famicom->argument = old_arg;
     fclose(file);
 }
 
+/// <summary>
+/// 快速读档
+/// </summary>
 void qload() {
-    FILE* const file = fopen("save.sfc", "rb");
+    const sfc_rom_info_t* const info = &g_famicom->rom_info;
+    char buffer[256]; sfc_make_file_name(info, "qsave", buffer);
+    FILE* const file = fopen(buffer, "rb");
     if (!file) return;
-    sfc_famicom_t buf;
-    fread(&buf, 1, sizeof(buf), file);
-
-    int load_save_memory = 0;
-    if (load_save_memory) {
-        memcpy(g_famicom->save_memory, buf.save_memory, sizeof(buf.save_memory));
-        fclose(file);
-        return;
-    }
-
-
-    memcpy(&buf.interfaces, &g_famicom->interfaces, sizeof(buf.interfaces));
-    memcpy(&buf.mapper, &g_famicom->mapper, sizeof(buf.mapper));
-    //memcpy(&buf.prg_banks, &g_famicom->prg_banks, sizeof(buf.prg_banks[0]) * 4);
-
-    for (int i = 0; i != 4; ++i) {
-        buf.prg_banks[i] = g_famicom->prg_banks[i];
-    }
-
-    buf.rom_info.data_prgrom = g_famicom->rom_info.data_prgrom;
-    buf.rom_info.data_chrrom = g_famicom->rom_info.data_chrrom;
-
-    memcpy(g_famicom, &buf, sizeof(buf));
-#if 0
-
-    //if (0) {
-    //    memcpy(g_famicom->save_memory, buf.save_memory, sizeof(buf.save_memory));
-    //    fclose(file);
-    //    return;
-    //}
-
-
-    g_famicom->registers = buf.registers;
-    g_famicom->cpu_cycle_count = buf.cpu_cycle_count;
-    g_famicom->apu = buf.apu;
-    g_famicom->mapper_buffer = buf.mapper_buffer;
-
-    g_famicom->ppu = buf.ppu;
-
-
-    memcpy(g_famicom->main_memory, buf.main_memory, sizeof(buf.main_memory));
-    memcpy(g_famicom->video_memory, buf.video_memory, sizeof(buf.main_memory));
-    memcpy(g_famicom->video_memory_ex, buf.video_memory_ex, sizeof(buf.main_memory));
-    memcpy(g_famicom->save_memory, buf.save_memory, sizeof(buf.save_memory));
-#endif
-    // TODO: 保存CHR-RAM
-
-    // BANK保存为偏移量
-    for (int i = 4; i != 8; ++i) {
-        g_famicom->prg_banks[i]
-            = (size_t)buf.prg_banks[i]
-            + g_famicom->rom_info.data_prgrom
-            ;
-    }
-    // BANK保存为偏移量
-    for (int i = 0; i != 8; ++i) {
-        g_famicom->ppu.banks[i]
-            = (size_t)g_famicom->ppu.banks[i]
-            + g_famicom->rom_info.data_chrrom
-            ;
-    }
-    // BANK保存为偏移量
-    for (int i = 8; i != 16; ++i) {
-        g_famicom->ppu.banks[i]
-            = (size_t)g_famicom->ppu.banks[i]
-            + g_famicom->video_memory
-            ;
-    }
-    //fread(
-    //    g_famicom->rom_info.data_prgrom,
-    //    16 * 1024,
-    //    g_famicom->rom_info.count_prgrom16kb,
-    //    file
-    //);
-    // 读取保存ROM数据以免有CHR-RAM
-
-    fread(
-        g_famicom->rom_info.data_chrrom,
-        8 * 1024,
-        g_famicom->rom_info.count_chrrom_8kb | 1,
-        file
-    );
-
+    void* const old_arg = g_famicom->argument;
+    g_famicom->argument = file;
+    sfc_famicom_load_state(g_famicom);
+    g_famicom->argument = old_arg;
     fclose(file);
 }
 

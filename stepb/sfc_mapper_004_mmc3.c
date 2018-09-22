@@ -264,7 +264,7 @@ extern inline void sfc_operation_IRQ_try(sfc_famicom_t* famicom);
 /// <param name="famicom">The famicom.</param>
 static void sfc_mapper_04_hsync(sfc_famicom_t* famicom) {
     //  打开渲染时?
-    if (!(famicom->ppu.mask & (
+    if (!(famicom->ppu.data.mask & (
         ((uint8_t)SFC_PPU2001_Back |
         (uint8_t)SFC_PPU2001_Sprite)
         ))) return;

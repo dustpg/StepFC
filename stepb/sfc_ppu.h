@@ -57,14 +57,8 @@ enum sfc_ppu_flag_sprite_attr {
 /// 
 /// </summary>
 typedef struct {
-    // 内存地址库
-    uint8_t*        banks[0x4000 / 0x0400];
     // 内存地址库 - 对比用
     //uint8_t*        banks_backup[0x4000 / 0x0400];
-#if 0
-    // VRAM 地址 15bit [调试用]
-    uint16_t        vdebug;
-#endif
     // VRAM 地址 15bit
     uint16_t        v;
     // 临时 VRAM 地址 15bit
@@ -92,6 +86,15 @@ typedef struct {
         // 精灵数据: 256B
         uint8_t     sprites[0x100];
     };
+} sfc_ppu_data_t;
+
+
+typedef struct {
+    // PPU 内存地址库
+    uint8_t*            banks[0x4000 / 0x0400];
+    // PPU 数据
+    sfc_ppu_data_t      data;
+
 } sfc_ppu_t;
 
 // backup banks

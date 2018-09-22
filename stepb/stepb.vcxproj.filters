@@ -102,6 +102,9 @@
     <ClCompile Include="sfc_state_sl.c">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="sfc_mapper_074_mmc3_mo.c">
+      <Filter>mapper</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="src">

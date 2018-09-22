@@ -86,7 +86,7 @@ typedef struct {
     // 水平同步
     void(*hsync)(sfc_famicom_t*);
     // 写入RAM到流
-    void(*write_ram_to_stream)(sfc_famicom_t*);
+    void(*write_ram_to_stream)(const sfc_famicom_t*);
     // 从流读取RAM
     void(*read_ram_from_stream)(sfc_famicom_t*);
 } sfc_mapper_t;

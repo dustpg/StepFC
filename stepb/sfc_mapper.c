@@ -15,10 +15,10 @@ extern inline sfc_ecode sfc_load_mapper_02(sfc_famicom_t* famicom);
 extern inline sfc_ecode sfc_load_mapper_03(sfc_famicom_t* famicom);
 // mapper004 - TxROM
 extern inline sfc_ecode sfc_load_mapper_04(sfc_famicom_t* famicom);
+// mapper074 - MMC3 魔改
+extern inline sfc_ecode sfc_load_mapper_4A(sfc_famicom_t* famicom);
 
 #define SFC_CASE_LOAD_MAPPER(id) case 0x##id: return sfc_load_mapper_##id(famicom);
-// 山寨版
-#define SFC_CASE_LOAD_MAPPER_SHANZHAI(id1, id2) case 0x##id1: return sfc_load_mapper_##id2(famicom);
 
 
 /// <summary>
@@ -32,8 +32,17 @@ static void sfc_mapper_hsync_defualt(sfc_famicom_t* famicom) {
 /// SFCs the mapper WRTS.
 /// </summary>
 /// <param name="famicom">The famicom.</param>
-static void sfc_mapper_wrts_defualt(sfc_famicom_t* famicom) {
+static void sfc_mapper_wrts_defualt(const sfc_famicom_t* famicom) {
+    // PRG-RAM 不考虑
 
+    // 没有CHR-ROM则表明全是CHR-RAM
+    if (!famicom->rom_info.count_chrrom_8kb) {
+        famicom->interfaces.sl_write_stream(
+            famicom->argument,
+            famicom->rom_info.data_chrrom,
+            8 * 1024
+        );
+    }
 }
 
 /// <summary>
@@ -41,7 +50,16 @@ static void sfc_mapper_wrts_defualt(sfc_famicom_t* famicom) {
 /// </summary>
 /// <param name="famicom">The famicom.</param>
 static void sfc_mapper_rrfs_defualt(sfc_famicom_t* famicom) {
+    // PRG-RAM 不考虑
 
+    // 没有CHR-ROM则表明全是CHR-RAM
+    if (!famicom->rom_info.count_chrrom_8kb) {
+        famicom->interfaces.sl_read_stream(
+            famicom->argument,
+            famicom->rom_info.data_chrrom,
+            8 * 1024
+        );
+    }
 }
 
 
@@ -64,7 +82,7 @@ extern sfc_ecode sfc_load_mapper(sfc_famicom_t* famicom, uint8_t id) {
         SFC_CASE_LOAD_MAPPER(02);
         SFC_CASE_LOAD_MAPPER(03);
         SFC_CASE_LOAD_MAPPER(04);
-        SFC_CASE_LOAD_MAPPER_SHANZHAI(4A, 04);
+        SFC_CASE_LOAD_MAPPER(4A);
     }
     assert(!"NO MAPPER");
     return SFC_ERROR_MAPPER_NOT_FOUND;

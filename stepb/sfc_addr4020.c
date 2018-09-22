@@ -297,15 +297,15 @@ extern inline void sfc_write_cpu_address4020(uint16_t address, uint8_t data, sfc
         return;
     case 0x14:
         // 精灵RAM直接储存器访问
-        if (famicom->ppu.oamaddr) {
-            uint8_t* dst = famicom->ppu.sprites;
-            const uint8_t len = famicom->ppu.oamaddr;
+        if (famicom->ppu.data.oamaddr) {
+            uint8_t* dst = famicom->ppu.data.sprites;
+            const uint8_t len = famicom->ppu.data.oamaddr;
             const uint8_t* src = sfc_get_dma_address(data, famicom);
             // 需要换行
             memcpy(dst, src + len, len);
             memcpy(dst + len, src, 256 - len);
         }
-        else memcpy(famicom->ppu.sprites, sfc_get_dma_address(data, famicom), 256);
+        else memcpy(famicom->ppu.data.sprites, sfc_get_dma_address(data, famicom), 256);
         famicom->cpu_cycle_count += 513;
         famicom->cpu_cycle_count += famicom->cpu_cycle_count & 1;
         return;

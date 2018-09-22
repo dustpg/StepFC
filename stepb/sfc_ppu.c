@@ -7,7 +7,7 @@
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="data">The data.</param>
-/// <param name="ppu">The ppu-></param>
+/// <param name="ppu">The ppu->data.</param>
 uint8_t sfc_read_ppu_address(uint16_t address, sfc_ppu_t* ppu) {
     const uint16_t real_address = address & (uint16_t)0x3FFF;
     // 使用BANK读取
@@ -15,8 +15,8 @@ uint8_t sfc_read_ppu_address(uint16_t address, sfc_ppu_t* ppu) {
         const uint16_t index = real_address >> 10;
         const uint16_t offset = real_address & (uint16_t)0x3FF;
         assert(ppu->banks[index]);
-        const uint8_t data = ppu->pseudo;
-        ppu->pseudo = ppu->banks[index][offset];
+        const uint8_t data = ppu->data.pseudo;
+        ppu->data.pseudo = ppu->banks[index][offset];
         return data;
     }
     // 调色板索引
@@ -26,9 +26,9 @@ uint8_t sfc_read_ppu_address(uint16_t address, sfc_ppu_t* ppu) {
         const uint16_t index = real_address >> 10;
         const uint16_t offset = real_address & (uint16_t)0x3FF;
         assert(ppu->banks[index]);
-        ppu->pseudo = ppu->banks[index][offset];
+        ppu->data.pseudo = ppu->banks[index][offset];
         // 读取调色板能返回即时值
-        return ppu->spindexes[real_address & (uint16_t)0x1f];
+        return ppu->data.spindexes[real_address & (uint16_t)0x1f];
     }
 }
 
@@ -37,7 +37,7 @@ uint8_t sfc_read_ppu_address(uint16_t address, sfc_ppu_t* ppu) {
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="data">The data.</param>
-/// <param name="ppu">The ppu-></param>
+/// <param name="ppu">The ppu->data.</param>
 void sfc_write_ppu_address(uint16_t address, uint8_t data, sfc_ppu_t* ppu) {
     const uint16_t real_address = address & (uint16_t)0x3FFF;
     // 使用BANK写入
@@ -51,13 +51,13 @@ void sfc_write_ppu_address(uint16_t address, uint8_t data, sfc_ppu_t* ppu) {
     else {
         // 独立地址
         if (real_address & (uint16_t)0x03) {
-            ppu->spindexes[real_address & (uint16_t)0x1f] = data;
+            ppu->data.spindexes[real_address & (uint16_t)0x1f] = data;
         }
         // 镜像$3F00/$3F04/$3F08/$3F0C
         else {
             const uint16_t offset = real_address & (uint16_t)0x0f;
-            ppu->spindexes[offset] = data;
-            ppu->spindexes[offset | (uint16_t)0x10] = data;
+            ppu->data.spindexes[offset] = data;
+            ppu->data.spindexes[offset | (uint16_t)0x10] = data;
         }
     }
 }
@@ -67,7 +67,7 @@ void sfc_write_ppu_address(uint16_t address, uint8_t data, sfc_ppu_t* ppu) {
 /// StepFC: 使用CPU地址空间读取PPU寄存器
 /// </summary>
 /// <param name="address">The address.</param>
-/// <param name="ppu">The ppu-></param>
+/// <param name="ppu">The ppu->data.</param>
 /// <returns></returns>
 uint8_t sfc_read_ppu_register_via_cpu(uint16_t address, sfc_ppu_t* ppu) {
     uint8_t data = 0x00;
@@ -85,11 +85,11 @@ uint8_t sfc_read_ppu_register_via_cpu(uint16_t address, sfc_ppu_t* ppu) {
     case 2:
         // 0x2002: Status ($2002) < read
         // 只读状态寄存器
-        data = ppu->status;
+        data = ppu->data.status;
         // 读取后会清除VBlank状态
-        ppu->status &= ~(uint8_t)SFC_PPU2002_VBlank;
+        ppu->data.status &= ~(uint8_t)SFC_PPU2002_VBlank;
         // wiki.nesdev.com/w/index.php/PPU_scrolling:  $2002 read
-        ppu->w = 0;
+        ppu->data.w = 0;
         break;
     case 3:
         // 0x2003: OAM address port ($2003) > write
@@ -101,8 +101,8 @@ uint8_t sfc_read_ppu_register_via_cpu(uint16_t address, sfc_ppu_t* ppu) {
         // 读写寄存器
 
         // - [???] Address should not increment on $2004 read 
-        //data = ppu->sprites[ppu->oamaddr++];
-        data = ppu->sprites[ppu->oamaddr];
+        //data = ppu->data.sprites[ppu->data.oamaddr++];
+        data = ppu->data.sprites[ppu->data.oamaddr];
         break;
     case 5:
         // 0x2005: Scroll ($2005) >> write x2
@@ -115,10 +115,10 @@ uint8_t sfc_read_ppu_register_via_cpu(uint16_t address, sfc_ppu_t* ppu) {
     case 7:
         // 0x2007: Data ($2007) <> read/write
         // PPU VRAM读写端口
-        //assert(ppu->vdebug == ppu->v);
-        data = sfc_read_ppu_address(ppu->v, ppu);
-        ppu->v += (uint16_t)((ppu->ctrl & SFC_PPU2000_VINC32) ? 32 : 1);
-        //ppu->vdebug += (uint16_t)((ppu->ctrl & SFC_PPU2000_VINC32) ? 32 : 1);
+        //assert(ppu->data.vdebug == ppu->data.v);
+        data = sfc_read_ppu_address(ppu->data.v, ppu);
+        ppu->data.v += (uint16_t)((ppu->data.ctrl & SFC_PPU2000_VINC32) ? 32 : 1);
+        //ppu->data.vdebug += (uint16_t)((ppu->data.ctrl & SFC_PPU2000_VINC32) ? 32 : 1);
         break;
     }
     return data;
@@ -130,7 +130,7 @@ uint8_t sfc_read_ppu_register_via_cpu(uint16_t address, sfc_ppu_t* ppu) {
 /// </summary>
 /// <param name="ppu">The ppu.</param>
 //extern inline void sfc_ppu_bankup_banks(sfc_ppu_t* ppu) {
-//    memcpy(ppu->banks_backup, ppu->banks, sizeof(ppu->banks));
+//    memcpy(ppu->data.banks_backup, ppu->data.banks, sizeof(ppu->data.banks));
 //}
 
 /// <summary>
@@ -138,22 +138,22 @@ uint8_t sfc_read_ppu_register_via_cpu(uint16_t address, sfc_ppu_t* ppu) {
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="data">The data.</param>
-/// <param name="ppu">The ppu-></param>
+/// <param name="ppu">The ppu->data.</param>
 void sfc_write_ppu_register_via_cpu(uint16_t address, uint8_t data, sfc_ppu_t* ppu) {
     switch (address & (uint16_t)0x7)
     {
     case 0:
         // PPU 控制寄存器
         // 0x2000: Controller ($2000) > write
-        ppu->ctrl = data;
+        ppu->data.ctrl = data;
 
         // t: ....BA.. ........ = d: ......BA
-        ppu->t = (ppu->t & (uint16_t)0xF3FF) | (((uint16_t)data & 0x03) << 10);
+        ppu->data.t = (ppu->data.t & (uint16_t)0xF3FF) | (((uint16_t)data & 0x03) << 10);
         break;
     case 1:
         // PPU 掩码寄存器
         // 0x2001: Mask ($2001) > write
-        ppu->mask = data;
+        ppu->data.mask = data;
         break;
     case 2:
         // 0x2002: Status ($2002) < read
@@ -163,60 +163,60 @@ void sfc_write_ppu_register_via_cpu(uint16_t address, uint8_t data, sfc_ppu_t* p
     case 3:
         // 0x2003: OAM address port ($2003) > write
         // PPU OAM 地址端口
-        ppu->oamaddr = data;
+        ppu->data.oamaddr = data;
         break;
     case 4:
         // 0x2004: OAM data ($2004) <> read/write
         // PPU OAM 数据端口
-        ppu->sprites[ppu->oamaddr++] = data;
+        ppu->data.sprites[ppu->data.oamaddr++] = data;
         break;
     case 5:
         // 0x2005: Scroll ($2005) >> write x2
         // PPU 滚动位置寄存器 - 双写
-        if (ppu->w) {
+        if (ppu->data.w) {
             // t: .CBA..HG FED..... = d: HGFEDCBA
             // w:                   = 0
-            ppu->t = (ppu->t & (uint16_t)0x8FFF) | (((uint16_t)data & 0x07) << 12);
-            ppu->t = (ppu->t & (uint16_t)0xFC1F) | (((uint16_t)data & 0xF8) << 2);
-            ppu->w = 0;
+            ppu->data.t = (ppu->data.t & (uint16_t)0x8FFF) | (((uint16_t)data & 0x07) << 12);
+            ppu->data.t = (ppu->data.t & (uint16_t)0xFC1F) | (((uint16_t)data & 0xF8) << 2);
+            ppu->data.w = 0;
         }
         else {
             // t: ........ ...HGFED = d: HGFED...
             // x:               CBA = d: .....CBA
             // w:                   = 1
-            ppu->t = (ppu->t & (uint16_t)0xFFE0) | ((uint16_t)data >> 3);
-            ppu->x = data & 0x07;
-            ppu->w = 1;
+            ppu->data.t = (ppu->data.t & (uint16_t)0xFFE0) | ((uint16_t)data >> 3);
+            ppu->data.x = data & 0x07;
+            ppu->data.w = 1;
         }
         break;
     case 6:
         // 0x2006: Address ($2006) >> write x2
         // PPU 地址寄存器 - 双写
         // 写入高字节
-        if (ppu->w) {
+        if (ppu->data.w) {
             // t: ........ HGFEDCBA = d: HGFEDCBA
             // v                    = t
             // w:                   = 0
-            ppu->t = (ppu->t & (uint16_t)0xFF00) | (uint16_t)data;
-            ppu->v = ppu->t;
-            //ppu->vdebug = ppu->v;
-            ppu->w = 0;
+            ppu->data.t = (ppu->data.t & (uint16_t)0xFF00) | (uint16_t)data;
+            ppu->data.v = ppu->data.t;
+            //ppu->data.vdebug = ppu->data.v;
+            ppu->data.w = 0;
         }
         else {
             // t: ..FEDCBA ........ = d: ..FEDCBA
             // t: .X...... ........ = 0
             // w:                   = 1
-            ppu->t = (ppu->t & (uint16_t)0x80FF) | (((uint16_t)data & 0x3F) << 8);
-            ppu->w = 1;
+            ppu->data.t = (ppu->data.t & (uint16_t)0x80FF) | (((uint16_t)data & 0x3F) << 8);
+            ppu->data.w = 1;
         }
         break;
     case 7:
         // 0x2007: Data ($2007) <> read/write
         // PPU VRAM数据端
-        //assert(ppu->vdebug == ppu->v);
-        sfc_write_ppu_address(ppu->v, data, ppu);
-        ppu->v += (uint16_t)((ppu->ctrl & SFC_PPU2000_VINC32) ? 32 : 1);
-        //ppu->vdebug += (uint16_t)((ppu->ctrl & SFC_PPU2000_VINC32) ? 32 : 1);
+        //assert(ppu->data.vdebug == ppu->data.v);
+        sfc_write_ppu_address(ppu->data.v, data, ppu);
+        ppu->data.v += (uint16_t)((ppu->data.ctrl & SFC_PPU2000_VINC32) ? 32 : 1);
+        //ppu->data.vdebug += (uint16_t)((ppu->data.ctrl & SFC_PPU2000_VINC32) ? 32 : 1);
         break;
     }
 }
@@ -229,15 +229,15 @@ void sfc_write_ppu_register_via_cpu(uint16_t address, uint8_t data, sfc_ppu_t* p
 void sfc_ppu_do_under_cycle256(sfc_ppu_t* ppu) {
     // http://wiki.nesdev.com/w/index.php/PPU_scrolling#Wrapping_around
 
-    if ((ppu->v & 0x7000) != 0x7000) {
-        ppu->v += 0x1000;
+    if ((ppu->data.v & 0x7000) != 0x7000) {
+        ppu->data.v += 0x1000;
     }
     else {
-        ppu->v &= 0x8FFF;
-        uint16_t y = (ppu->v & 0x03E0) >> 5;
+        ppu->data.v &= 0x8FFF;
+        uint16_t y = (ppu->data.v & 0x03E0) >> 5;
         if (y == 29) {
             y = 0;
-            ppu->v ^= 0x0800;
+            ppu->data.v ^= 0x0800;
         }
         else if (y == 31) {
             y = 0;
@@ -246,7 +246,7 @@ void sfc_ppu_do_under_cycle256(sfc_ppu_t* ppu) {
             y++;
         }
         // put coarse Y back into v
-        ppu->v = (ppu->v & 0xFC1F) | (y << 5);
+        ppu->data.v = (ppu->data.v & 0xFC1F) | (y << 5);
     }
 }
 
@@ -256,7 +256,7 @@ void sfc_ppu_do_under_cycle256(sfc_ppu_t* ppu) {
 /// <param name="ppu">The ppu.</param>
 void sfc_ppu_do_under_cycle257(sfc_ppu_t* ppu) {
     // v: .....F.. ...EDCBA = t: .....F.. ...EDCBA
-    ppu->v = (ppu->v & (uint16_t)0xFBE0) | (ppu->t & (uint16_t)0x041F);
+    ppu->data.v = (ppu->data.v & (uint16_t)0xFBE0) | (ppu->data.t & (uint16_t)0x041F);
 }
 
 
@@ -266,7 +266,7 @@ void sfc_ppu_do_under_cycle257(sfc_ppu_t* ppu) {
 /// <param name="ppu">The ppu.</param>
 void sfc_ppu_do_end_of_vblank(sfc_ppu_t* ppu) {
     // v: .....F.. ...EDCBA = t: .....F.. ...EDCBA
-    ppu->v = (ppu->v & (uint16_t)0x841F) | (ppu->t & (uint16_t)0x7BE0);
+    ppu->data.v = (ppu->data.v & (uint16_t)0x841F) | (ppu->data.t & (uint16_t)0x7BE0);
 }
 
 /// <summary>

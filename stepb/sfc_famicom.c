@@ -17,7 +17,8 @@ extern sfc_ecode sfc_load_mapper(sfc_famicom_t* famicom, uint8_t);
 static void sfc_audio_changed(void*a, uint32_t b, int c) {}
 // 默认SRAM读写事件
 static void sfc_save_load_sram(void*a, const sfc_rom_info_t*b, const uint8_t*c) {}
-
+// 默认状态读写事件
+static void sfc_sl_stream(void*a, const uint8_t* b, uint32_t c) {}
 // 声明一个随便(SB)的函数指针类型
 typedef void(*sfc_funcptr_t)();
 
@@ -44,6 +45,8 @@ sfc_ecode sfc_famicom_init(
     famicom->interfaces.audio_changed = sfc_audio_changed;
     famicom->interfaces.load_sram = sfc_save_load_sram;
     famicom->interfaces.save_sram = sfc_save_load_sram;
+    famicom->interfaces.sl_write_stream = sfc_sl_stream;
+    famicom->interfaces.sl_read_stream = sfc_sl_stream;
     // 初步BANK
     famicom->prg_banks[0] = famicom->main_memory;
     famicom->prg_banks[3] = famicom->save_memory;
@@ -209,9 +212,7 @@ extern uint32_t sfc_crc32b(uint32_t input, const void *buf, size_t bufLen);
 /// <returns></returns>
 sfc_ecode sfc_load_default_rom(void* arg, sfc_rom_info_t* info) {
     assert(info->data_prgrom == NULL && "FREE FIRST");
-    //FILE * const file = fopen("D:/doc/fcrom/MetalMax.NES", "rb");
-    //FILE* const file = fopen("cpu_interrupts.nes", "rb");
-    FILE* const file = fopen("D:/doc/fcrom/Super_mario_brothers3.nes", "rb");
+    FILE* const file = fopen("cpu_interrupts.nes", "rb");
     // 文本未找到
     if (!file) return SFC_ERROR_FILE_NOT_FOUND;
     sfc_ecode code = SFC_ERROR_ILLEGAL_FILE;
