@@ -1,0 +1,126 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="src">
+      <UniqueIdentifier>{17e62427-f400-43fd-bf6c-8788aa71143f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src_b">
+      <UniqueIdentifier>{c6939d4c-5ad2-486c-b59f-9fadf22ef003}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="header_b">
+      <UniqueIdentifier>{e57b18c0-5945-4f2f-963b-ab30d6695f37}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="mapper_b">
+      <UniqueIdentifier>{f21547cc-8d1f-4d9a-98d4-f37a60883628}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="cpp">
+      <UniqueIdentifier>{b65e9406-166e-410e-a54b-fc0e5e112870}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="main.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\stepb\sfc_6502.c">
+      <Filter>src_b</Filter>
+    </ClCompile>
+    <ClCompile Include="..\stepb\sfc_addr4020.c">
+      <Filter>src_b</Filter>
+    </ClCompile>
+    <ClCompile Include="..\stepb\sfc_config.c">
+      <Filter>src_b</Filter>
+    </ClCompile>
+    <ClCompile Include="..\stepb\sfc_cpu.c">
+      <Filter>src_b</Filter>
+    </ClCompile>
+    <ClCompile Include="..\stepb\sfc_crc32b.c">
+      <Filter>src_b</Filter>
+    </ClCompile>
+    <ClCompile Include="..\stepb\sfc_famicom.c">
+      <Filter>src_b</Filter>
+    </ClCompile>
+    <ClCompile Include="..\stepb\sfc_mapper.c">
+      <Filter>src_b</Filter>
+    </ClCompile>
+    <ClCompile Include="..\stepb\sfc_play_ez.c">
+      <Filter>src_b</Filter>
+    </ClCompile>
+    <ClCompile Include="..\stepb\sfc_ppu.c">
+      <Filter>src_b</Filter>
+    </ClCompile>
+    <ClCompile Include="..\stepb\sfc_render_ez.c">
+      <Filter>src_b</Filter>
+    </ClCompile>
+    <ClCompile Include="..\stepb\sfc_state_sl.c">
+      <Filter>src_b</Filter>
+    </ClCompile>
+    <ClCompile Include="..\stepb\sfc_mapper_001_mmc1.c">
+      <Filter>mapper_b</Filter>
+    </ClCompile>
+    <ClCompile Include="..\stepb\sfc_mapper_002_uxrom.c">
+      <Filter>mapper_b</Filter>
+    </ClCompile>
+    <ClCompile Include="..\stepb\sfc_mapper_003_cnrom.c">
+      <Filter>mapper_b</Filter>
+    </ClCompile>
+    <ClCompile Include="..\stepb\sfc_mapper_004_mmc3.c">
+      <Filter>mapper_b</Filter>
+    </ClCompile>
+    <ClCompile Include="..\stepb\sfc_mapper_074_mmc3_mo.c">
+      <Filter>mapper_b</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\xa2_play1.cpp">
+      <Filter>cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\d2d_draw2.cpp">
+      <Filter>cpp</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\stepb\sfc_6502.h">
+      <Filter>header_b</Filter>
+    </ClInclude>
+    <ClInclude Include="..\stepb\sfc_apu.h">
+      <Filter>header_b</Filter>
+    </ClInclude>
+    <ClInclude Include="..\stepb\sfc_config.h">
+      <Filter>header_b</Filter>
+    </ClInclude>
+    <ClInclude Include="..\stepb\sfc_cpu.h">
+      <Filter>header_b</Filter>
+    </ClInclude>
+    <ClInclude Include="..\stepb\sfc_famicom.h">
+      <Filter>header_b</Filter>
+    </ClInclude>
+    <ClInclude Include="..\stepb\sfc_mapper.h">
+      <Filter>header_b</Filter>
+    </ClInclude>
+    <ClInclude Include="..\stepb\sfc_mapper_helper.h">
+      <Filter>header_b</Filter>
+    </ClInclude>
+    <ClInclude Include="..\stepb\sfc_play.h">
+      <Filter>header_b</Filter>
+    </ClInclude>
+    <ClInclude Include="..\stepb\sfc_ppu.h">
+      <Filter>header_b</Filter>
+    </ClInclude>
+    <ClInclude Include="..\stepb\sfc_rom.h">
+      <Filter>header_b</Filter>
+    </ClInclude>
+    <ClInclude Include="..\stepb\sfc_code.h">
+      <Filter>header_b</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\d2d_interface2.h">
+      <Filter>cpp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\p_XAudio2_7.h">
+      <Filter>cpp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\p_XAudio2_base.h">
+      <Filter>cpp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\xa2_interface1.h">
+      <Filter>cpp</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

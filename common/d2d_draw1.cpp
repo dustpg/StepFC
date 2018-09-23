@@ -12,7 +12,7 @@
 #include <cassert>
 #include <iterator>
 #include <algorithm>
-#include "d2d_interface.h"
+#include "d2d_interface1.h"
 
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "dxguid.lib")
