@@ -31,18 +31,6 @@ void extra_buffer() {
 }
 
 
-/// <summary>
-/// 每次重新开始播放, 提交预先缓存
-/// </summary>
-void buffer_the_sound() {
-    xa2_flush_buffer();
-    extra_buffer();
-    extra_buffer();
-}
-
-
-
-
 extern void sfc_render_frame_easy(
     sfc_famicom_t* famicom, 
     uint8_t* buffer
@@ -50,7 +38,7 @@ extern void sfc_render_frame_easy(
 
 enum {
     IB_IS_RECORD = 0,
-    IB_IS_REPLAY = 1,
+    IB_IS_REPLAY = 0,
 };
 
 struct interface_audio_state {
@@ -551,7 +539,7 @@ void sfc_sl_read_stream(void*, uint8_t*, uint32_t);
 /// </summary>
 /// <returns></returns>
 int main() {
-    //void make_mario_jump(); make_mario_jump(); return 0;
+    printf("Battle Control Online! \n");
     memset(&g_states, 0, sizeof(g_states));
     g_states.square1.period = 1;
     g_states.square2.period = 1;
@@ -587,12 +575,12 @@ int main() {
         (int)famicom.rom_info.mapper_number
     );
     xa2_init(SAMPLES_PER_SEC);
-    buffer_the_sound();
     main_cpp();
     xa2_clean();
     ib_try_save_record();
     free(g_states.input_buffer_1mb);
     sfc_famicom_uninit(&famicom);
+    printf("Battle Control Terminated! \n");
     return 0;
 }
 
