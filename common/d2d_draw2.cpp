@@ -312,71 +312,7 @@ bool InitD3D(HWND hwnd) noexcept {
             uint32_t buf[CARD_WIDTH*CARD_HEIGHT];
             const auto count = std::fread(buf, sizeof(uint32_t), CARD_WIDTH*CARD_HEIGHT, file);
             std::fclose(file);
-#if 0
-            [&]() noexcept {
 
-                const auto ptr = std::malloc(CARD_WIDTH*CARD_HEIGHT * 9 * 4);
-                if (!ptr) return;
-                const auto write_to = reinterpret_cast<uint32_t*>(ptr);
-                for (uint32_t y = 1; y != 63; ++y) {
-                    for (uint32_t x = 1; x != 127; ++x) {
-                        const uint32_t i = x + y * 128;
-                        const auto A = buf[i-129];
-                        const auto B = buf[i-128];
-                        const auto C = buf[i-127];
-                        const auto D = buf[i-1];
-                        const auto E = buf[i];
-                        const auto F = buf[i+1];
-                        const auto G = buf[i+127];
-                        const auto H = buf[i+128];
-                        const auto I = buf[i+129];
-
-                        uint32_t E0, E1, E2, E3, E4, E5, E6, E7, E8;
-
-                        if (B != H && D != F) {
-                            E0 = D == B ? D : E;
-                            E1 = (D == B && E != C) || (B == F && E != A) ? B : E;
-                            E2 = B == F ? F : E;
-                            E3 = (D == B && E != G) || (D == H && E != A) ? D : E;
-                            E4 = E;
-                            E5 = (B == F && E != I) || (H == F && E != C) ? F : E;
-                            E6 = D == H ? D : E;
-                            E7 = (D == H && E != I) || (H == F && E != G) ? H : E;
-                            E8 = H == F ? F : E;
-                        }
-                        else {
-                            E0 = E;
-                            E1 = E;
-                            E2 = E;
-                            E3 = E;
-                            E4 = E;
-                            E5 = E;
-                            E6 = E;
-                            E7 = E;
-                            E8 = E;
-                        }
-                        const uint32_t base = x * 3 + (y * 3) * 128 * 3;
-
-                        write_to[base + 0 + 128 * 3 * 0] = E0;
-                        write_to[base + 1 + 128 * 3 * 0] = E1;
-                        write_to[base + 2 + 128 * 3 * 0] = E2;
-
-                        write_to[base + 0 + 128 * 3 * 1] = E3;
-                        write_to[base + 1 + 128 * 3 * 1] = E4;
-                        write_to[base + 2 + 128 * 3 * 1] = E5;
-
-                        write_to[base + 0 + 128 * 3 * 2] = E6;
-                        write_to[base + 1 + 128 * 3 * 2] = E7;
-                        write_to[base + 2 + 128 * 3 * 2] = E8;
-                    }
-                }
-                if (const auto out = std::fopen("out.data", "wb")) {
-                    std::fwrite(ptr, 1, CARD_WIDTH*CARD_HEIGHT * 9 * 4, out);
-                    std::fclose(out);
-                }
-                std::free(ptr);
-            }();
-#endif
             D2D1_BITMAP_PROPERTIES1 properties = D2D1::BitmapProperties1(
                 D2D1_BITMAP_OPTIONS_NONE,
                 D2D1::PixelFormat(DXGI_FORMAT_R8G8B8A8_UNORM, D2D1_ALPHA_MODE_IGNORE)
@@ -420,5 +356,3 @@ void ClearD3D() noexcept {
     ::SafeRelease(g_data.device);
     ::SafeRelease(g_data.swap_chain);
 }
-
-
