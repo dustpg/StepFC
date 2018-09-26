@@ -41,7 +41,7 @@
 后面还有4倍的一些算法, 4x4就是16倍, 用CPU处理自然略慢, 就用着色器处理吧, 这里就用比较熟悉的HLSL实现.
 
 
-### EPX/Scale2×/AdvMAME2×
+### Scale2x
 [www.scale2x.it](http://www.scale2x.it)
 
 看名字就知道这个算法是将分辨率提高至2倍
@@ -170,7 +170,7 @@ E7 = (D == H && D != B && H != F && E != I) || (H == F && D != H && B != F && E 
 E8 = H == F && D != H && B != F ? F : E;
 ```
 
-同样, 直接"拿来"未做针对着色器的优化. 效果如下...同样还是像素着色器效率更好, 不过差距小了一点, 测试256x240效率就差不多了.
+同样, 直接"拿来"未做针对着色器的优化. 效果如下...同样还是像素着色器效率更好, 不过差距小了一点, 256x240的话, 效率就差不多了.
 
 ![scale3x](./scale3x.png)
 (scale3x后2倍最邻插值)
@@ -182,9 +182,11 @@ E8 = H == F && D != H && B != F ? F : E;
 可也看出"圆"处理得比2x好, 其他的很一般了. 特别是中间的那个分割线, 还以为自己实现有问题, 找了很久, 然后用作者自己写的程序跑了一下还是一样的, 2X也有这种情况但是不明显, 估计放大倍数越大越明显.
 
 ### ScaleNx
-可以看出ScaleNx优点是: 容易实现, 不会引入新的颜色. 不会引入新的颜色这一点算是有得有失吧, 处理后还是像素风.
+可以看出ScaleNx优点是: 容易实现, 不会引入新的颜色. 不会引入新的颜色这一点算是有得有失吧, 处理后还是像素风. 比如有一个很不错的算法只能放大到4倍, 现在要放大至8倍, 可以先用Scale2x处理再用那个算法.
 
-还有有人(Sp00kyFox)根据ScaleNx改进(效果上)算法, 称为ScaleNxSFX, 增加了对于旁边点的判断范围, 以及基于Scale3x深度改进ScaleFX-rAA和ScaleFX-Hybrid.
+还有有人(Sp00kyFox)根据ScaleNx改进(效果上)算法, 称为ScaleNxSFX, 增加了对于旁边点的判断范围, 以及基于Scale3x深度改进(It was originally intended as an improvement upon Scale3x but became a new filter in its own right)而形成的, 还有ScaleFX-rAA和ScaleFX-Hybrid两个额外处理. 这个算法比较新, 到最近(本文初稿于2018-09-24)作者似乎还在更新, 所以效果[应该不错](https://forums.libretro.com/t/scalenx-artifact-removal-and-algorithm-improvement/1686/132), 没准还有新的算法会在这个主题出现. 
+
+以及guest(r)基于Scale2x派生的Scale2xPlus, 这家伙在07年派生出这个算法, 但是居然也出现在了那个主题讨论中.
 
 ### REF
  - [Pixel Scalers](http://www.datagenetics.com/blog/december32013/index.html)

@@ -67,7 +67,7 @@ float4 eagle2x(uint2 pos) {
 
 通过阅读源代码, emmm, 上古代码, 还是16bit的颜色, 对于显卡用的float4感觉差了一个世纪.
 
-sai2x有一个重要步骤: 插值, 会生成新的颜色, 作者实现的插值感觉很魔幻(实际就是右移看作除以2, 然后提前打码避免移动到其他颜色通道, 都是奇数的话会产生1的误差, 所以再做了低位处理, 值得学习), 这里由于是```float4```直接取平均值.
+sai2x有一个重要步骤: 插值, 会生成新的颜色. 作者实现的插值感觉很不错, 值得学习, 不过这里由于是```float4```直接取平均值.
 
 ```
 I|E F|J
@@ -119,18 +119,15 @@ M|N O|P
         ENDIF
         IF A == B AND A == H AND G != C AND C == M, THEN
             A2 = A
-        ELSIF C == G AND C == D && A != H AND A == I, THEN
+        ELSIF C == G AND C == D AND A != H AND A == I, THEN
             A2 = C
         ELSE
             A2 = INTERPOLATE(A, C)
         ENDIF
-        A3 = INTERPOLATE4(A, B, C, D);
+        A3 = INTERPOLATE(A, B, C, D);
     ENDIF
 ```
-可以看出作者将图像分为几个情况分别处理, 比如最外面的4个分支分别对应, 这个点可能是'\', '/', 'X', 以及其他情况. 导致分支非常多, 中间还有一个作者自己发明的插值公式, 在这简写为```A3_SP_PROC```.
-
-
-由于分支实在太多, 自己有可能重写错了, 如果错了的话, 这个算法算是自己派生的, 这个理由不错. 自己没错, 错的是键盘.
+可以看出作者将图像分为几个情况分别处理, 比如最外面的4个分支分别对应, 这个点可能是'\', '/', 'X', 以及其他情况, 导致分支非常多. 中间还有一个作者自己发明的插值公式, 在这简写为```A3_SP_PROC```. 由于分支实在太多, 自己有可能重写错了.
 
 ![sai2x](./sai2x.png)
 (sai2x后4倍最邻插值)
@@ -142,6 +139,139 @@ M|N O|P
 
 可以看出因为A0点总是原来值, 所以放大后看起来像是往左上角偏了一个像素. 由于插值, 新加入了中间色, 实际上以100%比例看更合适, 所以像素风不再.
 
-对于圆的处理效果很不错, 单独的点被处理成'星'状. 效果最差的是'点状网', 中间和边缘的效果不一致. 
+对于圆的处理效果很不错, 单独的点被处理成'星(+)'状, 要知道这是一个2倍的缩放, '+'是三个像素的. 效果最差的是'点状网', 主要是中间和边缘的效果不一致. 
+
+### SuperEagle
+作者同2xSaI的Kreed. 针对Eagle算法做出了改进.
+```
+原称呼:
+   B1 B2
+4  5  6  S2
+1  2  3  S1
+   A1 A2
+改为:
+   A B
+ C D E F     D -\ D0 D1
+ G H I J       -/ D2 D3
+   K L
+
+    IF H == E AND D != I, THEN
+        D1 = D2 = H
+        IF G == H OR E == B, THEN
+            D0 = INTERPOLATE(H, INTERPOLATE(H, D))
+        ELSE
+            D0 = INTERPOLATE(D, E)
+        ENDIF
+
+        IF E == F OR H == K, THEN
+            D3 = INTERPOLATE(H, INTERPOLATE(H, I))
+        ELSE
+            D3 = INTERPOLATE(H, I)
+        ENDIF
+    ELSIF D == I AND H != E, THEN
+        D3 = D0 = D
+
+        IF A == D OR F == J, THEN
+            D1 = INTERPOLATE(D, INTERPOLATE(D, E))
+        ELSE
+            D1 = INTERPOLATE(D, E)
+        ENDIF
+
+        IF I == L OR C == D, THEN
+            D2 = INTERPOLATE(D, INTERPOLATE(D, H))
+        ELSE
+            D2 = INTERPOLATE(H, I)
+        ENDIF
+    ELSIF D == I AND H == E, THEN
+        D0D1D2D3_SP_POC(A, B, C, D, ...)
+    ELSE 
+        D3 = D0 = INTERPOLATE(H, E)
+        D3 = INTERPOLATE(I, I, I, D3)
+        D0 = INTERPOLATE(D, D, D, D0)
+
+        D2 = D1 = INTERPOLATE(D, I)
+        D2 = INTERPOLATE(H, H, H, D2)
+        D1 = INTERPOLATE(E, E, E, D1)
+    ENDIF
+```
+
+有两次插值的地方, float4的话可以直接```A*0.75+B*0.25```, 也有类似sai2x的地方, 作者自己发明的插值算法, 这里用```D0D1D2D3_SP_POC```代替.
+
+![supereagle2x](./supereagle2x.png)
+(supereagle后4倍最邻插值)
+
+既然是Eagle的'升级版', 就和Eagle比较吧.
+
+
+![supereagle2x_vs](./supereagle2x_vs.gif)
+
+可以看出作者很喜欢插值, 把Eagle不会引入新颜色的特点去掉了. 不过顺带解决了Eagle的BUG, 也就是消失的单独点, 代替的是颜色浅了, 变成25%, 不过也变成4倍. 当然, 也有像素偏移的现象.
+
+### Super2xSaI
+```Super2xSaI```, 这里称为supersai2x, 作者同2xSaI的Kreed, 针对```2xSaI```算法做出了改进(了吗?).
+```
+原称呼:
+  B0 B1 B2 B3
+  4  5  6  S2
+  1  2  3  S1
+  A0 A1 A2 A2
+改为:
+    A B C D               
+    E F G H     F -\ F0 F1
+    I J K L       -/ F2 F3
+    M N O P
+
+
+
+    IF J == G AND F != K, THEN
+        F1 = F3 = J
+    ELSIF F == K AND J != G, THEN
+        F1 = F3 = F
+    ELSIF F == K AND J == G, THEN
+        F3 = F1 = F1_SP_PROC(A, B, C, D, ...)
+    ELSE
+        IF G == K AND K == N AND J != O AND K != M, THEN
+            F3 = INTERPOLATE(K, K, K, J)
+        ELSIF F == J AND J == O AND N != K AND J != P, THEN
+            F3 = INTERPOLATE(J, J, J, K)
+        ELSE
+            F3 = INTERPOLATE(J, K)
+        ENDIF
+
+        IF G == K AND G == B AND F != C AND G != A, THEN
+            F1 = INTERPOLATE(G, G, G, F)
+        ELSIF (F == J AND F == C AND B != G AND F != D)
+            F1 = INTERPOLATE(G, F, F, F)
+        ELSE
+            F1 = INTERPOLATE(F, G)
+        ENDIF
+    ENDIF
+
+    ; ELSIF 这里可以看作 OR
+    IF J == G AND F != K AND I == J AND J != C, THEN
+        F0 = INTERPOLATE(J, F)
+    ELSIF E == J AND K == J AND I != F AND J != A, THEN
+        F0 = INTERPOLATE(J, F)
+    ELSE
+        F0 = F
+    ENDIF
+
+    ; ELSIF 这里可以看作 OR
+    IF F == K AND J != G AND E == F AND F != O, THEN
+        F2 = INTERPOLATE(J, F)
+    ELSIF F == I AND G == F AND E != J AND F != M, THEN
+        F2 = INTERPOLATE(J, F)
+    ELSE
+        F2 = J
+    ENDIF
+```
+可能是是性能上的提升吧?
+
+
+
+???? BUG? 这个算法有BUG吧? 感觉像素变成竖线了. 处理得比较好的是非坐标对齐的图像, 处理得不好的是坐标对齐的图像, 可能这是这个算法的偏向吧. 
+
+作者Kreed的这一系列大致是对点周围共计16点判断, 然后生成2x2的新数据, 会产生新的像素, 会产生像素偏移. 
 
 ### REF
+ - [The advanced 2x Scale and Interpolation engine](https://vdnoort.home.xs4all.nl/emulation/2xsai/)
