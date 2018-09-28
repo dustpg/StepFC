@@ -212,8 +212,8 @@ extern uint32_t sfc_crc32b(uint32_t input, const void *buf, size_t bufLen);
 /// <returns></returns>
 sfc_ecode sfc_load_default_rom(void* arg, sfc_rom_info_t* info) {
     assert(info->data_prgrom == NULL && "FREE FIRST");
-    //FILE* const file = fopen("cpu_interrupts.nes", "rb");
-    FILE* const file = fopen("D:/doc/fcrom/CONTRA.NES", "rb");
+    FILE* const file = fopen("cpu_interrupts.nes", "rb");
+    //FILE* const file = fopen("D:/doc/fcrom/CONTRA.NES", "rb");
     // 文本未找到
     if (!file) return SFC_ERROR_FILE_NOT_FOUND;
     sfc_ecode code = SFC_ERROR_ILLEGAL_FILE;

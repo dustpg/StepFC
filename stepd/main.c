@@ -539,6 +539,7 @@ void sfc_sl_read_stream(void*, uint8_t*, uint32_t);
 /// </summary>
 /// <returns></returns>
 int main() {
+    void make_triwave(); make_triwave();
     printf("Battle Control Online! \n");
     memset(&g_states, 0, sizeof(g_states));
     g_states.square1.period = 1;
@@ -651,3 +652,40 @@ void qload() {
     fclose(file);
 }
 
+
+
+
+void make_triwave() {
+    enum {
+        TIME = 4,
+        LEN = 32 * 4,
+        LEN2 = LEN / 2,
+        COUNT = 44100 * 5 / LEN
+    };
+    uint8_t buf[LEN];
+    for (uint16_t i = 0; i != LEN2; ++i)
+        buf[i] = i;
+    for (uint16_t i = 0; i != LEN2; ++i)
+        buf[i + LEN2] = LEN2 - i - 1;
+    {
+        FILE* file = fopen("out.raw", "wb");
+        if (!file) return;
+        for (int i = 0; i != COUNT; ++i)
+            fwrite(buf, sizeof(buf), 1, file);
+        fclose(file);
+    }
+
+    for (uint16_t i = 0; i != LEN2; ++i)
+        buf[i] = i & (uint16_t)(~3);
+    for (uint16_t i = 0; i != LEN2; ++i)
+        buf[i + LEN2] = (LEN2 - i - 1)& (uint16_t)(~3);;
+
+    {
+        FILE* file = fopen("out2.raw", "wb");
+        if (!file) return;
+        for (int i = 0; i != COUNT; ++i)
+            fwrite(buf, sizeof(buf), 1, file);
+        fclose(file);
+    }
+    exit(0);
+}
