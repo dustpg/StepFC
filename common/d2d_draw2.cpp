@@ -355,4 +355,7 @@ void ClearD3D() noexcept {
     ::SafeRelease(g_data.device_context);
     ::SafeRelease(g_data.device);
     ::SafeRelease(g_data.swap_chain);
+
+
 }
+

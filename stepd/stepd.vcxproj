@@ -153,6 +153,7 @@
     <ClInclude Include="..\stepb\sfc_play.h" />
     <ClInclude Include="..\stepb\sfc_ppu.h" />
     <ClInclude Include="..\stepb\sfc_rom.h" />
+    <ClInclude Include="sfc_audio_filter.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

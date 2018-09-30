@@ -3,6 +3,7 @@
 #include "../stepb/sfc_play.h"
 #include "../common/d2d_interface2.h"
 #include "../common/xa2_interface1.h"
+#include "sfc_audio_filter.h"
 #include <math.h>
 #include <string.h>
 #include <assert.h>
@@ -63,8 +64,20 @@ struct interface_audio_state {
     uint8_t                         triangle_seq_index;
     uint8_t                         dmc_enable;
 
-
+    sfc_1storder_rc_lopass_filter_t lp_14kHz;
+    sfc_1storder_rc_hipass_filter_t hp_440Hz;
+    sfc_1storder_rc_hipass_filter_t hp__90Hz;
 } g_states;
+
+
+#define LP14kHz(x) sfc_filter_rclp(&g_states.lp_14kHz, x)
+#define HP440Hz(x) sfc_filter_rchp(&g_states.hp_440Hz, x)
+#define HP_90Hz(x) sfc_filter_rchp(&g_states.hp__90Hz, x)
+
+
+float filter_this(float x) {
+    return HP_90Hz(HP440Hz(LP14kHz(x)));
+}
 
 
 static inline void ib_set_keys(uint32_t pos, uint8_t data) {
@@ -539,9 +552,12 @@ void sfc_sl_read_stream(void*, uint8_t*, uint32_t);
 /// </summary>
 /// <returns></returns>
 int main() {
-    void make_triwave(); make_triwave();
     printf("Battle Control Online! \n");
     memset(&g_states, 0, sizeof(g_states));
+    sfc_make_rclp(&g_states.lp_14kHz, SAMPLES_PER_SEC, 14000);
+    sfc_make_rchp(&g_states.hp_440Hz, SAMPLES_PER_SEC, 440);
+    sfc_make_rchp(&g_states.hp__90Hz, SAMPLES_PER_SEC, 90);
+    void make_triwave(); make_triwave();
     g_states.square1.period = 1;
     g_states.square2.period = 1;
     g_states.triangle.period = 1;
@@ -654,38 +670,55 @@ void qload() {
 
 
 
-
 void make_triwave() {
-    enum {
-        TIME = 4,
-        LEN = 32 * 4,
-        LEN2 = LEN / 2,
-        COUNT = 44100 * 5 / LEN
-    };
-    uint8_t buf[LEN];
-    for (uint16_t i = 0; i != LEN2; ++i)
-        buf[i] = i;
-    for (uint16_t i = 0; i != LEN2; ++i)
-        buf[i + LEN2] = LEN2 - i - 1;
-    {
-        FILE* file = fopen("out.raw", "wb");
-        if (!file) return;
-        for (int i = 0; i != COUNT; ++i)
-            fwrite(buf, sizeof(buf), 1, file);
-        fclose(file);
+    float tri4[(1 << 4) * 2];
+    float tri6[(1 << 6) * 2];
+    // 4bit T-WAVE - A
+    for (int i = 0; i != (1 << 4); ++i)
+        tri4[i] = (1 << 4) - 1 - i;
+    // 4bit T-WAVE - B
+    for (int i = 0; i != (1 << 4); ++i)
+        tri4[i + (1 << 4)] = i;
+    // 6bit T-WAVE - A
+    for (int i = 0; i != (1 << 6); ++i)
+        tri6[i] = (1 << 6) - 1 - i;
+    // 6bit T-WAVE - B
+    for (int i = 0; i != (1 << 6); ++i)
+        tri6[i + (1 << 6)] = i;
+
+    FILE* const file1 = fopen("out1.raw", "wb");
+    FILE* const file2 = fopen("out2.raw", "wb");
+    if (!file1 || !file2) exit(1);
+
+    
+    float buf[(1 << 6) * 2];
+    // 6bit WAVE
+    for (int i = 0; i != (1 << 6) * 2; ++i) 
+        buf[i] = 159.79f / (1.f / (tri6[i] / 4.f / 8227.f) + 100.f);
+    for (int i = 0; i != 44100 * 5 / ((1 << 6) * 2); ++i)
+        fwrite(buf, sizeof(buf), 1, file1);
+    // 4bit WAVE
+    for (int i = 0; i != (1 << 6) * 2; ++i)
+        buf[i] = 159.79f / (1.f / (tri4[i/4] / 8227.f) + 100.f);
+    for (int i = 0; i != 44100 * 5 / ((1 << 6) * 2); ++i)
+        fwrite(buf, sizeof(buf), 1, file2);
+    fclose(file1);
+    fclose(file2);
+
+
+
+    FILE* const file3 = fopen("out3.raw", "wb");
+    if (!file3) exit(1);
+    float buf2[(1 << 6) * 2];
+    for (int i = 0; i != 44100 * 5 / ((1 << 6) * 2); ++i) {
+        for (int j = 0; j != (1 << 6) * 2; ++j) {
+            buf2[j] = filter_this(buf[j]);
+        }
+        fwrite(buf2, sizeof(buf2), 1, file3);
     }
 
-    for (uint16_t i = 0; i != LEN2; ++i)
-        buf[i] = i & (uint16_t)(~3);
-    for (uint16_t i = 0; i != LEN2; ++i)
-        buf[i + LEN2] = (LEN2 - i - 1)& (uint16_t)(~3);;
+    fclose(file3);
 
-    {
-        FILE* file = fopen("out2.raw", "wb");
-        if (!file) return;
-        for (int i = 0; i != COUNT; ++i)
-            fwrite(buf, sizeof(buf), 1, file);
-        fclose(file);
-    }
     exit(0);
 }
+

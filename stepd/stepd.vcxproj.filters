@@ -1,9 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="src">
-      <UniqueIdentifier>{17e62427-f400-43fd-bf6c-8788aa71143f}</UniqueIdentifier>
-    </Filter>
     <Filter Include="src_b">
       <UniqueIdentifier>{c6939d4c-5ad2-486c-b59f-9fadf22ef003}</UniqueIdentifier>
     </Filter>
@@ -16,10 +13,13 @@
     <Filter Include="cpp">
       <UniqueIdentifier>{b65e9406-166e-410e-a54b-fc0e5e112870}</UniqueIdentifier>
     </Filter>
+    <Filter Include="new">
+      <UniqueIdentifier>{17e62427-f400-43fd-bf6c-8788aa71143f}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.c">
-      <Filter>src</Filter>
+      <Filter>new</Filter>
     </ClCompile>
     <ClCompile Include="..\stepb\sfc_6502.c">
       <Filter>src_b</Filter>
@@ -121,6 +121,9 @@
     </ClInclude>
     <ClInclude Include="..\common\xa2_interface1.h">
       <Filter>cpp</Filter>
+    </ClInclude>
+    <ClInclude Include="sfc_audio_filter.h">
+      <Filter>new</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
