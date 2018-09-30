@@ -199,6 +199,7 @@ NES是这样的, FC似乎就不同了, 详细的可以查看nesdev的说明, 所
 
  - "d2d_draw2.cpp" "d2d_draw2.h"
  - 由于GPL的原因, 并没有实现之前介绍的全部算法
+ - 0
 
 
 项目地址[Github-StepFC-StepD](https://github.com/dustpg/StepFC/tree/master/stepd)
