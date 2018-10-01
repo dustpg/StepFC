@@ -20,6 +20,10 @@
 #pragma comment(lib, "d3d11.lib")
 
 struct alignas(sizeof(float)*4) GlobalData {
+    uint32_t                scale_fac;
+    uint32_t                shader_length;
+    uint8_t*                shader_buffer;
+
     IDXGISwapChain*         swap_chain;
     ID3D11Device*           device;
     ID3D11DeviceContext*    device_context;
@@ -31,7 +35,15 @@ struct alignas(sizeof(float)*4) GlobalData {
     ID2D1Bitmap1*           d2d_bg;
     ID2D1Bitmap1*           d2d_test_card;
     ID2D1SolidColorBrush*   d2d_brush;
-} g_data = {  };
+
+} g_data = { 1, 0 };
+
+
+// {B8AF3834-4CBE-47BF-8ECD-1F6CF0A9D43A}
+static const GUID CLSID_DustPG_FamicomAE = {
+    0xb8af3834, 0x4cbe, 0x47bf, { 0x8e, 0xcd, 0x1f, 0x6c, 0xf0, 0xa9, 0xd4, 0x3a }
+};
+
 
 enum { WINDOW_WIDTH = 1280, WINDOW_HEIGHT = 720 };
 static const wchar_t WINDOW_TITLE[] = L"D2D Draw";
@@ -41,6 +53,19 @@ LRESULT CALLBACK ThisWndProc(HWND , UINT , WPARAM , LPARAM ) noexcept;
 void DoRender(uint32_t sync) noexcept;
 bool InitD3D(HWND) noexcept;
 void ClearD3D() noexcept;
+auto FamicomAE__Register(ID2D1Factory1* factory) noexcept->HRESULT;
+
+template<typename T> void GetShaderDataOnce(T call) {
+    call(g_data.shader_buffer, g_data.shader_length);
+    std::free(g_data.shader_buffer);
+    g_data.shader_length = 0;
+    g_data.shader_buffer = nullptr;
+}
+
+
+uint32_t GetScaleFac() noexcept {
+    return g_data.scale_fac;
+}
 
 template<class Interface>
 inline void SafeRelease(Interface *&pInterfaceToRelease) {
@@ -359,3 +384,223 @@ void ClearD3D() noexcept {
 
 }
 
+
+#include <d2d1effectauthor.h>
+#include <atomic>
+
+// FC后期特效
+class FamicomAE final : public ID2D1EffectImpl, public ID2D1DrawTransform {
+public:
+    // ID2D1EffectImpl
+    IFACEMETHODIMP Initialize(ID2D1EffectContext* pContextInternal, ID2D1TransformGraph* pTransformGraph) noexcept override;
+    IFACEMETHODIMP PrepareForRender(D2D1_CHANGE_TYPE changeType) noexcept override;
+    IFACEMETHODIMP SetGraph(ID2D1TransformGraph* pGraph) noexcept override { assert("unsupported!"); return E_NOTIMPL; }
+    // IUnknown
+    IFACEMETHODIMP_(ULONG) AddRef() noexcept override { return ++m_cRef; }
+    IFACEMETHODIMP_(ULONG) Release() noexcept override;
+    IFACEMETHODIMP QueryInterface(REFIID riid, void** ppOutput) noexcept override;
+    // ID2D1Transform
+    IFACEMETHODIMP MapInputRectsToOutputRect(const D2D1_RECT_L* pInputRects,
+        const D2D1_RECT_L* pInputOpaqueSubRects,
+        UINT32 inputRectCount,
+        D2D1_RECT_L* pOutputRect,
+        D2D1_RECT_L* pOutputOpaqueSubRect) noexcept override;
+    IFACEMETHODIMP MapOutputRectToInputRects(const D2D1_RECT_L* pOutputRect,
+        D2D1_RECT_L* pInputRects,
+        UINT32 inputRectCount) const noexcept override;
+    IFACEMETHODIMP MapInvalidRect(UINT32 inputIndex,
+        D2D1_RECT_L invalidInputRect,
+        D2D1_RECT_L* pInvalidOutputRect) const noexcept override;
+    // ID2D1TransformNode
+    IFACEMETHODIMP_(UINT32) GetInputCount() const noexcept override { return 2; }
+    // ID2D1DrawTransform
+    IFACEMETHODIMP SetDrawInfo(ID2D1DrawInfo *pDrawInfo) noexcept override;
+public:
+    // 构造函数
+    FamicomAE() noexcept {}
+    // 析构函数
+    ~FamicomAE() noexcept { ::SafeRelease(m_pDrawInfo); }
+private:
+    // 刻画信息
+    ID2D1DrawInfo*              m_pDrawInfo = nullptr;
+    // 引用计数器
+    std::atomic<uint32_t>       m_cRef = 1;
+    // 放大倍数
+    uint32_t                    m_cScale = GetScaleFac();
+    // 输入矩形
+    D2D1_RECT_L                 m_inputRect = D2D1::RectL();
+};
+
+
+// {88A1F5A7-E47F-4240-BA79-A54C2EE53D39}
+static const GUID GUID_FamicomAE_PS = { 
+    0x88a1f5a7, 0xe47f, 0x4240, { 0xba, 0x79, 0xa5, 0x4c, 0x2e, 0xe5, 0x3d, 0x39 } 
+};
+
+
+// 注册径向模糊特效
+auto FamicomAE__Register(ID2D1Factory1* factory) noexcept ->HRESULT {
+    assert(factory && "bad argment");
+    const WCHAR* pszXml = LR"xml(<?xml version = "1.0" ?>
+<Effect>
+    <Property name = "DisplayName" type = "string" value = "FamicomAE" />
+    <Property name = "Author" type = "string" value = "dustpg" />
+    <Property name = "Category" type = "string" value = "Transform" />
+    <Property name = "Description" type = "string" value = "径向模糊" />
+    <Inputs>
+        <Input name = "Source" />
+        <Input name = "Source" />
+    </Inputs>
+</Effect>
+)xml";
+    // 创建
+    auto create_this = [](IUnknown** effect) noexcept ->HRESULT {
+        assert(effect && "bad argment");
+        ID2D1EffectImpl* obj = new(std::nothrow) FamicomAE();
+        *effect = obj;
+        return obj ? S_OK : E_OUTOFMEMORY;
+    };
+    // 注册
+    return factory->RegisterEffectFromString(
+        CLSID_DustPG_FamicomAE,
+        pszXml,
+        nullptr, 0,
+        create_this
+    );
+}
+
+// 初始化对象 Create 创建后 会调用此方法
+IFACEMETHODIMP FamicomAE::Initialize(
+    ID2D1EffectContext* pEffectContext,
+    ID2D1TransformGraph* pTransformGraph) noexcept {
+    // 参数检查
+    assert(pEffectContext && pTransformGraph && "bad arguments");
+    if (!pEffectContext || !pTransformGraph) return E_INVALIDARG;
+    HRESULT hr = S_FALSE;
+    // 载入shader文件
+    if (SUCCEEDED(hr)) {
+        // 检查是否已经可以
+        BYTE buf[4] = { 0 };
+        auto tmp = pEffectContext->LoadPixelShader(GUID_FamicomAE_PS, buf, 0);
+        // 失败时载入
+        if (FAILED(tmp)) {
+            GetShaderDataOnce([&hr, pEffectContext](const uint8_t* data, uint32_t len) noexcept {
+                if (!data) return;
+                hr = pEffectContext->LoadPixelShader(GUID_FamicomAE_PS, data, len);
+            });
+        }
+    }
+    // 连接
+    if (SUCCEEDED(hr)) {
+        hr = pTransformGraph->SetSingleTransformNode(this);
+    }
+    return hr;
+}
+
+
+// 准备渲染
+IFACEMETHODIMP FamicomAE::PrepareForRender(D2D1_CHANGE_TYPE changeType) noexcept {
+    if (changeType == D2D1_CHANGE_TYPE_NONE) return S_OK;
+    m_pDrawInfo->SetPixelShader(GUID_FamicomAE_PS);
+    m_pDrawInfo->SetInputDescription(0, { D2D1_FILTER_MIN_MAG_MIP_POINT, 0 });
+    return S_OK;
+}
+
+// 实现 IUnknown::Release
+IFACEMETHODIMP_(ULONG) FamicomAE::Release() noexcept {
+    if ((--m_cRef) == 0) {
+        delete this;
+        return 0;
+    }
+    else {
+        return m_cRef;
+    }
+}
+
+// 实现 IUnknown::QueryInterface
+IFACEMETHODIMP FamicomAE::QueryInterface(REFIID riid, _Outptr_ void** ppOutput) noexcept {
+    *ppOutput = nullptr;
+    HRESULT hr = S_OK;
+    // 获取 ID2D1EffectImpl
+    if (riid == IID_ID2D1EffectImpl) {
+        *ppOutput = static_cast<ID2D1EffectImpl*>(this);
+    }
+    // 获取 ID2D1DrawTransform
+    else if (riid == IID_ID2D1DrawTransform) {
+        *ppOutput = static_cast<ID2D1DrawTransform*>(this);
+    }
+    // 获取 ID2D1Transform
+    else if (riid == IID_ID2D1Transform) {
+        *ppOutput = static_cast<ID2D1Transform*>(this);
+    }
+    // 获取 ID2D1TransformNode
+    else if (riid == IID_ID2D1TransformNode) {
+        *ppOutput = static_cast<ID2D1TransformNode*>(this);
+    }
+    // 获取 IUnknown
+    else if (riid == IID_IUnknown) {
+        *ppOutput = this;
+    }
+    // 没有接口
+    else {
+        hr = E_NOINTERFACE;
+    }
+    if (*ppOutput != nullptr) {
+        AddRef();
+    }
+    return hr;
+}
+
+
+// 设置刻画信息
+IFACEMETHODIMP FamicomAE::SetDrawInfo(_In_ ID2D1DrawInfo *drawInfo) noexcept {
+    ::SafeRelease(m_pDrawInfo);
+    if (drawInfo) {
+        drawInfo->AddRef();
+        m_pDrawInfo = drawInfo;
+    }
+    return S_OK;
+}
+
+// 映射无效矩形区
+IFACEMETHODIMP FamicomAE::MapInvalidRect(
+    UINT32 inputIndex,
+    D2D1_RECT_L invalidInputRect,
+    _Out_ D2D1_RECT_L* pInvalidOutputRect
+) const noexcept {
+    *pInvalidOutputRect = m_inputRect;
+    return S_OK;
+}
+
+// 映射输出矩形到输入矩形数组
+IFACEMETHODIMP FamicomAE::MapOutputRectToInputRects(
+    _In_ const D2D1_RECT_L* pOutputRect,
+    _Out_writes_(inputRectCount) D2D1_RECT_L* pInputRects,
+    UINT32 inputRectCount
+) const noexcept {
+    // 虽说是数组 这里就一个
+    //if (inputRectCount != 1) return E_INVALIDARG;
+    // 映射
+    for (uint32_t i = 0; i != inputRectCount; ++i)
+        pInputRects[i] = m_inputRect;
+    return S_OK;
+}
+
+// 映射输入矩形数组到输出输出矩形
+IFACEMETHODIMP FamicomAE::MapInputRectsToOutputRect(
+    _In_reads_(inputRectCount) const D2D1_RECT_L* pInputRects,
+    _In_reads_(inputRectCount) const D2D1_RECT_L* pInputOpaqueSubRects,
+    UINT32 inputRectCount,
+    _Out_ D2D1_RECT_L* pOutputRect,
+    _Out_ D2D1_RECT_L* pOutputOpaqueSubRect
+) noexcept {
+    //if (inputRectCount != 1) return E_INVALIDARG;
+
+    *pOutputRect = pInputRects[0];
+    pOutputRect->right *= m_cScale;
+    pOutputRect->bottom *= m_cScale;
+
+    m_inputRect = pInputRects[0];
+    *pOutputOpaqueSubRect = *pOutputRect;
+    return S_OK;
+}

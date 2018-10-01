@@ -75,7 +75,7 @@ struct interface_audio_state {
 #define HP_90Hz(x) sfc_filter_rchp(&g_states.hp__90Hz, x)
 
 
-float filter_this(float x) {
+static inline float filter_this(float x) {
     return HP_90Hz(HP440Hz(LP14kHz(x)));
 }
 
@@ -399,6 +399,10 @@ void submit_now_buffer() {
         + SAMPLES_PER_FRAME_ALIGNED
         * (g_famicom->frame_counter % BASIC_BUFFER_COUNT)
         ;
+
+    //for (int i = 0; i != SAMPLES_PER_FRAME; ++i)
+    //    buffer[i] = filter_this(buffer[i]);
+
     d2d_submit_wave(buffer, SAMPLES_PER_FRAME);
     xa2_submit_buffer(buffer, SAMPLES_PER_FRAME);
 }
@@ -547,17 +551,13 @@ void this_save_sram(void*arg, const sfc_rom_info_t* info, const uint8_t* ptr) {
 void sfc_sl_write_stream(void*, const uint8_t*, uint32_t);
 void sfc_sl_read_stream(void*, uint8_t*, uint32_t);
 
-/// <summary>
-/// 应用程序入口
-/// </summary>
-/// <returns></returns>
-int main() {
-    printf("Battle Control Online! \n");
+
+void init_global() {
     memset(&g_states, 0, sizeof(g_states));
     sfc_make_rclp(&g_states.lp_14kHz, SAMPLES_PER_SEC, 14000);
     sfc_make_rchp(&g_states.hp_440Hz, SAMPLES_PER_SEC, 440);
     sfc_make_rchp(&g_states.hp__90Hz, SAMPLES_PER_SEC, 90);
-    void make_triwave(); make_triwave();
+
     g_states.square1.period = 1;
     g_states.square2.period = 1;
     g_states.triangle.period = 1;
@@ -565,6 +565,42 @@ int main() {
     g_states.lfsr = 1;
 
     g_states.dmc.period = 500;
+}
+
+void print_cso_file() {
+    char path_input[1024];
+    // 上次输入的东西?
+    {
+        FILE* const last_input_file = fopen("last_input.ini", "rb");
+        if (last_input_file) {
+            const auto len = fread(path_input, 1, sizeof(path_input) - 1, last_input_file);
+            path_input[len] = 0;
+            fclose(last_input_file);
+        }
+    }
+    // 输入shader文件地址
+    printf("Input shader file(*.cso) path: ");
+    gets_s(path_input, sizeof(path_input));
+    const uint32_t len = strlen(path_input);
+    {
+        // 保存输入
+        FILE* const this_input_file = fopen("last_input.ini", "wb");
+        if (this_input_file) {
+            fwrite(path_input, 1, len, this_input_file);
+            fclose(this_input_file);
+        }
+    }
+}
+
+/// <summary>
+/// 应用程序入口
+/// </summary>
+/// <returns></returns>
+int main() {
+    printf("Battle Control Online! \n");
+    init_global();
+    print_cso_file();
+
     // 申请1MB作为按键缓存
     g_states.input_buffer_1mb = malloc(1 << 20);
     if (!g_states.input_buffer_1mb) return -1;

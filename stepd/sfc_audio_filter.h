@@ -24,7 +24,7 @@ static inline void sfc_make_rclp(
     sfc_1storder_rc_lopass_filter_t* filter,
     float sample_frequency,
     float cutoff_frequency) {
-    const float PI = 3.1415926535897932384626433832795;
+    const float PI = 3.1415926535897932384626433832795f;
     const float RC = 1.f / 2.f / PI / cutoff_frequency;
     const float k1 = 1.f / (1.f + RC * sample_frequency);
     const float k2 = 1.f - k1;
@@ -40,7 +40,7 @@ static inline void sfc_make_rchp(
     sfc_1storder_rc_hipass_filter_t* filter,
     float sample_frequency,
     float cutoff_frequency) {
-    const float PI = 3.1415926535897932384626433832795;
+    const float PI = 3.1415926535897932384626433832795f;
     const float RC = 1.f / 2.f / PI / cutoff_frequency;
     float k = RC / (RC + 1.f / sample_frequency);
 
