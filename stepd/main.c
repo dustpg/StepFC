@@ -393,7 +393,7 @@ extern void _stdcall Sleep(unsigned);
 /// <summary>
 /// 提交当前缓冲区
 /// </summary>
-void submit_now_buffer() {
+void submit_now_buffer(void*rgba) {
     float* const buffer
         = s_buffer
         + SAMPLES_PER_FRAME_ALIGNED
@@ -402,15 +402,15 @@ void submit_now_buffer() {
 
     //for (int i = 0; i != SAMPLES_PER_FRAME; ++i)
     //    buffer[i] = filter_this(buffer[i]);
-
-    d2d_submit_wave(buffer, SAMPLES_PER_FRAME);
+    // 跳过视频帧
+    if (rgba) d2d_submit_wave(buffer, SAMPLES_PER_FRAME);
     xa2_submit_buffer(buffer, SAMPLES_PER_FRAME);
 }
 
 /// <summary>
 /// 播放该帧音频
 /// </summary>
-static void play_audio() {
+static void play_audio(void* rgba) {
     const unsigned left = xa2_buffer_left();
     // 太低
     if (!left) {
@@ -422,16 +422,16 @@ static void play_audio() {
     else if (left > BUFFER_MAX) {
         printf("<buffer overflow[%d]>\n", left);
         // 可以让图像接口空等一两帧, 这里直接睡过去
-        Sleep(30);
+        //Sleep(10);
         // 这里还能直接return跳过该音频帧
-        //return;
+        return;
     }
     // 收尾
     const uint32_t old_index = g_states.last_cycle * SAMPLES_PER_SEC / NTSC_CPU_RATE;
     make_samples(old_index, SAMPLES_PER_FRAME);
     g_states.last_cycle = 0;
     // 提交当前缓存
-    submit_now_buffer();
+    submit_now_buffer(rgba);
 }
 
 
@@ -449,29 +449,33 @@ extern void main_render(void* rgba) {
     ib_try_record_replay();
     sfc_render_frame_easy(g_famicom, buffer);
 
-    // 生成调色板数据
-    uint32_t palette[32];
-    
-    for (int i = 0; i != 32; ++i)
-        palette[i] = sfc_stdpalette[g_famicom->ppu.data.spindexes[i]];
-    // 镜像数据
-    palette[4 * 1] = palette[0];
-    palette[4 * 2] = palette[0];
-    palette[4 * 3] = palette[0];
-    palette[4 * 4] = palette[0];
-    palette[4 * 5] = palette[0];
-    palette[4 * 6] = palette[0];
-    palette[4 * 7] = palette[0];
+    // 数据有效
 
-    uint32_t* data = rgba;
-    for (int y = 0; y != 240; ++y) {
-        for (int x = 0; x != 256; ++x) {
-            *data = palette[buffer[y*(256+8)+x] >> 1];
-            ++data;
+    if (rgba) {
+        uint32_t* data = rgba;
+        // 生成调色板数据
+        uint32_t palette[32];
+
+        for (int i = 0; i != 32; ++i)
+            palette[i] = sfc_stdpalette[g_famicom->ppu.data.spindexes[i]];
+        // 镜像数据
+        palette[4 * 1] = palette[0];
+        palette[4 * 2] = palette[0];
+        palette[4 * 3] = palette[0];
+        palette[4 * 4] = palette[0];
+        palette[4 * 5] = palette[0];
+        palette[4 * 6] = palette[0];
+        palette[4 * 7] = palette[0];
+
+        for (int y = 0; y != 240; ++y) {
+            for (int x = 0; x != 256; ++x) {
+                *data = palette[buffer[y*(256+8)+x] >> 1];
+                ++data;
+                }
         }
-    }
 
-    play_audio();
+    }
+    play_audio(rgba);
 }
 
 
@@ -567,20 +571,31 @@ void init_global() {
     g_states.dmc.period = 500;
 }
 
-void print_cso_file() {
-    char path_input[1024];
+
+enum {
+    PATH_BUFLEN = 1024
+};
+
+void clear_input_buffer() {
+    int c;  while ((c = getchar()) != '\n' && c != EOF);
+}
+
+void get_cso_file_path(char path_input[PATH_BUFLEN]) {
     // 上次输入的东西?
-    {
-        FILE* const last_input_file = fopen("last_input.ini", "rb");
-        if (last_input_file) {
-            const auto len = fread(path_input, 1, sizeof(path_input) - 1, last_input_file);
-            path_input[len] = 0;
-            fclose(last_input_file);
-        }
+    FILE* const last_input_file = fopen("last_input.ini", "rb");
+    if (last_input_file) {
+        const auto len = fread(path_input, 1, PATH_BUFLEN-1, last_input_file);
+        path_input[len] = 0;
+        fclose(last_input_file);
+        printf("Last path: [%s], enter 'N' to rewrite, other to skip\n", path_input);
+        const int ch = getchar();
+        if (!(ch == 'N' || ch == 'n'))  return;
+        // 清除输入缓存
+        clear_input_buffer();
     }
     // 输入shader文件地址
     printf("Input shader file(*.cso) path: ");
-    gets_s(path_input, sizeof(path_input));
+    gets_s(path_input, PATH_BUFLEN);
     const uint32_t len = strlen(path_input);
     {
         // 保存输入
@@ -597,9 +612,18 @@ void print_cso_file() {
 /// </summary>
 /// <returns></returns>
 int main() {
+    char cso_path[PATH_BUFLEN]; char png_path[PATH_BUFLEN];
     printf("Battle Control Online! \n");
     init_global();
-    print_cso_file();
+    get_cso_file_path(cso_path);
+    // 把CSO后缀换成png
+    strcpy(png_path, cso_path);
+    char* const ext  = strstr(png_path, ".cso");
+    if (ext) {
+        ext[1] = 'p';
+        ext[2] = 'n';
+        ext[3] = 'g';
+    }
 
     // 申请1MB作为按键缓存
     g_states.input_buffer_1mb = malloc(1 << 20);
@@ -628,7 +652,7 @@ int main() {
         (int)famicom.rom_info.mapper_number
     );
     xa2_init(SAMPLES_PER_SEC);
-    main_cpp();
+    main_cpp(cso_path, png_path);
     xa2_clean();
     ib_try_save_record();
     free(g_states.input_buffer_1mb);

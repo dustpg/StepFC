@@ -1,9 +1,11 @@
 ﻿#define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
-#include <Windows.h>
+#include <windows.h>
+#include <timeapi.h>
 #include <d2d1_1.h>
 //#include <unknwn.h>
 #include <d3d11.h>
+#include <wincodec.h>
 //#include <d3dcompiler.h>
 //#include <DirectXMath.h>
 #include <cstdint>
@@ -14,15 +16,20 @@
 #include <algorithm>
 #include "d2d_interface2.h"
 
+#pragma comment(lib, "Winmm.lib")
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "dxguid.lib")
 #pragma comment(lib, "d2d1.lib")
 #pragma comment(lib, "d3d11.lib")
+#pragma comment(lib, "windowscodecs.lib")
 
 struct alignas(sizeof(float)*4) GlobalData {
     uint32_t                scale_fac;
     uint32_t                shader_length;
     uint8_t*                shader_buffer;
+
+
+    IWICImagingFactory*     wic_factory;
 
     IDXGISwapChain*         swap_chain;
     ID3D11Device*           device;
@@ -33,8 +40,16 @@ struct alignas(sizeof(float)*4) GlobalData {
     ID2D1DeviceContext*     d2d_context;
     ID2D1Bitmap1*           d2d_target;
     ID2D1Bitmap1*           d2d_bg;
-    ID2D1Bitmap1*           d2d_test_card;
+    ID2D1Bitmap1*           d2d_res;
     ID2D1SolidColorBrush*   d2d_brush;
+
+    ID2D1Effect*            d2d_effect;
+    ID2D1Image*             d2d_output;
+
+
+    uint32_t                time_tick;
+    float                   float_time;
+    float                   time_per_frame;
 
 } g_data = { 1, 0 };
 
@@ -51,9 +66,19 @@ static const wchar_t WINDOW_TITLE[] = L"D2D Draw";
 
 LRESULT CALLBACK ThisWndProc(HWND , UINT , WPARAM , LPARAM ) noexcept;
 void DoRender(uint32_t sync) noexcept;
-bool InitD3D(HWND) noexcept;
+bool InitD3D(HWND, const char* res) noexcept;
 void ClearD3D() noexcept;
+void Resize(HWND) noexcept;
 auto FamicomAE__Register(ID2D1Factory1* factory) noexcept->HRESULT;
+auto LoadBitmapFromMemory(
+    ID2D1DeviceContext* pRenderTarget,
+    IWICImagingFactory* pIWICFactory,
+    uint8_t* buf,
+    size_t len,
+    ID2D1Bitmap1** ppBitmap
+) noexcept->HRESULT;
+
+void TickTime() noexcept;
 
 template<typename T> void GetShaderDataOnce(T call) {
     call(g_data.shader_buffer, g_data.shader_length);
@@ -80,7 +105,29 @@ inline void SafeRelease(Interface *&pInterfaceToRelease) {
 uint32_t g_sync = 1;
 uint32_t g_bg_data[256 * 256 + 256];
 
-extern "C" void main_cpp() noexcept {
+extern "C" void main_cpp(
+    const char* shader_bin_file_name,
+    const char* shader_res_file_name) noexcept {
+    // 目前假定为60FPS
+    g_data.time_per_frame = 1.f / 60.f;
+    // 读取着色器数据
+    if (const auto file = std::fopen(shader_bin_file_name, "rb")) {
+        std::fseek(file, 0, SEEK_END);
+        const auto len = std::ftell(file);
+        std::fseek(file, 0, SEEK_SET);
+        if (const auto ptr = std::malloc(len)) {
+            std::fread(ptr, 1, len, file);
+            g_data.shader_length = len;
+            g_data.shader_buffer = reinterpret_cast<uint8_t*>(ptr);
+        }
+        std::fclose(file);
+        if (const auto substr = std::strstr(shader_bin_file_name, "x.cso")) {
+            const auto ch = substr[-1];
+            // 1~8倍有效
+            if (ch > '0' && ch < '9')  g_data.scale_fac = ch - '0';
+        }
+    }
+    else std::printf("file<%s> not found.\n", shader_bin_file_name);
     // DPIAware
     ::SetProcessDPIAware();
     // 注册窗口
@@ -114,7 +161,7 @@ extern "C" void main_cpp() noexcept {
     if (!hwnd) return;
     ::ShowWindow(hwnd, SW_NORMAL);
     ::UpdateWindow(hwnd);
-    if (::InitD3D(hwnd)) {
+    if (::InitD3D(hwnd, shader_res_file_name)) {
         MSG msg = { 0 };
         while (msg.message != WM_QUIT) {
             // 获取消息
@@ -140,6 +187,9 @@ static const unsigned sc_key_map[16] = {
 LRESULT CALLBACK ThisWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) noexcept {
     switch (msg)
     {
+    case WM_SIZE:
+        ::Resize(hwnd);
+        break;
     case WM_CLOSE:
         ::ClearD3D();
         ::DestroyWindow(hwnd);
@@ -181,7 +231,7 @@ SFC_EXTERN_C void d2d_submit_wave(const float* data, unsigned len) SFC_NOEXCEPT 
     const auto ctx = g_data.d2d_context;
     const auto make_point = [=](unsigned i) {
         D2D1_POINT_2F point;
-        point.x = float(i) * 0.5f + 256.f + 1.f;
+        point.x = float(i) + 1.f;
         point.y = (100.f + 1.f) - (data[i] * 100.f);
         return point;
     };
@@ -201,18 +251,26 @@ void DoRender(uint32_t sync) noexcept {
         const auto ctx = g_data.d2d_context;
         ctx->BeginDraw();
         ctx->Clear(D2D1::ColorF(1.f, 1.f, 1.f, 1.f));
-        ctx->SetTransform(D2D1::Matrix3x2F::Scale({ 3.f, 3.f }));
-        main_render(g_bg_data);
-        const auto hr0 = g_data.d2d_bg->CopyFromMemory(nullptr, g_bg_data, 256 * 4);
-        assert(SUCCEEDED(hr0));
-        ctx->DrawBitmap(g_data.d2d_bg, nullptr, 1.f, D2D1_INTERPOLATION_MODE_NEAREST_NEIGHBOR);
+        ctx->SetTransform(D2D1::Matrix3x2F::Identity());
 
-        if (g_data.d2d_test_card) {
+
+        TickTime();
+
+        ctx->SetTransform(
+            D2D1::Matrix3x2F::Translation({ 0.f, 150.f })
+        );
+
+        if (g_data.d2d_output) {
+            ctx->DrawImage(
+                g_data.d2d_output
+            );
+        }
+        else {
             ctx->DrawBitmap(
-                g_data.d2d_test_card, 
-                nullptr, 
-                1.f, 
-                D2D1_INTERPOLATION_MODE_LINEAR
+                g_data.d2d_bg,
+                nullptr,
+                1.f,
+                D2D1_INTERPOLATION_MODE_NEAREST_NEIGHBOR
             );
         }
 
@@ -223,7 +281,82 @@ void DoRender(uint32_t sync) noexcept {
     }
 }
 
-bool InitD3D(HWND hwnd) noexcept {
+
+
+void TickTime() noexcept {
+    const uint32_t time = ::timeGetTime();
+    const uint32_t delta = time - g_data.time_tick;
+    // 没有经过一毫秒
+    if (!delta) return;
+    g_data.time_tick = time;
+    // 超过200毫秒就算了
+    if (delta > 200) return;
+
+    g_data.float_time += float(delta) * 0.001f;
+
+    // 超过半数就算一次
+    const float half_juster = g_data.float_time < g_data.time_per_frame ? 0.5f : 0.0f;
+    const long count = static_cast<long>(g_data.float_time / g_data.time_per_frame + half_juster);
+    if (count > 0) {
+        for (int i = 1; i != count; ++i) main_render(nullptr);
+        main_render(g_bg_data);
+        const auto hr0 = g_data.d2d_bg->CopyFromMemory(nullptr, g_bg_data, 256 * 4);
+        assert(SUCCEEDED(hr0));
+        g_data.float_time -= float(count) * g_data.time_per_frame;
+    }
+}
+
+
+void Resize(HWND hwnd) noexcept {
+    RECT rect; ::GetClientRect(hwnd, &rect);
+    const uint32_t width = rect.right - rect.left;
+    const uint32_t height = rect.bottom - rect.top;
+    if (width && height && g_data.d2d_target) {
+        const auto cur = g_data.d2d_target->GetPixelSize();
+        if (cur.width == width && cur.height == height) return;
+        HRESULT hr = S_OK;
+        IDXGISurface* dxgibuffer = nullptr;
+        g_data.d2d_context->SetTarget(nullptr);
+        g_data.d2d_target->Release();
+        g_data.d2d_target = nullptr;
+        // 重置交换链尺寸
+        if (SUCCEEDED(hr)) {
+            hr = g_data.swap_chain->ResizeBuffers(
+                2, width, height,
+                DXGI_FORMAT_R8G8B8A8_UNORM,
+                0
+            );
+        }
+        // 利用交换链获取Dxgi表面
+        if (SUCCEEDED(hr)) {
+            hr = g_data.swap_chain->GetBuffer(
+                0,
+                IID_IDXGISurface,
+                reinterpret_cast<void**>(&dxgibuffer)
+            );
+        }
+        // 利用Dxgi表面创建位图
+        if (SUCCEEDED(hr)) {
+            D2D1_BITMAP_PROPERTIES1 bitmap_properties = D2D1::BitmapProperties1(
+                D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
+                D2D1::PixelFormat(DXGI_FORMAT_R8G8B8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED)
+            );
+            hr = g_data.d2d_context->CreateBitmapFromDxgiSurface(
+                dxgibuffer,
+                &bitmap_properties,
+                &g_data.d2d_target
+            );
+            g_data.d2d_context->SetTarget(g_data.d2d_target);
+        }
+        // 重建失败?
+        ::SafeRelease(dxgibuffer);
+
+        // TODO: 错误处理
+        assert(SUCCEEDED(hr));
+    }
+}
+
+bool InitD3D(HWND hwnd, const char* res) noexcept {
     HRESULT hr = S_OK;
     IDXGIDevice1* dxgi_device = nullptr;
     IDXGISurface* dxgi_surface = nullptr;
@@ -277,6 +410,16 @@ bool InitD3D(HWND hwnd) noexcept {
     if (SUCCEEDED(hr)) {
         hr = g_data.swap_chain->GetBuffer(0, IID_IDXGISurface, (void**)&dxgi_surface);
     }
+    // 创建 WIC 工厂.
+    if (SUCCEEDED(hr)) {
+        hr = ::CoCreateInstance(
+            CLSID_WICImagingFactory,
+            nullptr,
+            CLSCTX_INPROC_SERVER,
+            IID_IWICImagingFactory,
+            reinterpret_cast<void**>(&g_data.wic_factory)
+        );
+    }
     // 创建D2D工厂
     if (SUCCEEDED(hr)) {
         hr = ::D2D1CreateFactory(
@@ -328,27 +471,24 @@ bool InitD3D(HWND hwnd) noexcept {
             &g_data.d2d_bg
         );
     }
-    // 创建测试卡片
+    // 创建着色器资源
     if (SUCCEEDED(hr)) {
-        constexpr uint32_t CARD_WIDTH = 128;
-        constexpr uint32_t CARD_HEIGHT = 64;
-        // 没有也没事
-        if (const auto file = fopen("test_card.raw", "rb")) {
-            uint32_t buf[CARD_WIDTH*CARD_HEIGHT];
-            const auto count = std::fread(buf, sizeof(uint32_t), CARD_WIDTH*CARD_HEIGHT, file);
+        if (const auto file = std::fopen(res, "rb")) {
+            std::fseek(file, 0, SEEK_END);
+            const auto len = std::ftell(file);
+            std::fseek(file, 0, SEEK_SET);
+            if (const auto ptr = std::malloc(len)) {
+                std::fread(ptr, 1, len, file);
+                hr = LoadBitmapFromMemory(
+                    g_data.d2d_context,
+                    g_data.wic_factory,
+                    reinterpret_cast<uint8_t*>(ptr),
+                    len,
+                    &g_data.d2d_res
+                );
+                std::free(ptr);
+            }
             std::fclose(file);
-
-            D2D1_BITMAP_PROPERTIES1 properties = D2D1::BitmapProperties1(
-                D2D1_BITMAP_OPTIONS_NONE,
-                D2D1::PixelFormat(DXGI_FORMAT_R8G8B8A8_UNORM, D2D1_ALPHA_MODE_IGNORE)
-            );
-            // 失败也没事? 算了, 这里失败表示后面很有可能失败
-            hr = g_data.d2d_context->CreateBitmap(
-                D2D1_SIZE_U{ CARD_WIDTH, CARD_HEIGHT },
-                buf, CARD_WIDTH * sizeof(uint32_t),
-                &properties,
-                &g_data.d2d_test_card
-            );
         }
     }
     // 创建纯色笔刷
@@ -357,6 +497,24 @@ bool InitD3D(HWND hwnd) noexcept {
             D2D1::ColorF(0.f, 0.f, 0.f, 1.f),
             &g_data.d2d_brush
         );
+    }
+    // 注册特效
+    if (SUCCEEDED(hr)) {
+        hr = FamicomAE__Register(g_data.d2d_factory);
+    }
+    // 创建特效
+    if (SUCCEEDED(hr)) {
+        const auto result = g_data.d2d_context->CreateEffect(
+            CLSID_DustPG_FamicomAE,
+            &g_data.d2d_effect
+        );
+        // 成功的话
+        if (SUCCEEDED(result)) {
+            g_data.d2d_effect->GetOutput(&g_data.d2d_output);
+            g_data.d2d_effect->SetInput(0, g_data.d2d_bg);
+            if (g_data.d2d_res)
+                g_data.d2d_effect->SetInput(1, g_data.d2d_res);
+        }
     }
     // 设置为输出目标
     if (SUCCEEDED(hr)) {
@@ -369,7 +527,10 @@ bool InitD3D(HWND hwnd) noexcept {
 }
 
 void ClearD3D() noexcept {
-    ::SafeRelease(g_data.d2d_test_card);
+    ::SafeRelease(g_data.d2d_res);
+    ::SafeRelease(g_data.d2d_effect);
+    ::SafeRelease(g_data.d2d_output);
+    
     ::SafeRelease(g_data.d2d_brush);
     ::SafeRelease(g_data.d2d_bg);
     ::SafeRelease(g_data.d2d_target); 
@@ -381,6 +542,7 @@ void ClearD3D() noexcept {
     ::SafeRelease(g_data.device);
     ::SafeRelease(g_data.swap_chain);
 
+    ::SafeRelease(g_data.wic_factory);
 
 }
 
@@ -481,9 +643,9 @@ IFACEMETHODIMP FamicomAE::Initialize(
     if (SUCCEEDED(hr)) {
         // 检查是否已经可以
         BYTE buf[4] = { 0 };
-        auto tmp = pEffectContext->LoadPixelShader(GUID_FamicomAE_PS, buf, 0);
-        // 失败时载入
-        if (FAILED(tmp)) {
+        hr = pEffectContext->LoadPixelShader(GUID_FamicomAE_PS, buf, 0);
+        // 失败时重载
+        if (FAILED(hr)) {
             GetShaderDataOnce([&hr, pEffectContext](const uint8_t* data, uint32_t len) noexcept {
                 if (!data) return;
                 hr = pEffectContext->LoadPixelShader(GUID_FamicomAE_PS, data, len);
@@ -603,4 +765,99 @@ IFACEMETHODIMP FamicomAE::MapInputRectsToOutputRect(
     m_inputRect = pInputRects[0];
     *pOutputOpaqueSubRect = *pOutputRect;
     return S_OK;
+}
+
+
+
+
+// 从内存文件读取位图
+auto LoadBitmapFromMemory(
+    ID2D1DeviceContext* pRenderTarget,
+    IWICImagingFactory* pIWICFactory,
+    uint8_t* buf,
+    size_t len,
+    ID2D1Bitmap1** ppBitmap
+) noexcept -> HRESULT {
+    IWICBitmapDecoder *pDecoder = nullptr;
+    IWICBitmapFrameDecode *pSource = nullptr;
+    IWICStream *pStream = nullptr;
+    IWICFormatConverter *pConverter = nullptr;
+    IWICBitmapScaler *pScaler = nullptr;
+
+    IWICStream* stream = nullptr;
+    HRESULT hr = S_OK;
+    // 创建内存流
+    if (SUCCEEDED(hr)) {
+        hr = pIWICFactory->CreateStream(&stream);
+    }
+    // 创建内存流
+    if (SUCCEEDED(hr)) {
+        hr = stream->InitializeFromMemory(buf, len);
+    }
+    // 创建解码器
+    if (SUCCEEDED(hr)) {
+        hr = pIWICFactory->CreateDecoderFromStream(
+            stream,
+            nullptr,
+            WICDecodeMetadataCacheOnLoad,
+            &pDecoder
+        );
+    }
+    if (SUCCEEDED(hr)) {
+        hr = pDecoder->GetFrame(0, &pSource);
+    }
+    if (SUCCEEDED(hr)) {
+        hr = pIWICFactory->CreateFormatConverter(&pConverter);
+    }
+    if (SUCCEEDED(hr)) {
+        hr = pConverter->Initialize(
+            pSource,
+            GUID_WICPixelFormat32bppBGRA,
+            WICBitmapDitherTypeNone,
+            nullptr,
+            0.f,
+            WICBitmapPaletteTypeMedianCut
+        );
+    }
+
+    D2D1_SIZE_U size = {};
+    // 获取数据
+    if (SUCCEEDED(hr)) {
+        hr = pConverter->GetSize(&size.width, &size.height);
+    }
+    const auto sizeof_rgba = static_cast<uint32_t>(sizeof(uint32_t));
+    const auto bylen = size.width * size.height * sizeof_rgba;
+    const auto bypch = size.width * sizeof_rgba;
+    uint32_t* ptr = nullptr;
+    // 申请空间
+    if (SUCCEEDED(hr)) {
+        ptr = (uint32_t*)std::malloc(bylen);
+        if (!ptr) hr = E_OUTOFMEMORY;
+    }
+    // 复制数据
+    if (SUCCEEDED(hr)) {
+        hr = pConverter->CopyPixels(nullptr, bypch, bylen, (BYTE*)ptr);
+    }
+    if (SUCCEEDED(hr)) {
+        D2D1_BITMAP_PROPERTIES1 bitmapProperties = D2D1::BitmapProperties1(
+            D2D1_BITMAP_OPTIONS_NONE,
+            D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED),
+            96.0f,
+            96.0f
+        );
+        hr = pRenderTarget->CreateBitmap(
+            size,
+            ptr, bypch,
+            &bitmapProperties,
+            ppBitmap
+        );
+    }
+    std::free(ptr);
+    ::SafeRelease(stream);
+    ::SafeRelease(pDecoder);
+    ::SafeRelease(pSource);
+    ::SafeRelease(pStream);
+    ::SafeRelease(pConverter);
+    ::SafeRelease(pScaler);
+    return hr;
 }

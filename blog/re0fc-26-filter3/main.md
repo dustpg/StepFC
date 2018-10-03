@@ -1,20 +1,23 @@
 ### HQx
+
+本文github[备份地址](https://github.com/dustpg/BlogFM/issues/30)
+
 进入[HQx](https://code.google.com/archive/p/hqx/)族了, HQx系列有一个特别的地方: 抗锯齿.
 
 根据维基的介绍, HQx大致分为两个, 原版Maxim Stepin的HQx以及效果稍微差但是省空间的ScaleHQ. 
 
-前者, 作者形式发布的代码, 就算出现问题, 我们可以派生出一个LGPL实现分支, 然后直接使用预编译的二进制码即可. 后者, 则是由不同的作者实现被误以为是原版的HQ.
+前者, 作者形式发布的代码, 就算出现问题, 我们可以派生出一个LGPL实现分支, 然后直接使用预编译的二进制码即可. 后者, 则是由不同的作者实现, 然后被误以为是原版的HQ.
 
 ### 2xScaleHQ
 那就先说说简单版的ScaleHQ吧, 似乎由guest(r)实现的. 根据libretro的文档, 有两个放大率的, 这里称为scalehq2x 和scalehq4x. 2x应该是在public domain, 而4x是GPL.
 
 
-代码上根本看不出算法, 只有数学运算, 还有配置参数. 又懒得去研究, 直接简单改写scalehq2x用于支持本框架. 由于抗锯齿的原因, 这个效果在100%下效果最好, 这是效果:
+代码上根本看不出算法, 只有数学运算, 猜测是将像素转换成图形, 然后继续渲染. 不过懒得去研究, 直接简单改写scalehq2x用于支持本框架. 由于抗锯齿的原因, 这个效果在100%下效果最好, 这是效果:
 ![scalehq2x](./scalehq2x.png)
 
 
 ### 4xScaleHQ
-这是guest(r)在GPL下发布的, 同2xScaleHQ, 只有数学运算和配置参数:
+这是guest(r)在GPL下发布的, 同2xScaleHQ, 只有数学运算:
 ![scalehq4x](./scalehq4x.png)
 
 
@@ -35,24 +38,26 @@
 
 
 ![hq2x](./hq2x.png)
+
 (HQ2x-100%下效果)
 
 ![hq3x](./hq3x.png)
+
 (HQ3x-100%下效果)
 
 ![hq4x](./hq4x.png)
+
 (HQ4x-100%下效果)
 
 ![hq4x-2xcubic](./hq4x-2xcubic.png)
+
 (HQ4x后再用双三次插值到原比例的8倍)
 
 HQx处理的效果非常讨人喜, 之前ScaleHQ提到的折线转交处也处理得很不错.
 
 ![hqx](./hqx.png)
 
-缺点, 除了实现比较困难外, 效果上可能就是把那个笑脸变成相低多边形的圆了.
-
-但是实际上, HQx在文字显示非常不错, 在实际的游戏中就稍微差了一点.
+缺点, 除了实现比较困难外, 效果上可能就是把那个笑脸变成相低多边形的圆了. 而实际上, HQx在文字显示上, 非常不错. 不过在游戏中, 由很多颜色组成的实际画面就稍微差了一点(感觉一块一块的).
 
 ### REF
  - [HQx](https://en.wikipedia.org/wiki/Hqx)

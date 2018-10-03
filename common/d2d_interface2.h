@@ -10,7 +10,11 @@
 #endif
 #endif
 
-SFC_EXTERN_C void main_cpp() SFC_NOEXCEPT;
+SFC_EXTERN_C void main_cpp(
+    const char* shader_bin_file_name, 
+    const char* shader_res_file_name
+) SFC_NOEXCEPT;
+
 SFC_EXTERN_C void main_render(void* rgba) SFC_NOEXCEPT;
 SFC_EXTERN_C void user_input(int index, unsigned char data) SFC_NOEXCEPT;
 SFC_EXTERN_C void qsave() SFC_NOEXCEPT;
