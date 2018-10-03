@@ -1,4 +1,7 @@
 ### 更多的算法
+
+本文github[备份地址](https://github.com/dustpg/BlogFM/issues/31)
+
 像素风格缩放算法还有非常多, 光维基那种对照图就还有LQx和xBR系列, 有机会的话再介绍吧!
 
 下面就是音频的部分了, 不过在介绍滤波器之前, 先讨论一个问题: 我们加入这些额外处理部分是为了提升用户体验程度. 与视频部分不同的是, 我们能拿到音频更基础的信息. 就像第一个音频播放状态机一样, 我们能知道音频在某一刻的信息.
@@ -217,6 +220,9 @@ void main_cpp(
 );
 ```
 
+.
+
+而音频方面, 滤波器虽然实现了但是默认没有打开, 需要的同学们可以在```submit_now_buffer```函数中将注释去掉即可.
 
 项目地址[Github-StepFC-StepD](https://github.com/dustpg/StepFC/tree/master/stepd)
 
