@@ -1,4 +1,9 @@
 ### Eagle
+
+本文github[备份地址](https://github.com/dustpg/BlogFM/issues/29)
+
+下面继续讨论一些关于像素风格缩放算法.
+
 Eagle本身是一个比较初级的想法[Eagle (idea)](https://everything2.com/index.pl?node_id=1859453), 称不上真正的算法, 但是有些后续的算法就是基于Eagle的. Eagle是放大至2倍, 这里称之为eagle2x.
 
 Eagle想得很简单, 放大两倍后, 那个像素旁边原本3个像素颜色一样的话就设定为该颜色, 否则就是最邻的.
@@ -158,13 +163,13 @@ M|N O|P
     IF H == E AND D != I, THEN
         D1 = D2 = H
         IF G == H OR E == B, THEN
-            D0 = INTERPOLATE(H, INTERPOLATE(H, D))
+            D0 = INTERPOLATE(H, H, D)
         ELSE
             D0 = INTERPOLATE(D, E)
         ENDIF
 
         IF E == F OR H == K, THEN
-            D3 = INTERPOLATE(H, INTERPOLATE(H, I))
+            D3 = INTERPOLATE(H, H, I)
         ELSE
             D3 = INTERPOLATE(H, I)
         ENDIF
@@ -172,13 +177,13 @@ M|N O|P
         D3 = D0 = D
 
         IF A == D OR F == J, THEN
-            D1 = INTERPOLATE(D, INTERPOLATE(D, E))
+            D1 = INTERPOLATE(D, D, E)
         ELSE
             D1 = INTERPOLATE(D, E)
         ENDIF
 
         IF I == L OR C == D, THEN
-            D2 = INTERPOLATE(D, INTERPOLATE(D, H))
+            D2 = INTERPOLATE(D, D, H)
         ELSE
             D2 = INTERPOLATE(H, I)
         ENDIF
@@ -267,9 +272,18 @@ M|N O|P
 ```
 可能是是性能上的提升吧?
 
+![supersai2x](./supersai2x.png)
+(supersai2x后4倍最邻插值)
+
+可以看出依旧在100%下是最好的. BUG? 这个算法有BUG吧? 感觉像素变成竖线了. 和2xSaI对比一下:
+
+![supersai2x_vs](./supersai2x_vs.gif)
+(与2xSaI对比, 均作了4倍最邻插值)
 
 
-???? BUG? 这个算法有BUG吧? 感觉像素变成竖线了. 处理得比较好的是非坐标对齐的图像, 处理得不好的是坐标对齐的图像, 可能这是这个算法的偏向吧. 
+
+
+处理得比较好的是非坐标对齐的图像, 处理得不好的是坐标对齐的图像, 可能这是这个算法的偏向吧. 
 
 作者Kreed的这一系列大致是对点周围共计16点判断, 然后生成2x2的新数据, 会产生新的像素, 会产生像素偏移. 
 

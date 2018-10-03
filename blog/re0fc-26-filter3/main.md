@@ -52,6 +52,8 @@ HQx处理的效果非常讨人喜, 之前ScaleHQ提到的折线转交处也处�
 
 缺点, 除了实现比较困难外, 效果上可能就是把那个笑脸变成相低多边形的圆了.
 
+但是实际上, HQx在文字显示非常不错, 在实际的游戏中就稍微差了一点.
+
 ### REF
  - [HQx](https://en.wikipedia.org/wiki/Hqx)
  - [ScaleHQ on libretro](https://github.com/libretro/common-shaders/tree/master/scalehq)
