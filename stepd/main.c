@@ -387,8 +387,6 @@ static void this_audio_event(void* arg, uint32_t cycle, int type) {
     g_famicom->apu.dmc = g_states.dmc;
 }
 
-// Windows API
-extern void _stdcall Sleep(unsigned);
 
 /// <summary>
 /// 提交当前缓冲区
@@ -595,7 +593,11 @@ void get_cso_file_path(char path_input[PATH_BUFLEN]) {
     }
     // 输入shader文件地址
     printf("Input shader file(*.cso) path: ");
+#ifdef _MSC_VER
     gets_s(path_input, PATH_BUFLEN);
+#else
+    gets(path_input);
+#endif
     const uint32_t len = strlen(path_input);
     {
         // 保存输入

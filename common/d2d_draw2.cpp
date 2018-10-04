@@ -1,7 +1,6 @@
 ﻿#define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <windows.h>
-#include <timeapi.h>
 #include <d2d1_1.h>
 //#include <unknwn.h>
 #include <d3d11.h>
@@ -15,6 +14,8 @@
 #include <iterator>
 #include <algorithm>
 #include "d2d_interface2.h"
+
+#include <mmsystem.h>
 
 #pragma comment(lib, "Winmm.lib")
 #pragma comment(lib, "dxgi.lib")
@@ -579,14 +580,14 @@ public:
     IFACEMETHODIMP SetDrawInfo(ID2D1DrawInfo *pDrawInfo) noexcept override;
 public:
     // 构造函数
-    FamicomAE() noexcept {}
+    FamicomAE() noexcept { m_cRef = 1; }
     // 析构函数
     ~FamicomAE() noexcept { ::SafeRelease(m_pDrawInfo); }
 private:
     // 刻画信息
     ID2D1DrawInfo*              m_pDrawInfo = nullptr;
     // 引用计数器
-    std::atomic<uint32_t>       m_cRef = 1;
+    std::atomic<uint32_t>       m_cRef;
     // 放大倍数
     uint32_t                    m_cScale = GetScaleFac();
     // 输入矩形
@@ -616,18 +617,21 @@ auto FamicomAE__Register(ID2D1Factory1* factory) noexcept ->HRESULT {
 </Effect>
 )xml";
     // 创建
-    auto create_this = [](IUnknown** effect) noexcept ->HRESULT {
-        assert(effect && "bad argment");
-        ID2D1EffectImpl* obj = new(std::nothrow) FamicomAE();
-        *effect = obj;
-        return obj ? S_OK : E_OUTOFMEMORY;
+    struct create_this {
+        static HRESULT WINAPI call(IUnknown** effect) noexcept {
+            assert(effect && "bad argment");
+            ID2D1EffectImpl* obj = new(std::nothrow) FamicomAE();
+            *effect = obj;
+            return obj ? S_OK : E_OUTOFMEMORY;
+        };
+        
     };
     // 注册
     return factory->RegisterEffectFromString(
         CLSID_DustPG_FamicomAE,
         pszXml,
         nullptr, 0,
-        create_this
+        create_this::call
     );
 }
 

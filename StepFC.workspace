@@ -11,7 +11,9 @@
   <Project Name="step8" Path="step8/step8.project" Active="No"/>
   <Project Name="step9" Path="step9/step9.project" Active="No"/>
   <Project Name="stepa" Path="stepa/stepa.project" Active="No"/>
-  <Project Name="stepb" Path="stepb/stepb.project" Active="Yes"/>
+  <Project Name="stepb" Path="stepb/stepb.project" Active="No"/>
+  <Project Name="stepc" Path="stepc/stepc.project" Active="No"/>
+  <Project Name="stepd" Path="stepd/stepd.project" Active="Yes"/>
   <BuildMatrix>
     <WorkspaceConfiguration Name="Debug" Selected="yes">
       <Environment/>
@@ -27,6 +29,8 @@
       <Project Name="step9" ConfigName="Debug"/>
       <Project Name="stepa" ConfigName="Debug"/>
       <Project Name="stepb" ConfigName="Debug"/>
+      <Project Name="stepc" ConfigName="Debug"/>
+      <Project Name="stepd" ConfigName="Debug"/>
     </WorkspaceConfiguration>
     <WorkspaceConfiguration Name="Release" Selected="yes">
       <Environment/>
@@ -42,6 +46,8 @@
       <Project Name="step9" ConfigName="Debug"/>
       <Project Name="stepa" ConfigName="Debug"/>
       <Project Name="stepb" ConfigName="Debug"/>
+      <Project Name="stepc" ConfigName="Debug"/>
+      <Project Name="stepd" ConfigName="Debug"/>
     </WorkspaceConfiguration>
   </BuildMatrix>
 </CodeLite_Workspace>

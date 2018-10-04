@@ -51,7 +51,7 @@ extern void sfc_render_frame_easy(
 
 enum {
     IB_IS_RECORD = 0,
-    IB_IS_REPLAY = 0,
+    IB_IS_REPLAY = 1,
 };
 
 struct interface_audio_state {
