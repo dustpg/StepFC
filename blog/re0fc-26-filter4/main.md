@@ -132,7 +132,7 @@ f0 = ----------
 ```c
 float input, output, prev_output;
 
-float cutoff_frequency = 90;
+float cutoff_frequency = 14000;
 float sample_frequency = 44100;
 float PI = 3.1415926535897932384626433832795;
 
@@ -167,7 +167,7 @@ f0 = ----------
 ```c
 float input, output, prev_input, prev_output;
 
-float cutoff_frequency = 14000;
+float cutoff_frequency = 90;
 float sample_frequency = 44100;
 float PI = 3.1415926535897932384626433832795;
 
