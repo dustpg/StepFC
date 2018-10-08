@@ -68,7 +68,7 @@ void sfc_famicom_uninit(sfc_famicom_t* famicom) {
 
 
 /// <summary>
-/// StepFC: 设置名词表用仓库
+/// StepFC: 设置名称表用仓库
 /// </summary>
 /// <param name="famicom">The famicom.</param>
 static inline void sfc_setup_nametable_bank(sfc_famicom_t* famicom) {

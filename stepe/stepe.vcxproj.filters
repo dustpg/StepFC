@@ -1,0 +1,126 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClInclude Include="sfc_mapper_helper.h">
+      <Filter>mapper</Filter>
+    </ClInclude>
+    <ClInclude Include="sfc_6502.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="sfc_apu.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="sfc_audio_filter.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="sfc_code.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="sfc_config.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="sfc_cpu.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="sfc_famicom.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="sfc_mapper.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="sfc_play.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="sfc_ppu.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="sfc_rom.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\d2d_interface2.h">
+      <Filter>cpp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\p_XAudio2_7.h">
+      <Filter>cpp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\p_XAudio2_base.h">
+      <Filter>cpp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\xa2_interface1.h">
+      <Filter>cpp</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="main.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="sfc_6502.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="sfc_addr4020.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="sfc_config.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="sfc_cpu.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="sfc_crc32b.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="sfc_mapper.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="sfc_mapper_001_mmc1.c">
+      <Filter>mapper</Filter>
+    </ClCompile>
+    <ClCompile Include="sfc_mapper_002_uxrom.c">
+      <Filter>mapper</Filter>
+    </ClCompile>
+    <ClCompile Include="sfc_mapper_003_cnrom.c">
+      <Filter>mapper</Filter>
+    </ClCompile>
+    <ClCompile Include="sfc_mapper_004_mmc3.c">
+      <Filter>mapper</Filter>
+    </ClCompile>
+    <ClCompile Include="sfc_mapper_074_mmc3_mo.c">
+      <Filter>mapper</Filter>
+    </ClCompile>
+    <ClCompile Include="sfc_famicom.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="sfc_play_ez.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="sfc_ppu.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="sfc_render_ez.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="sfc_state_sl.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\d2d_draw2.cpp">
+      <Filter>cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\xa2_play1.cpp">
+      <Filter>cpp</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="cpp">
+      <UniqueIdentifier>{699d82da-5462-4b39-8ff8-ac66bfd11c81}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="header">
+      <UniqueIdentifier>{4bb68818-9c0f-4a62-84a6-84f6bff4c4b2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src">
+      <UniqueIdentifier>{d6cd7ccc-5334-4bbe-b815-f84c0340b75d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="mapper">
+      <UniqueIdentifier>{85b898db-1688-47d3-93c1-e5b9ad85639f}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
