@@ -88,7 +88,7 @@ INS #$A
 INS #$A, X
 ```
 
-8. **零页X变址** Zero-page Y Indexed Addressing
+8. **零页Y变址** Zero-page Y Indexed Addressing
 双字节指令, 格式
 ```
 INS #$A, Y

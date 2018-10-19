@@ -53,11 +53,11 @@ CHECK_ZSFLAG(X);
 ### LDY - Load 'Y'
 | 寻址模式| 汇编格式| OP代码 |指令字节|指令周期|
 |--------|--------------|----|---------|----------|
-|  立即   |   LDX #Oper   |    A2   |    2    |    2     |
-|  零页   |   LDX Oper    |    A6   |    2    |    3     |
-|  零页,Y |   LDX Oper,Y  |    B6   |    2    |    4     |
-|  绝对   |   LDX Oper    |    AE   |    3    |    4     |
-|  绝对,Y |   LDX Oper,Y  |    BE   |    3    |    4*    |
+|  立即   |   LDY #Oper   |    A0   |    2    |    2     |
+|  零页   |   LDY Oper    |    A4   |    2    |    3     |
+|  零页,X |   LDY Oper,X  |    B4   |    2    |    4     |
+|  绝对   |   LDY Oper    |    AC   |    3    |    4     |
+|  绝对,X |   LDY Oper,X  |    BC   |    3    |    4*    |
 
 \* 在页面边界交叉时 +1s
 
