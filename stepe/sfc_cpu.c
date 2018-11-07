@@ -19,12 +19,7 @@ extern inline uint8_t sfc_get_inslen(uint8_t);
 extern inline uint8_t sfc_read_prgdata(uint16_t address, const sfc_famicom_t* famicom) {
     assert(((address & (uint16_t)0x8000) == (uint16_t)0x8000) || (address>>13) == 0);
     const uint16_t prgaddr = address;
-    return famicom->prg_banks[prgaddr >> 13][prgaddr & (uint16_t)0x1fff];
-    //const uint16_t id = prgaddr >> 13;
-    //if (id)
-    //    return famicom->prg_banks[id][prgaddr & (uint16_t)0x1fff];
-    //else
-    //    return famicom->prg_banks[0][prgaddr & (uint16_t)0x7ff];
+    return famicom->prg_banks[prgaddr >> 12][prgaddr & (uint16_t)0x0fff];
 }
 
 /// <summary>
@@ -112,7 +107,7 @@ uint8_t sfc_read_cpu_address(uint16_t address, sfc_famicom_t* famicom) {
         return famicom->save_memory[address & (uint16_t)0x1fff];
     case 4: case 5: case 6: case 7:
         // 高一位为1, [$8000, $10000) 程序PRG-ROM区
-        return famicom->prg_banks[address >> 13][address & (uint16_t)0x1fff];
+        return famicom->prg_banks[address >> 12][address & (uint16_t)0x0fff];
     }
     assert(!"invalid address");
     return 0;
@@ -161,7 +156,7 @@ void sfc_write_cpu_address(uint16_t address, uint8_t data, sfc_famicom_t* famico
         // 高三位为2, [$4000, $6000): pAPU寄存器 扩展ROM区
         // 前0x20字节为APU, I / O寄存器
         if (address < 0x4020) sfc_write_cpu_address4020(address, data, famicom);
-        else assert(!"NOT IMPL");
+        else famicom->mapper.write_low(famicom, address, data);
         return;
     case 3:
         // 高三位为3, [$6000, $8000): 存档 SRAM区

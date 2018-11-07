@@ -78,7 +78,7 @@ enum {
 
 
 /// <summary>
-/// NFS 文件头
+/// NSF 文件头
 /// </summary>
 typedef struct {
     // NESM
@@ -116,21 +116,22 @@ typedef struct {
     // 扩展位
     uint8_t     expansion[4];
 
-} sfc_nfs_header_t;
+} sfc_nsf_header_t;
 
-
+// 交换大小端
+void sfc_nsf_swap_endian(sfc_nsf_header_t* header);
 
 /// <summary>
-/// NFS 文件头用标志位
+/// NSF 文件头用标志位
 /// </summary>
-enum NFS_HEADER_FLAGS {
+enum NSF_HEADER_FLAGS {
     /*
         bit 0: if clear, this is an NTSC tune
         bit 0: if set, this is a PAL tune
         bit 1: if set, this is a dual PAL/NTSC tune
     */
-    SFC_NFS_PNB_IsPAL = 1 << 0,
-    SFC_NFS_PNB_Dual = 1 << 1,
+    SFC_NSF_PNB_IsPAL = 1 << 0,
+    SFC_NSF_PNB_Dual = 1 << 1,
     /*
         bit 0: if set, this song uses VRC6 audio
         bit 1: if set, this song uses VRC7 audio
@@ -139,10 +140,10 @@ enum NFS_HEADER_FLAGS {
         bit 4: if set, this song uses Namco 163 audio
         bit 5: if set, this song uses Sunsoft 5B audio
     */
-    SFC_NFS_EX_VCR6 = 1 << 0,
-    SFC_NFS_EX_VCR7 = 1 << 1,
-    SFC_NFS_EX__FDS = 1 << 2,
-    SFC_NFS_EX_MMC5 = 1 << 3,
-    SFC_NFS_EX_N163 = 1 << 4,
-    SFC_NFS_EX_FME7 = 1 << 5,
+    SFC_NSF_EX_VCR6 = 1 << 0,
+    SFC_NSF_EX_VCR7 = 1 << 1,
+    SFC_NSF_EX__FDS = 1 << 2,
+    SFC_NSF_EX_MMC5 = 1 << 3,
+    SFC_NSF_EX_N163 = 1 << 4,
+    SFC_NSF_EX_FME7 = 1 << 5,
 };

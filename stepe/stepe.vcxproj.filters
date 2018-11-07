@@ -108,6 +108,9 @@
     <ClCompile Include="..\common\xa2_play1.cpp">
       <Filter>cpp</Filter>
     </ClCompile>
+    <ClCompile Include="sfc_mapper_031_nsfs.c">
+      <Filter>mapper</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="cpp">

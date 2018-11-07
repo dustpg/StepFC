@@ -84,8 +84,10 @@ extern void sfc_before_execute(void*, sfc_famicom_t*);
 typedef struct {
     // Mapper 重置
     sfc_ecode(*reset)(sfc_famicom_t*);
+    // 写入低地址
+    void(*write_low)(sfc_famicom_t*, uint16_t, uint8_t);
     // 写入高地址
-    void (*write_high)(sfc_famicom_t*, uint16_t, uint8_t);
+    void(*write_high)(sfc_famicom_t*, uint16_t, uint8_t);
     // 水平同步
     void(*hsync)(sfc_famicom_t*);
     // 写入RAM到流
@@ -130,7 +132,7 @@ struct sfc_famicom {
     // 手柄按钮状态
     uint8_t             button_states[16];
     // 程序内存仓库(Bank)/窗口(Window)
-    uint8_t*            prg_banks[0x10000 >> 13];
+    uint8_t*            prg_banks[0x10000 >> 12];
     // 工作(work)/保存(save)内存
     uint8_t             save_memory[8 * 1024];
     // 显存

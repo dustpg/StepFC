@@ -736,6 +736,30 @@ void qload() {
     fclose(file);
 }
 
+/// <summary>
+/// Thises the is be.
+/// </summary>
+/// <returns></returns>
+static inline uint8_t this_is_be() {
+    const uint16_t data = 0x0100;
+    return *(const uint8_t*)(&data);
+}
+
+/// <summary>
+/// Thises the load NSF.
+/// </summary>
+/// <param name="info">The information.</param>
+/// <returns></returns>
+sfc_ecode this_load_nsf(sfc_rom_info_t* info, FILE* file) {
+    sfc_nsf_header_t header;
+    const size_t count = fread(&header, sizeof(header), 1, file);
+    fseek(file, 0, SEEK_SET);
+    // 交换大小端
+    if (this_is_be()) sfc_nsf_swap_endian(&header);
+
+    return SFC_ERROR_ILLEGAL_FILE;
+}
+
 
 /// <summary>
 /// 加载ROM
@@ -745,11 +769,11 @@ void qload() {
 /// <returns></returns>
 sfc_ecode this_load_rom(void* arg, sfc_rom_info_t* info) {
     assert(info->data_prgrom == NULL && "FREE FIRST");
-    //FILE* const file = fopen("cpu_interrupts.nes", "rb");
-    FILE* const file = fopen("D:/doc/fcrom/pico.NES", "rb");
+    FILE* const file = fopen("31_test_16.nes", "rb");
     // 文本未找到
     if (!file) return SFC_ERROR_FILE_NOT_FOUND;
     sfc_ecode code = SFC_ERROR_ILLEGAL_FILE;
+    //sfc_ecode code = this_load_nsf(info, file);
     // 读取文件头
     sfc_nes_header_t nes_header;
     if (fread(&nes_header, sizeof(nes_header), 1, file)) {

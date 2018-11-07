@@ -46,7 +46,9 @@ sfc_ecode sfc_famicom_init(
     famicom->interfaces.sl_read_stream = sfc_sl_stream;
     // 初步BANK
     famicom->prg_banks[0] = famicom->main_memory;
-    famicom->prg_banks[3] = famicom->save_memory;
+    famicom->prg_banks[1] = famicom->main_memory;
+    famicom->prg_banks[6] = famicom->save_memory;
+    famicom->prg_banks[7] = famicom->save_memory + 4*1024;
     // 提供了接口
     if (interfaces) {
         const int count = sizeof(*interfaces) / sizeof(interfaces->load_rom);
@@ -240,4 +242,33 @@ sfc_ecode sfc_load_new_rom(sfc_famicom_t* famicom) {
         code = sfc_famicom_reset(famicom);
     }
     return code;
+}
+
+
+/// <summary>
+/// SFCs the NSF swap endian u16.
+/// </summary>
+/// <param name="data">The data.</param>
+static inline void sfc_nsf_swap_endian_u16(uint16_t* data) {
+    union {
+        uint16_t    u16;
+        uint8_t     u8[2];
+    } union_data;
+    union_data.u16 = *data;
+    const uint8_t a = union_data.u8[0];
+    union_data.u8[0] = union_data.u8[1];
+    union_data.u8[1] = a;
+    *data = union_data.u16;
+}
+
+/// <summary>
+/// SFCs the NSF swap endian.
+/// </summary>
+/// <param name="header">The header.</param>
+void sfc_nsf_swap_endian(sfc_nsf_header_t* header) {
+    sfc_nsf_swap_endian_u16(&header->load_addr_le);
+    sfc_nsf_swap_endian_u16(&header->init_addr_le);
+    sfc_nsf_swap_endian_u16(&header->play_addr_le);
+    sfc_nsf_swap_endian_u16(&header->play_speed_ntsc_le);
+    sfc_nsf_swap_endian_u16(&header->play_speed__pal_le);
 }

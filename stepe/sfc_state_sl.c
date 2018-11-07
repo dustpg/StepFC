@@ -45,7 +45,7 @@ enum SFC_SL_CONSTANT {
     // 主版本号
     SL_MAJOR_VER = 0x01,
     // 副版本号
-    SL_MINOR_VER = 0x00,
+    SL_MINOR_VER = 0x01,
 };
 
 /// <summary>
@@ -81,7 +81,7 @@ typedef struct {
     // 16字节对齐/ 保留用
     uint8_t         reserved1[8];
     // CPU BANK 高位偏移
-    uint32_t        cpu_hi_banks_offset[4];
+    uint32_t        cpu_hi_banks_offset[8];
     // PPU BANK 低位偏移
     uint32_t        ppu_lo_banks_offset[8];
     // PPU BANK 高位偏移
@@ -210,9 +210,9 @@ void sfc_famicom_save_state(sfc_famicom_t* famicom) {
         basic.cpu_cycle_lo = famicom->cpu_cycle_count;
         basic.ram_mask = ram_mask;
         // BANKS 偏移量
-        for (int i = 0; i != 4; ++i)
+        for (int i = 0; i != 8; ++i)
             basic.cpu_hi_banks_offset[i]
-            = famicom->prg_banks[4 + i]
+            = famicom->prg_banks[8 + i]
             - famicom->rom_info.data_prgrom
             ;
         for (int i = 0; i != 8; ++i)
@@ -324,8 +324,8 @@ sfc_ecode sfc_famicom_load_state(sfc_famicom_t* famicom) {
         famicom->cpu_cycle_count = hb.cpu_cycle_lo;
         ram_mask = hb.ram_mask;
         // BANKS 偏移量
-        for (int i = 0; i != 4; ++i)
-            famicom->prg_banks[4 + i]
+        for (int i = 0; i != 8; ++i)
+            famicom->prg_banks[8 + i]
             = hb.cpu_hi_banks_offset[i]
             + famicom->rom_info.data_prgrom
             ;

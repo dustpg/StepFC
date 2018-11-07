@@ -61,7 +61,7 @@ SRAM,  PRG-ROM: 已经说过了
 ### Mapper000 - NROM
 目前当然是实现Mapper000, 实际上也就是没有Mapper的意思:
 
- - 适用于16KB(NROM-128)或者32KB(NROM-256)的RPG-ROM
+ - 适用于16KB(NROM-128)或者32KB(NROM-256)的PRG-ROM
  - CPU ```$8000-$BFFF```: ROM开始的16kb
  - CPU ```$C000-$FFFF```: ROM最后的16kb
 
@@ -85,7 +85,7 @@ BANK是每个Mapper载入的单位, 在某种意义上也可以称为window. 根
  - ```1: [$2000, $4000)``` PPU 寄存器
  - ```2: [$4000, $6000)``` pAPU寄存器以及扩展区域
  - ```3: [$6000, $8000)``` 存档用SRAM区
- - 剩下的全是 程序代码区 RPG-ROM
+ - 剩下的全是 程序代码区 PRG-ROM
 
 也就是:
 ```c

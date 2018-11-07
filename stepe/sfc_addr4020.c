@@ -106,7 +106,6 @@ extern inline uint8_t sfc_read_cpu_address4020(uint16_t address, sfc_famicom_t* 
 /// <param name="data">The data.</param>
 /// <returns></returns>
 static inline const uint8_t* sfc_get_dma_address(uint8_t data, const sfc_famicom_t* famicom) {
-    const uint16_t offset = ((uint16_t)(data & 0x07) << 8);
     switch (data >> 5)
     {
     default:
@@ -118,13 +117,13 @@ static inline const uint8_t* sfc_get_dma_address(uint8_t data, const sfc_famicom
         assert(!"TODO");
     case 0:
         // 系统内存
-        return famicom->main_memory + offset;
+        return famicom->main_memory + ((uint16_t)(data & 0x07) << 8);
     case 3:
         // 存档 SRAM区
-        return famicom->save_memory + offset;
+        return famicom->save_memory + ((uint16_t)(data & 0x1f) << 8);
     case 4: case 5: case 6: case 7:
         // 高一位为1, [$8000, $10000) 程序PRG-ROM区
-        return famicom->prg_banks[data >> 5] + offset;
+        return famicom->prg_banks[data >> 4] + ((uint16_t)(data & 0x0f) << 8);
     }
 }
 
