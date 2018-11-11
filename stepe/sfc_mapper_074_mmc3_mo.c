@@ -20,7 +20,8 @@ static void sfc_mapper_wrts_074(const sfc_famicom_t* famicom) {
     // PRG-RAM 不考虑
 
     // $08 $09是CHR-RAM
-    assert(famicom->rom_info.count_chrrom_8kb >= 2);
+
+    assert(famicom->rom_info.size_chrrom >= 16*1024);
     famicom->interfaces.sl_write_stream(
         famicom->argument,
         famicom->rom_info.data_chrrom 
@@ -37,7 +38,7 @@ static void sfc_mapper_rrfs_074(sfc_famicom_t* famicom) {
     // PRG-RAM 不考虑
 
     // $08 $09是CHR-RAM
-    assert(famicom->rom_info.count_chrrom_8kb >= 2);
+    assert(famicom->rom_info.size_chrrom >= 16 * 1024);
     famicom->interfaces.sl_read_stream(
         famicom->argument,
         famicom->rom_info.data_chrrom

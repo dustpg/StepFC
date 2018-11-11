@@ -47,6 +47,7 @@ sfc_ecode sfc_famicom_init(
     // 初步BANK
     famicom->prg_banks[0] = famicom->main_memory;
     famicom->prg_banks[1] = famicom->main_memory;
+    famicom->prg_banks[4] = famicom->bus_memory;
     famicom->prg_banks[6] = famicom->save_memory;
     famicom->prg_banks[7] = famicom->save_memory + 4*1024;
     // 提供了接口
@@ -189,6 +190,10 @@ sfc_ecode sfc_famicom_reset(sfc_famicom_t* famicom) {
     famicom->registers.status = 0x34
         | SFC_FLAG_R    //  一直为1
         ;
+    // NSF
+    if (famicom->rom_info.song_count) {
+        sfc_famicom_nsf_init(famicom, 0, 0);
+    }
     // 调色板
     // 名称表
     sfc_setup_nametable_bank(famicom);
@@ -225,8 +230,8 @@ sfc_ecode sfc_load_new_rom(sfc_famicom_t* famicom) {
     if (code == SFC_ERROR_OK) {
         // 计算HASH
         sfc_rom_info_t* const info = &famicom->rom_info;
-        info->prgrom_crc32b = sfc_crc32b(0, info->data_prgrom, info->count_prgrom16kb * 16 * 1024);
-        info->chrrom_crc32b = sfc_crc32b(0, info->data_chrrom, info->count_chrrom_8kb * 8 * 1024);
+        info->prgrom_crc32b = sfc_crc32b(0, info->data_prgrom, info->size_prgrom);
+        info->chrrom_crc32b = sfc_crc32b(0, info->data_chrrom, info->size_chrrom);
         // 载入SRAM
         sfc_check_load_sram(famicom);
     }
@@ -246,19 +251,19 @@ sfc_ecode sfc_load_new_rom(sfc_famicom_t* famicom) {
 
 
 /// <summary>
+/// uint8_t x2
+/// </summary>
+typedef struct { uint8_t a, b; } u8x2_t;
+
+/// <summary>
 /// SFCs the NSF swap endian u16.
 /// </summary>
 /// <param name="data">The data.</param>
 static inline void sfc_nsf_swap_endian_u16(uint16_t* data) {
-    union {
-        uint16_t    u16;
-        uint8_t     u8[2];
-    } union_data;
-    union_data.u16 = *data;
-    const uint8_t a = union_data.u8[0];
-    union_data.u8[0] = union_data.u8[1];
-    union_data.u8[1] = a;
-    *data = union_data.u16;
+    u8x2_t* const ptr = (u8x2_t*)data;
+    const uint8_t c = ptr->a;
+    ptr->a = ptr->b;
+    ptr->b = c;
 }
 
 /// <summary>

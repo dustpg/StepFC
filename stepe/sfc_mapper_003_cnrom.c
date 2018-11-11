@@ -25,7 +25,8 @@ extern sfc_ecode sfc_mapper_00_reset(sfc_famicom_t* famicom);
 /// <param name="address">The address.</param>
 /// <param name="value">The value.</param>
 static void sfc_mapper_03_write_high(sfc_famicom_t* famicom, uint16_t address, uint8_t value) {
-    const int bank = (value % famicom->rom_info.count_chrrom_8kb) * 8;
+    const uint32_t count_prgrom8kb = famicom->rom_info.size_prgrom >> 13;
+    const int bank = (value % count_prgrom8kb) * 8;
     for (int i = 0; i != 8; ++i)
         sfc_load_chrrom_1k(famicom, i, bank +i );
 }

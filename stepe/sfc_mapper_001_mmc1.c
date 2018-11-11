@@ -147,7 +147,7 @@ static void sfc_mapper_01_write_prgbank(sfc_famicom_t* famicom) {
     case 3:
         // 固定高16KB到最后 切换低16KB
         bank = bankid * 2;
-        last = famicom->rom_info.count_prgrom16kb * 2;
+        last = famicom->rom_info.size_prgrom >> 13;
         sfc_load_prgrom_8k(famicom, 0, bank + 0);
         sfc_load_prgrom_8k(famicom, 1, bank + 1);
         sfc_load_prgrom_8k(famicom, 2, last - 2);
@@ -193,12 +193,13 @@ static void sfc_mapper_01_write_register(sfc_famicom_t* famicom, uint16_t addres
 /// <param name="famicom">The famicom.</param>
 /// <returns></returns>
 static sfc_ecode sfc_mapper_01_reset(sfc_famicom_t* famicom) {
+    const uint32_t count_prgrom16kb = famicom->rom_info.size_prgrom >> 14;
     // 你用MMC1居然没有32KB PRG-ROM?
-    assert(famicom->rom_info.count_prgrom16kb > 2 && "bad count");
+    assert(count_prgrom16kb > 2 && "bad count");
     // PRG-ROM
     sfc_load_prgrom_8k(famicom, 0, 0);
     sfc_load_prgrom_8k(famicom, 1, 1);
-    const int last = famicom->rom_info.count_prgrom16kb * 2;
+    const int last = count_prgrom16kb * 2;
     sfc_load_prgrom_8k(famicom, 2, last-2);
     sfc_load_prgrom_8k(famicom, 3, last-1);
     // CHR-ROM

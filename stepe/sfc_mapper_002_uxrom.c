@@ -17,12 +17,13 @@
 /// <param name="famicom">The famicom.</param>
 /// <returns></returns>
 static sfc_ecode sfc_mapper_02_reset(sfc_famicom_t* famicom) {
+    const uint32_t count_prgrom16kb = famicom->rom_info.size_prgrom >> 14;
     // 你用UxROM居然没有32KB PRG-ROM?
-    assert(famicom->rom_info.count_prgrom16kb > 2 && "bad count");
+    assert(count_prgrom16kb > 2 && "bad count");
     // PRG-ROM
     sfc_load_prgrom_8k(famicom, 0, 0);
     sfc_load_prgrom_8k(famicom, 1, 1);
-    const int last = famicom->rom_info.count_prgrom16kb * 2;
+    const int last = count_prgrom16kb * 2;
     sfc_load_prgrom_8k(famicom, 2, last-2);
     sfc_load_prgrom_8k(famicom, 3, last-1);
     // CHR-ROM 没有 是RAM
@@ -39,7 +40,8 @@ static sfc_ecode sfc_mapper_02_reset(sfc_famicom_t* famicom) {
 /// <param name="address">The address.</param>
 /// <param name="value">The value.</param>
 static void sfc_mapper_02_write_high(sfc_famicom_t* famicom, uint16_t address, uint8_t value) {
-    const int bank = (value % famicom->rom_info.count_prgrom16kb) * 2;
+    const uint32_t count_prgrom16kb = famicom->rom_info.size_prgrom >> 14;
+    const int bank = (value % count_prgrom16kb) * 2;
     sfc_load_prgrom_8k(famicom, 0, bank + 0);
     sfc_load_prgrom_8k(famicom, 1, bank + 1);
 }

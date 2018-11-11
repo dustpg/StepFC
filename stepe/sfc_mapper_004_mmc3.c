@@ -88,7 +88,7 @@ static void sfc_mapper_04_update_banks(sfc_famicom_t* famicom) {
         sfc_load_chrrom_1k(famicom, 7, R5);
     }
     
-    const int last = famicom->rom_info.count_prgrom16kb * 2;
+    const int last = famicom->rom_info.size_prgrom >> 13;
     if (mapper->prmode) {
         // (-2) R7 R6 (-1)
         sfc_load_prgrom_8k(famicom, 0, last - 2);
@@ -240,12 +240,13 @@ static inline void sfc_mapper_04_write_irq_enable(sfc_famicom_t* famicom, uint8_
 /// <param name="famicom">The famicom.</param>
 /// <returns></returns>
 static sfc_ecode sfc_mapper_04_reset(sfc_famicom_t* famicom) {
+    const uint32_t count_prgrom16kb = famicom->rom_info.size_prgrom >> 14;
     // 你用MMC4居然没有32KB PRG-ROM?
-    assert(famicom->rom_info.count_prgrom16kb > 2 && "bad count");
+    assert(count_prgrom16kb > 2 && "bad count");
     // PRG-ROM
     sfc_load_prgrom_8k(famicom, 0, 0);
     sfc_load_prgrom_8k(famicom, 1, 1);
-    const int last = famicom->rom_info.count_prgrom16kb * 2;
+    const int last = count_prgrom16kb * 2;
     sfc_load_prgrom_8k(famicom, 2, last - 2);
     sfc_load_prgrom_8k(famicom, 3, last - 1);
     // CHR-ROM

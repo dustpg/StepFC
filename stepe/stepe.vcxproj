@@ -149,6 +149,7 @@
     <ClCompile Include="sfc_mapper_002_uxrom.c" />
     <ClCompile Include="sfc_mapper_003_cnrom.c" />
     <ClCompile Include="sfc_mapper_004_mmc3.c" />
+    <ClCompile Include="sfc_mapper_024_vrc6a.c" />
     <ClCompile Include="sfc_mapper_031_nsfs.c" />
     <ClCompile Include="sfc_mapper_074_mmc3_mo.c" />
     <ClCompile Include="sfc_play_ez.c" />

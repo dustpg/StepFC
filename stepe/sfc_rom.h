@@ -16,10 +16,10 @@ typedef struct {
     uint32_t    prgrom_crc32b;
     // CHR-ROM CRC32-b
     uint32_t    chrrom_crc32b;
-    // 16KB为单位 程序只读储存器 数据长度
-    uint32_t    count_prgrom16kb;
-    //  8KB为单位 角色只读存储器 数据长度
-    uint32_t    count_chrrom_8kb;
+    // 程序只读储存器 数据长度
+    uint32_t    size_prgrom;
+    // 角色只读存储器 数据长度
+    uint32_t    size_chrrom;
     // Mapper 编号
     uint8_t     mapper_number;
     // 是否Vertical Mirroring(否即为水平)
@@ -29,7 +29,27 @@ typedef struct {
     // 是否有SRAM(电池供电的)
     uint8_t     save_ram;
     // 保留以对齐
-    uint8_t     reserved[4];
+    uint8_t     reserved;
+    // PAL/NTSC 位
+    uint8_t     pal_ntsc_bits;
+    // 扩展音频 位
+    uint8_t     extra_sound;
+    // 曲子数量(>0表示NSF)
+    uint8_t     song_count;
+    // 加载地址
+    uint16_t    load_addr;
+    // 初始化地址
+    uint16_t    init_addr;
+    // 播放地址
+    uint16_t    play_addr;
+    // Bankswitch 初始值
+    uint8_t     bankswitch_init[8];
+    // 歌曲名称
+    char        name[32];
+    // 作者名称
+    char        artist[32];
+    // 版权
+    char        copyright[32];
 
 } sfc_rom_info_t;
 
@@ -82,7 +102,12 @@ enum {
 /// </summary>
 typedef struct {
     // NESM
-    char        nesm[4];
+    union {
+        // NESM
+        char        nesm[4];
+        // NESM
+        uint32_t    nesm_u32;
+    };
     // 1A
     uint8_t     u8_1a;
     // 版本号

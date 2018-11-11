@@ -38,7 +38,7 @@ static void sfc_mapper_wrts_defualt(const sfc_famicom_t* famicom) {
     // PRG-RAM 不考虑
 
     // 没有CHR-ROM则表明全是CHR-RAM
-    if (!famicom->rom_info.count_chrrom_8kb) {
+    if (!famicom->rom_info.size_chrrom) {
         famicom->interfaces.sl_write_stream(
             famicom->argument,
             famicom->rom_info.data_chrrom,
@@ -55,7 +55,7 @@ static void sfc_mapper_rrfs_defualt(sfc_famicom_t* famicom) {
     // PRG-RAM 不考虑
 
     // 没有CHR-ROM则表明全是CHR-RAM
-    if (!famicom->rom_info.count_chrrom_8kb) {
+    if (!famicom->rom_info.size_chrrom) {
         famicom->interfaces.sl_read_stream(
             famicom->argument,
             famicom->rom_info.data_chrrom,
@@ -115,12 +115,13 @@ extern sfc_ecode sfc_load_mapper(sfc_famicom_t* famicom, uint8_t id) {
 /// <param name="famicom">The famicom.</param>
 /// <returns></returns>
 extern sfc_ecode sfc_mapper_00_reset(sfc_famicom_t* famicom) {
-    assert(famicom->rom_info.count_prgrom16kb && "bad count");
-    assert(famicom->rom_info.count_prgrom16kb <= 2 && "bad count");
+    const uint32_t count_prgrom16kb = famicom->rom_info.size_prgrom >> 14;
+    assert(count_prgrom16kb && "bad count");
+    assert(count_prgrom16kb <= 2 && "bad count");
     // PRG-ROM
 
     // 16KB -> 载入 $8000-$BFFF, $C000-$FFFF 为镜像
-    const int id2 = famicom->rom_info.count_prgrom16kb & 2;
+    const int id2 = count_prgrom16kb & 2;
     // 32KB -> 载入 $8000-$FFFF
     sfc_load_prgrom_8k(famicom, 0, 0);
     sfc_load_prgrom_8k(famicom, 1, 1);

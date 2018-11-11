@@ -701,6 +701,7 @@ static inline void sfc_operation_NOP(uint16_t address, sfc_famicom_t* famicom, u
 
 }
 
+
 SFC_FORCEINLINE
 /// <summary>
 /// RTS: Return from Subroutine

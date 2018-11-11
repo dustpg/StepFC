@@ -436,6 +436,39 @@ static void play_audio(void* rgba) {
 // 标准调色板
 extern uint32_t sfc_stdpalette[];
 
+
+/// <summary>
+/// SFCs the play NSF once.
+/// </summary>
+/// <param name="famicom">The famicom.</param>
+void sfc_play_nsf_once(sfc_famicom_t* famicom) {
+    ++famicom->frame_counter;
+    const uint32_t cpu_cycle_per_frame_4 = famicom->config.cpu_cycle_per_frame / 4;
+    // 1-3
+    for (uint32_t i = 0; i != 3; ++i) {
+        const uint32_t cpu_cycle_per_frame_this = cpu_cycle_per_frame_4 * i;
+        while (famicom->cpu_cycle_count < cpu_cycle_per_frame_this)
+            sfc_cpu_execute_one(famicom);
+        sfc_trigger_frame_counter(famicom);
+    }
+    // 4-U
+    const uint32_t cpu_cycle_per_frame_this = cpu_cycle_per_frame_4 * 3 / 4;
+    while (famicom->cpu_cycle_count < cpu_cycle_per_frame_this)
+        sfc_cpu_execute_one(famicom);
+
+    // VB
+    sfc_famicom_nsf_play(g_famicom);
+
+    // 4-D
+    const uint32_t cpu_cycle_per_frame = famicom->config.cpu_cycle_per_frame;
+    while (famicom->cpu_cycle_count < cpu_cycle_per_frame)
+        sfc_cpu_execute_one(famicom);
+    sfc_trigger_frame_counter(famicom);
+
+    // END
+    famicom->cpu_cycle_count = 0;
+}
+
 /// <summary>
 /// 主渲染
 /// </summary>
@@ -445,7 +478,10 @@ extern void main_render(void* rgba) {
 
     // 记录信息
     ib_try_record_replay();
-    sfc_render_frame_easy(g_famicom, buffer);
+    if (g_famicom->rom_info.song_count)
+        sfc_play_nsf_once(g_famicom);
+    else
+        sfc_render_frame_easy(g_famicom, buffer);
 
     // 数据有效
 
@@ -655,8 +691,8 @@ int main() {
 
     printf(
         "ROM: PRG-ROM: %d x 16kb   CHR-ROM %d x 8kb   Mapper: %03d\n",
-        (int)famicom.rom_info.count_prgrom16kb,
-        (int)famicom.rom_info.count_chrrom_8kb,
+        (int)famicom.rom_info.size_prgrom / (16*1024),
+        (int)famicom.rom_info.size_chrrom / (8 *1024),
         (int)famicom.rom_info.mapper_number
     );
     xa2_init(SAMPLES_PER_SEC);
@@ -753,10 +789,52 @@ static inline uint8_t this_is_be() {
 sfc_ecode this_load_nsf(sfc_rom_info_t* info, FILE* file) {
     sfc_nsf_header_t header;
     const size_t count = fread(&header, sizeof(header), 1, file);
-    fseek(file, 0, SEEK_SET);
     // 交换大小端
     if (this_is_be()) sfc_nsf_swap_endian(&header);
-
+    // 检测合法性
+    union {
+        // NESM
+        char        nesm[4];
+        // NESM
+        uint32_t    nesm_u32;
+    } data;
+    data.nesm[0] = 'N';
+    data.nesm[1] = 'E';
+    data.nesm[2] = 'S';
+    data.nesm[3] = 'M';
+    // 开头匹配
+    if (header.nesm_u32 == data.nesm_u32 && header.u8_1a == 0x1a) {
+        // 获取ROM长度
+        fseek(file, 0, SEEK_END);
+        const long len = ftell(file) - sizeof(header);
+        const size_t offset = header.load_addr_le & 0x0fff;
+        const size_t alloclen = len + offset + 8 * 1024;
+        uint8_t* const data_ptr = malloc(alloclen);
+        if (!data_ptr) return SFC_ERROR_OUT_OF_MEMORY;
+        memset(data_ptr, 0, alloclen);
+        fseek(file, sizeof(header), SEEK_SET);
+        fread(data_ptr + offset, len, 1, file);
+        // 填写信息
+        info->data_prgrom = data_ptr;
+        info->data_chrrom = data_ptr + len + offset;
+        info->size_prgrom = len;
+        info->size_chrrom = 0;
+        info->mapper_number = 0x1f;
+        info->vmirroring = 0;
+        info->save_ram = 0;
+        info->four_screen = 0;
+        // NSF
+        memcpy(info->name, &header.name, sizeof(info->name) * 3);
+        memcpy(info->bankswitch_init, &header.bankswitch_init, sizeof(header.bankswitch_init));
+        info->song_count = header.count;
+        info->load_addr = header.load_addr_le;
+        info->init_addr = header.init_addr_le;
+        info->play_addr = header.play_addr_le;
+        info->pal_ntsc_bits = header.pal_ntsc_bits;
+        info->extra_sound = header.extra_sound;
+        return SFC_ERROR_OK;
+    }
+    fseek(file, 0, SEEK_SET);
     return SFC_ERROR_ILLEGAL_FILE;
 }
 
@@ -772,8 +850,8 @@ sfc_ecode this_load_rom(void* arg, sfc_rom_info_t* info) {
     FILE* const file = fopen("31_test_16.nes", "rb");
     // 文本未找到
     if (!file) return SFC_ERROR_FILE_NOT_FOUND;
-    sfc_ecode code = SFC_ERROR_ILLEGAL_FILE;
-    //sfc_ecode code = this_load_nsf(info, file);
+    //sfc_ecode code = SFC_ERROR_ILLEGAL_FILE;
+    sfc_ecode code = this_load_nsf(info, file);
     // 读取文件头
     sfc_nes_header_t nes_header;
     if (fread(&nes_header, sizeof(nes_header), 1, file)) {
@@ -816,8 +894,8 @@ sfc_ecode this_load_rom(void* arg, sfc_rom_info_t* info) {
                 // 填写info数据表格
                 info->data_prgrom = ptr;
                 info->data_chrrom = ptr + size1;
-                info->count_prgrom16kb = prgrom16;
-                info->count_chrrom_8kb = chrrom8;
+                info->size_prgrom = prgrom16 * 16*1024;
+                info->size_chrrom = chrrom8 * 8 * 1024;
                 info->mapper_number
                     = (nes_header.control1 >> 4)
                     | (nes_header.control2 & 0xF0)

@@ -17,7 +17,7 @@ extern inline uint8_t sfc_get_inslen(uint8_t);
 /// <param name="famicom">The famicom.</param>
 /// <returns></returns>
 extern inline uint8_t sfc_read_prgdata(uint16_t address, const sfc_famicom_t* famicom) {
-    assert(((address & (uint16_t)0x8000) == (uint16_t)0x8000) || (address>>13) == 0);
+    assert(((address & (uint16_t)0x8000) == (uint16_t)0x8000) || (address>>13) == 0 || (address >= 0x4100 && address < 0x4200));
     const uint16_t prgaddr = address;
     return famicom->prg_banks[prgaddr >> 12][prgaddr & (uint16_t)0x0fff];
 }
@@ -171,4 +171,22 @@ void sfc_write_cpu_address(uint16_t address, uint8_t data, sfc_famicom_t* famico
         return;
     }
     assert(!"invalid address");
+}
+
+/// <summary>
+/// StepFC: NSF用长跳转
+/// </summary>
+/// <param name="address">The address.</param>
+/// <param name="famicom">The famicom.</param>
+void sfc_cpu_long_jmp(uint16_t address, sfc_famicom_t* famicom) {
+    famicom->registers.program_counter = 0x4100;
+    const uint32_t loop_point = 0x4103;
+    // JSR
+    famicom->bus_memory[0x100] = 0x20;
+    famicom->bus_memory[0x101] = (uint8_t)(address & 0xff);
+    famicom->bus_memory[0x102] = (uint8_t)(address >> 8);
+    // JMP $4103
+    famicom->bus_memory[0x103] = 0x4c;
+    famicom->bus_memory[0x104] = (uint8_t)(loop_point & 0xff);
+    famicom->bus_memory[0x105] = (uint8_t)(loop_point >> 8);
 }

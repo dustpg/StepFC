@@ -133,6 +133,8 @@ struct sfc_famicom {
     uint8_t             button_states[16];
     // 程序内存仓库(Bank)/窗口(Window)
     uint8_t*            prg_banks[0x10000 >> 12];
+    // BUS
+    uint8_t             bus_memory[512];
     // 工作(work)/保存(save)内存
     uint8_t             save_memory[8 * 1024];
     // 显存
@@ -162,6 +164,9 @@ void sfc_famicom_save_state(sfc_famicom_t*);
 // 读取状态
 sfc_ecode sfc_famicom_load_state(sfc_famicom_t*);
 
-
+// 初始化NSF
+void sfc_famicom_nsf_init(sfc_famicom_t*, uint8_t index, uint8_t pal);
+// 播放NSF
+void sfc_famicom_nsf_play(sfc_famicom_t*);
 
 // ----------------------- 内部函数
