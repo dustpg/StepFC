@@ -15,6 +15,10 @@ extern inline sfc_ecode sfc_load_mapper_02(sfc_famicom_t* famicom);
 extern inline sfc_ecode sfc_load_mapper_03(sfc_famicom_t* famicom);
 // mapper004 - TxROM
 extern inline sfc_ecode sfc_load_mapper_04(sfc_famicom_t* famicom);
+// mapper024 - VRC6a
+extern inline sfc_ecode sfc_load_mapper_18(sfc_famicom_t* famicom);
+// mapper026 - VRC6b
+extern inline sfc_ecode sfc_load_mapper_1A(sfc_famicom_t* famicom);
 // mapper031 - NSF 子集
 extern inline sfc_ecode sfc_load_mapper_1F(sfc_famicom_t* famicom);
 // mapper074 - MMC3 魔改
@@ -27,7 +31,7 @@ extern inline sfc_ecode sfc_load_mapper_4A(sfc_famicom_t* famicom);
 /// SFCs the mapper hsync defualt.
 /// </summary>
 /// <param name="famicom">The famicom.</param>
-static void sfc_mapper_hsync_defualt(sfc_famicom_t* famicom) {
+static void sfc_mapper_hsync_defualt(sfc_famicom_t* famicom, uint16_t line) {
 }
 
 /// <summary>
@@ -97,6 +101,8 @@ extern sfc_ecode sfc_load_mapper(sfc_famicom_t* famicom, uint8_t id) {
         SFC_CASE_LOAD_MAPPER(02);
         SFC_CASE_LOAD_MAPPER(03);
         SFC_CASE_LOAD_MAPPER(04);
+        SFC_CASE_LOAD_MAPPER(18);
+        SFC_CASE_LOAD_MAPPER(1A);
         SFC_CASE_LOAD_MAPPER(1F);
         SFC_CASE_LOAD_MAPPER(4A);
     }

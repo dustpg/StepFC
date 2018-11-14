@@ -304,3 +304,4 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 stepd/last_input.ini
+*.ini

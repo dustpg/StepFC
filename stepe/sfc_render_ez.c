@@ -777,7 +777,7 @@ void sfc_render_frame_easy(sfc_famicom_t* famicom, uint8_t* buffer) {
             sfc_ppu_do_under_cycle257(&famicom->ppu);
         }
         // 水平同步
-        famicom->mapper.hsync(famicom);
+        famicom->mapper.hsync(famicom, i);
         // 执行HBlank
 
         buffer += SFC_BUFFER_WIDTH;
@@ -795,7 +795,7 @@ void sfc_render_frame_easy(sfc_famicom_t* famicom, uint8_t* buffer) {
         for (; *count < end_cycle_count_this_round;)
             sfc_cpu_execute_one(famicom);
         // 水平同步
-        famicom->mapper.hsync(famicom);
+        famicom->mapper.hsync(famicom, SCAN_LINE_COUNT);
     }
     // 垂直空白期间
 
@@ -809,8 +809,10 @@ void sfc_render_frame_easy(sfc_famicom_t* famicom, uint8_t* buffer) {
         end_cycle_count += per_scanline;
         const uint32_t end_cycle_count_this_round = end_cycle_count / MASTER_CYCLE_PER_CPU;
         uint32_t* const count = &famicom->cpu_cycle_count;
-        for (; *count < end_cycle_count_this_round;)
+        for (; *count < end_cycle_count_this_round;) 
             sfc_cpu_execute_one(famicom);
+        // 水平同步
+        famicom->mapper.hsync(famicom, SCAN_LINE_COUNT + i + 1);
     }
     // 结束
     famicom->ppu.data.status = 0;
@@ -834,6 +836,9 @@ void sfc_render_frame_easy(sfc_famicom_t* famicom, uint8_t* buffer) {
         uint32_t* const count = &famicom->cpu_cycle_count;
         for (; *count < end_cycle_count_last_round;)
             sfc_cpu_execute_one(famicom);
+
+        // 水平同步
+        famicom->mapper.hsync(famicom, vblank_line + 1 + SCAN_LINE_COUNT);
     }
 
     // 重置计数器(32位整数太短了)

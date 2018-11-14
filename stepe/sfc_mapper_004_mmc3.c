@@ -9,7 +9,7 @@
 #endif
 
 /// <summary>
-/// 
+/// MMC3 内部数据
 /// </summary>
 typedef struct {
     // 寄存器编号
@@ -263,12 +263,15 @@ extern inline void sfc_operation_IRQ_try(sfc_famicom_t* famicom);
 /// SFCs the mapper 04 hsync.
 /// </summary>
 /// <param name="famicom">The famicom.</param>
-static void sfc_mapper_04_hsync(sfc_famicom_t* famicom) {
+static void sfc_mapper_04_hsync(sfc_famicom_t* famicom, uint16_t line) {
     //  打开渲染时?
     if (!(famicom->ppu.data.mask & (
         ((uint8_t)SFC_PPU2001_Back |
         (uint8_t)SFC_PPU2001_Sprite)
         ))) return;
+
+    // 超过可见扫描线
+    if (line >= SFC_HEIGHT) return;
 
     MAPPER;
     if (mapper->counter) {

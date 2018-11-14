@@ -4,6 +4,38 @@
 
 #include <stdint.h>
 
+
+/// <summary>
+/// 
+/// </summary>
+enum sfc_channel_index {
+    // [VRC6] VRC6
+    SFC_VRC6_VRC6 = -2,
+    // 帧计数器/序列器
+    SFC_FrameCounter = -1,
+    // [2A03] 总体
+    SFC_Overview = 0,
+    // [2A03] 方波#1
+    SFC_2A03_Square1,
+    // [2A03] 方波#2
+    SFC_2A03_Square2,
+    // [2A03] 三角波
+    SFC_2A03_Triangle,
+    // [2A03] 噪声
+    SFC_2A03_Noise,
+    // [2A03] DMC
+    SFC_2A03_MDC,
+    // [VRC6] 方波#1
+    SFC_VRC6_Square1,
+    // [VRC6] 方波#2
+    SFC_VRC6_Square2,
+    // [VRC6] 锯齿波
+    SFC_VRC6_Saw,
+
+    // 总声道数量
+    SFC_CHANNEL_COUNT
+} ;
+
 /// <summary>
 /// 
 /// </summary>
@@ -151,6 +183,61 @@ struct sfc_dmc_data_t {
     uint8_t         data;
 };
 
+
+/// <summary>
+/// VRC6 方波数据
+/// </summary>
+typedef struct {
+    // 周期
+    uint16_t        period;
+    // 周期-原始
+    uint16_t        period_raw;
+    // 音量
+    uint8_t         volume;
+    // 占空比
+    uint8_t         duty;
+    // 使能位
+    uint8_t         enable;
+    // 索引
+    uint8_t         index;
+} sfc_vrc6_square_data_t;
+
+/// <summary>
+/// VRC6 锯齿波数据
+/// </summary>
+typedef struct {
+    // 周期
+    uint16_t        period;
+    // 周期-原始
+    uint16_t        period_raw;
+    // 累加率
+    uint8_t         rate;
+    // 内部累加器
+    uint8_t         accumulator;
+    // 使能位
+    uint8_t         enable;
+    // 增加次数
+    uint8_t         count;
+} sfc_vrc6_saw_data_t;
+
+/// <summary>
+/// VRC6数据
+/// </summary>
+typedef struct {
+    // 方波 #1
+    sfc_vrc6_square_data_t      square1;
+    // 方波 #2
+    sfc_vrc6_square_data_t      square2;
+    // 锯齿波
+    sfc_vrc6_saw_data_t         saw;
+    // 频率控制
+    uint8_t                     freq_ctrl;
+    // 暂停
+    uint8_t                     halt;
+} sfc_vrc6_data_t;
+
+
+
 /// <summary>
 /// APU寄存器数据
 /// </summary>
@@ -165,6 +252,8 @@ typedef struct {
     struct sfc_noise_data_t     noise;
     // DMC
     struct sfc_dmc_data_t       dmc;
+    // VRC6
+    sfc_vrc6_data_t             vrc6;
     // 状态寄存器(写: 声道使能)
     uint8_t                     status_write;
     // 状态寄存器(读:)

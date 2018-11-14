@@ -61,7 +61,7 @@ typedef struct {
     // ROM 加载器卸载
     sfc_ecode(*free_rom)(void*, sfc_rom_info_t*);
     // 音频事件
-    void(*audio_changed)(void*, uint32_t, int);
+    void(*audio_changed)(void*, uint32_t, enum sfc_channel_index);
     // 保存SRAM 8KB
     void(*save_sram)(void*, const sfc_rom_info_t*, const uint8_t*);
     // 读取SRAM 8KB
@@ -89,7 +89,7 @@ typedef struct {
     // 写入高地址
     void(*write_high)(sfc_famicom_t*, uint16_t, uint8_t);
     // 水平同步
-    void(*hsync)(sfc_famicom_t*);
+    void(*hsync)(sfc_famicom_t*, uint16_t);
     // 写入RAM到流
     void(*write_ram_to_stream)(const sfc_famicom_t*);
     // 从流读取RAM

@@ -67,6 +67,13 @@ struct interface_audio_state {
     sfc_1storder_rc_lopass_filter_t lp_14kHz;
     sfc_1storder_rc_hipass_filter_t hp_440Hz;
     sfc_1storder_rc_hipass_filter_t hp__90Hz;
+
+
+    sfc_vrc6_data_t                 vrc6;
+
+    float vrc6_squ1_cycle       ;
+    float vrc6_squ2_cycle       ;
+    float vrc6_saw__cycle       ;
 } g_states;
 
 
@@ -239,7 +246,8 @@ static void make_samples(const uint32_t begin, const uint32_t end) {
     assert(g_states.noise.period);
     assert(g_states.dmc.period);
 
-    const float square1p = g_states.square1.period;
+    //const float square1p = g_states.square1.period ? (float)g_states.square1.period : 1.f;
+    const float square1p = g_states.square2.period;
     const float square2p = g_states.square2.period;
     const float trianglep = g_states.triangle.period;
     const float noise_p = g_states.noise.period;
@@ -318,13 +326,83 @@ static void make_samples(const uint32_t begin, const uint32_t end) {
             = 159.79f 
             / (1.f / (triangle / 8227.f + noise / 12241.f + dmc / 22638.f) + 100.f)
             ;
-        const float output 
+        // 2A03
+        float output 
             = square_out
             //* 0.f
             + tnd_out
             //* 0.f
             ;
-        buffer[i] = output 
+
+        // VRC6
+        if (g_famicom->rom_info.extra_sound & SFC_NSF_EX_VCR6) {
+            sfc_vrc6_data_t* const vrc6_data = &g_states.vrc6;
+            //sfc_vrc6_data_t* const vrc6_data = &g_famicom->apu.vrc6;
+
+
+            const float vrc6_squ1p = vrc6_data->square1.period;
+            const float vrc6_squ2p = vrc6_data->square2.period;
+            const float vrc6_raw_p = vrc6_data->saw.period;
+
+
+
+
+            uint8_t vrc6 = 0;
+
+
+
+
+            if (vrc6_data->square1.enable) {
+
+
+
+                g_states.vrc6_squ1_cycle += cpu_cycle_per_sample;
+                const int count1 = (int)(g_states.vrc6_squ1_cycle / vrc6_squ1p);
+                g_states.vrc6_squ1_cycle -= (float)count1 * vrc6_squ1p;
+                vrc6_data->square1.index += (uint8_t)count1;
+                vrc6_data->square1.index &= 0xf;
+
+
+                vrc6 += vrc6_data->square1.index <= vrc6_data->square1.duty
+                    ? vrc6_data->square1.volume : 0;
+            }
+
+            if (vrc6_data->square2.enable) {
+
+                g_states.vrc6_squ2_cycle += cpu_cycle_per_sample;
+                const int count2 = (int)(g_states.vrc6_squ2_cycle / vrc6_squ2p);
+                g_states.vrc6_squ2_cycle -= (float)count2 * vrc6_squ2p;
+                vrc6_data->square2.index += (uint8_t)count2;
+                vrc6_data->square2.index &= 0xf;
+
+                vrc6 += vrc6_data->square2.index <= vrc6_data->square2.duty
+                    ? vrc6_data->square2.volume : 0;
+            }
+
+            if (vrc6_data->saw.enable) {
+
+
+                g_states.vrc6_saw__cycle += cpu_cycle_per_sample * 0.5f;
+                const int count3 = (int)(g_states.vrc6_saw__cycle / vrc6_raw_p);
+                g_states.vrc6_saw__cycle -= (float)count3 * vrc6_raw_p;
+                vrc6_data->saw.accumulator += (uint8_t)((int)vrc6_data->saw.rate * count3);
+                vrc6_data->saw.count += count3;
+                if (vrc6_data->saw.count >= 7) {
+                    vrc6_data->saw.count = 0;
+                    vrc6_data->saw.accumulator = 0;
+                }
+
+                vrc6 += vrc6_data->saw.accumulator >> 3;
+            }
+
+            output += 0.00752f * (float)vrc6;
+
+        }
+
+        static float max_vol = 0.8f;
+        if (output > max_vol) max_vol = output;
+
+        buffer[i] = output / max_vol
             //* 2.f
             ;
     }
@@ -337,7 +415,7 @@ static void make_samples(const uint32_t begin, const uint32_t end) {
 /// <param name="arg">The argument.</param>
 /// <param name="cycle">The cycle.</param>
 /// <param name="type">The type.</param>
-static void this_audio_event(void* arg, uint32_t cycle, int type) {
+static void this_audio_event(void* arg, uint32_t cycle, enum sfc_channel_index type) {
 
     const uint32_t old_index = g_states.last_cycle * SAMPLES_PER_SEC / NTSC_CPU_RATE;
     const uint32_t now_index = cycle * SAMPLES_PER_SEC / NTSC_CPU_RATE;
@@ -348,16 +426,16 @@ static void this_audio_event(void* arg, uint32_t cycle, int type) {
 
     switch (type)
     {
-    case 0:
+    case SFC_Overview:
         g_states.dmc = g_famicom->apu.dmc;
         g_states.dmc_enable = g_famicom->apu.status_write & SFC_APU4015_WRITE_EnableDMC;
-    case 6:
+    case SFC_FrameCounter:
         g_states.square1.u32 = sfc_check_square1_state(g_famicom).u32;
         g_states.square2.u32 = sfc_check_square2_state(g_famicom).u32;
         g_states.triangle.u32 = sfc_check_triangle_state(g_famicom).u32;
         g_states.noise.u32 = sfc_check_noise_state(g_famicom).u32;
         break;
-    case 1:
+    case SFC_2A03_Square1:
         g_states.square1.u32 = sfc_check_square1_state(g_famicom).u32;
         // 写入了$4003
         if (!g_famicom->apu.square1.seq_index) {
@@ -365,7 +443,7 @@ static void this_audio_event(void* arg, uint32_t cycle, int type) {
             g_states.square1_seq_index = 0;
         }
         break;
-    case 2:
+    case SFC_2A03_Square2:
         g_states.square2.u32 = sfc_check_square2_state(g_famicom).u32;
         // 写入了$4004
         if (!g_famicom->apu.square2.seq_index) {
@@ -373,14 +451,28 @@ static void this_audio_event(void* arg, uint32_t cycle, int type) {
             g_states.square2_seq_index = 0;
         }
         break;
-    case 3:
+    case SFC_2A03_Triangle:
         g_states.triangle.u32 = sfc_check_triangle_state(g_famicom).u32;
         break;
-    case 4:
+    case SFC_2A03_Noise:
         g_states.noise.u32 = sfc_check_noise_state(g_famicom).u32;
         break;
-    case 5:
+    case SFC_2A03_MDC:
         g_states.dmc = g_famicom->apu.dmc;
+        break;
+    case SFC_VRC6_Square1:
+        g_famicom->apu.vrc6.square1.index = g_states.vrc6.square1.index;
+        g_states.vrc6.square1 = g_famicom->apu.vrc6.square1;
+        g_states.vrc6.halt = g_famicom->apu.vrc6.halt;
+        break;
+    case SFC_VRC6_Square2:
+        g_famicom->apu.vrc6.square2.index = g_states.vrc6.square2.index;
+        g_states.vrc6.square2 = g_famicom->apu.vrc6.square2;
+        break;
+    case SFC_VRC6_Saw:
+        g_famicom->apu.vrc6.saw.count = g_states.vrc6.saw.count;
+        g_famicom->apu.vrc6.saw.accumulator = g_states.vrc6.saw.accumulator;
+        g_states.vrc6.saw = g_famicom->apu.vrc6.saw;
         break;
     }
     // 替换当前的DMC
