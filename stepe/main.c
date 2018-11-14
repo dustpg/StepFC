@@ -247,7 +247,7 @@ static void make_samples(const uint32_t begin, const uint32_t end) {
     assert(g_states.dmc.period);
 
     //const float square1p = g_states.square1.period ? (float)g_states.square1.period : 1.f;
-    const float square1p = g_states.square2.period;
+    const float square1p = g_states.square1.period;
     const float square2p = g_states.square2.period;
     const float trianglep = g_states.triangle.period;
     const float noise_p = g_states.noise.period;
