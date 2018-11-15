@@ -168,6 +168,9 @@ static inline void sfc_setup_nametable_bank(sfc_famicom_t* famicom) {
     );
 }
 
+// 重置VRC7
+extern void sfc_vrc7_reset(sfc_famicom_t* famicom);
+
 /// <summary>
 /// StepFC: 重置famicom
 /// </summary>
@@ -199,6 +202,8 @@ sfc_ecode sfc_famicom_reset(sfc_famicom_t* famicom) {
     sfc_setup_nametable_bank(famicom);
     // 重置APU
     sfc_apu_on_reset(&famicom->apu);
+    // 重置VRC7
+    sfc_vrc7_reset(famicom);
     return SFC_ERROR_OK;
 }
 

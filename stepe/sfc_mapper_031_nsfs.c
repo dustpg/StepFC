@@ -97,6 +97,38 @@ static void sfc_mapper_1F_write_high(sfc_famicom_t*f, uint16_t d, uint8_t v) {
 
 
 /// <summary>
+/// NSFs: 写入RAM到流
+/// </summary>
+/// <param name="famicom">The famicom.</param>
+static void sfc_mapper_1F_write_ram(const sfc_famicom_t* famicom) {
+    // NSF场合
+    if (famicom->rom_info.song_count) {
+        // 保存BUS
+        famicom->interfaces.sl_write_stream(
+            famicom->argument,
+            famicom->bus_memory,
+            sizeof(famicom->bus_memory)
+        );
+    }
+}
+
+/// <summary>
+/// NSFs: 从流读取至RAM
+/// </summary>
+/// <param name="famicom">The famicom.</param>
+static void sfc_mapper_1F_read_ram(sfc_famicom_t* famicom) {
+    // NSF场合
+    if (famicom->rom_info.song_count) {
+        // 读取BUS
+        famicom->interfaces.sl_read_stream(
+            famicom->argument,
+            famicom->bus_memory,
+            sizeof(famicom->bus_memory)
+        );
+    }
+}
+
+/// <summary>
 /// SFCs the load mapper 1F
 /// </summary>
 /// <param name="famicom">The famicom.</param>
@@ -105,6 +137,8 @@ extern inline sfc_ecode sfc_load_mapper_1F(sfc_famicom_t* famicom) {
     famicom->mapper.reset = sfc_mapper_1F_reset;
     famicom->mapper.write_low = sfc_mapper_1F_write_low;
     famicom->mapper.write_high = sfc_mapper_1F_write_high;
+    famicom->mapper.read_ram_from_stream = sfc_mapper_1F_read_ram;
+    famicom->mapper.write_ram_to_stream = sfc_mapper_1F_write_ram;
     return SFC_ERROR_OK;
 }
 

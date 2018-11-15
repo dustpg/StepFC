@@ -156,6 +156,11 @@ extern inline void sfc_write_cpu_address4020(uint16_t address, uint8_t data, sfc
         famicom->apu.square1.sweep_period = (data >> 4) & (uint8_t)0x07;
         famicom->apu.square1.sweep_shift = data & (uint8_t)0x07;
         famicom->apu.square1.sweep_reload = 1;
+
+        //if (famicom->apu.square1.sweep_enable) {
+        //    int printf();
+        //    printf("%d\n", data);
+        //}
         break;
     case 0x02:
         type = SFC_2A03_Square1;
@@ -164,6 +169,7 @@ extern inline void sfc_write_cpu_address4020(uint16_t address, uint8_t data, sfc
             = (famicom->apu.square1.cur_period & (uint16_t)0xff00)
             | (uint16_t)data;
         //famicom->apu.square1.use_period = famicom->apu.square1.cur_period;
+        //assert(famicom->apu.square1.cur_period != 0xffff);
         break;
     case 0x03:
         type = SFC_2A03_Square1;
@@ -178,6 +184,8 @@ extern inline void sfc_write_cpu_address4020(uint16_t address, uint8_t data, sfc
         //famicom->apu.square1.use_period = famicom->apu.square1.cur_period;
         famicom->apu.square1.envelope.start = 1;
         famicom->apu.square1.seq_index = 0;
+
+        //assert(famicom->apu.square1.cur_period != 0xffff);
 
         //if (famicom->button_states[0]) {
         //    printf("<4003>\n");
@@ -339,6 +347,7 @@ extern inline void sfc_write_cpu_address4020(uint16_t address, uint8_t data, sfc
         // $4014:  MI-- ----
         famicom->apu.frame_counter = data;
         if (data & (uint8_t)SFC_APU4017_IRQDisable) {
+            famicom->registers.irq_flag = 0;
             famicom->apu.frame_interrupt = 0;
         }
         // 5步模式会立刻产生一个1/2和1/4时钟信号
@@ -394,8 +403,10 @@ void sfc_sweep_square(struct sfc_square_data_t* square, uint16_t one) {
             if (square->cur_period >= 8) {
                 uint16_t target
                     = square->cur_period
-                    - (square->cur_period >> square->sweep_shift);
+                    - (square->cur_period >> square->sweep_shift)
+                    ;
                 target -= one;
+                if (target == 0xffff) --target;
                 square->cur_period = target;
             }
         }
@@ -533,6 +544,7 @@ void sfc_trigger_frame_counter(sfc_famicom_t* famicom) {
     const uint32_t cycle = famicom->cpu_cycle_count;
     famicom->interfaces.audio_changed(famicom->argument, cycle, SFC_FrameCounter);
 }
+
 
 
 /// <summary>

@@ -13,7 +13,7 @@ sfc_square_channel_state_t sfc_check_square1_state(const sfc_famicom_t* famicom)
     sfc_square_channel_state_t state = { 0, 0, 0 };
     // 方波#1
     const uint16_t square1period = famicom->apu.square1.cur_period;
-    state.period = square1period + 1;
+    state.period = square1period + 1;//  == 0xffff ? 0xffff : square1period + 1;
     // 使能
     if (!(famicom->apu.status_write & SFC_APU4015_WRITE_EnableSquare1)) return state;
     // 长度计数器为0
@@ -40,7 +40,7 @@ sfc_square_channel_state_t sfc_check_square2_state(const sfc_famicom_t* famicom)
     sfc_square_channel_state_t state = { 0, 0, 0 };
     // 方波#2
     const uint16_t square2period = famicom->apu.square2.cur_period;
-    state.period = square2period + 1;
+    state.period = square2period + 1;// == 0xffff ? 0xffff : square2period + 1;
     // 使能
     if (!(famicom->apu.status_write & SFC_APU4015_WRITE_EnableSquare2)) return state;
     // 长度计数器为0

@@ -63,8 +63,8 @@ extern inline uint8_t sfc_read_prgdata(uint16_t, const sfc_famicom_t*);
 
 // 实用函数
 #define SFC_READ(a) sfc_read_cpu_address(a, famicom)
-//#define SFC_READ_PC(a) sfc_read_cpu_address(a, famicom)
-#define SFC_READ_PC(a) sfc_read_prgdata(a, famicom)
+#define SFC_READ_PC(a) sfc_read_cpu_address(a, famicom)
+//#define SFC_READ_PC(a) sfc_read_prgdata(a, famicom)
 #define SFC_PUSH(a) (famicom->main_memory + 0x100)[SFC_SP--] = a;
 #define SFC_POP() (famicom->main_memory + 0x100)[++SFC_SP];
 #define SFC_WRITE(a, v) sfc_write_cpu_address(a, v, famicom)

@@ -23,6 +23,9 @@ extern inline sfc_ecode sfc_load_mapper_1A(sfc_famicom_t* famicom);
 extern inline sfc_ecode sfc_load_mapper_1F(sfc_famicom_t* famicom);
 // mapper074 - MMC3 魔改
 extern inline sfc_ecode sfc_load_mapper_4A(sfc_famicom_t* famicom);
+// mapper085 - VRC7
+extern inline sfc_ecode sfc_load_mapper_55(sfc_famicom_t* famicom);
+
 
 #define SFC_CASE_LOAD_MAPPER(id) case 0x##id: return sfc_load_mapper_##id(famicom);
 
@@ -105,6 +108,7 @@ extern sfc_ecode sfc_load_mapper(sfc_famicom_t* famicom, uint8_t id) {
         SFC_CASE_LOAD_MAPPER(1A);
         SFC_CASE_LOAD_MAPPER(1F);
         SFC_CASE_LOAD_MAPPER(4A);
+        SFC_CASE_LOAD_MAPPER(55);
     }
     assert(!"NO MAPPER");
     return SFC_ERROR_MAPPER_NOT_FOUND;

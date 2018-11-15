@@ -133,7 +133,7 @@ struct sfc_famicom {
     uint8_t             button_states[16];
     // 程序内存仓库(Bank)/窗口(Window)
     uint8_t*            prg_banks[0x10000 >> 12];
-    // BUS
+    // BUS: 前256自定义[0-127, VRC7 PATCH用, 128-255, 未使用]
     uint8_t             bus_memory[512];
     // 工作(work)/保存(save)内存
     uint8_t             save_memory[8 * 1024];
@@ -144,6 +144,11 @@ struct sfc_famicom {
     // 主内存
     uint8_t             main_memory[2 * 1024];
 };
+
+
+// VRC7 PATCH用128字节
+static inline uint8_t* sfc_get_vrc7_patch(sfc_famicom_t* f) { return f->bus_memory; }
+static inline const uint8_t* sfc_get_vrc7_patchc(const sfc_famicom_t* f) { return f->bus_memory; }
 
 
 // 初始化

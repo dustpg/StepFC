@@ -28,7 +28,21 @@ static float s_buffer[SAMPLES_PER_FRAME_ALIGNED * (BASIC_BUFFER_COUNT + 1)];
 /// 由于各种外部原因需要额外插入一帧缓存
 /// </summary>
 void extra_buffer() {
-    xa2_submit_buffer(s_buffer + SAMPLES_PER_FRAME_ALIGNED * BASIC_BUFFER_COUNT, SAMPLES_PER_FRAME);
+    float* const buffer
+        = s_buffer
+        + SAMPLES_PER_FRAME_ALIGNED
+        * (g_famicom->frame_counter % BASIC_BUFFER_COUNT)
+        ;
+    const float last = buffer[SAMPLES_PER_FRAME - 1];
+
+    float* const send = s_buffer + SAMPLES_PER_FRAME_ALIGNED * BASIC_BUFFER_COUNT;
+
+    if (last != 0.f) printf("<LAST:%f>", last);
+
+    for (int i = 0; i != SAMPLES_PER_FRAME; ++i)
+        send[i] = last;
+
+    xa2_submit_buffer(send, SAMPLES_PER_FRAME);
 }
 
 
@@ -1020,4 +1034,26 @@ sfc_ecode this_free_rom(void* arg, sfc_rom_info_t* info) {
     info->data_prgrom = NULL;
 
     return SFC_ERROR_OK;
+}
+
+
+void sfc_before_execute(void* ctx, sfc_famicom_t* famicom) {
+    static int line = 0;
+    line++;
+    return;
+    char buf[SFC_DISASSEMBLY_BUF_LEN2];
+    const uint16_t pc = famicom->registers.program_counter;
+
+    if (line < 20000) return;
+
+    sfc_fc_disassembly(pc, famicom, buf);
+    printf(
+        "%4d - %s   A:%02X X:%02X Y:%02X P:%02X SP:%02X\n",
+        line, buf,
+        (int)famicom->registers.accumulator,
+        (int)famicom->registers.x_index,
+        (int)famicom->registers.y_index,
+        (int)famicom->registers.status,
+        (int)famicom->registers.stack_pointer
+    );
 }

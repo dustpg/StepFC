@@ -117,6 +117,9 @@
     <ClCompile Include="sfc_mapper_026_vrc6b.c">
       <Filter>mapper</Filter>
     </ClCompile>
+    <ClCompile Include="sfc_mapper_085_vrc7.c">
+      <Filter>mapper</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="cpp">

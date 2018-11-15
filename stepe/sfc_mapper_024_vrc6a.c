@@ -13,8 +13,6 @@
 // ------------------------------- MAPPER 024 - VRC6a
 
 typedef struct {
-    // PPU Banking Style ($B003)
-    uint8_t         ppu_style;
     // IRQ contrl
     uint8_t         irq_control;
     // IRQ contrl
@@ -23,6 +21,8 @@ typedef struct {
     uint8_t         irq_counter;
     // IRQ enable
     uint8_t         irq_enable;
+    // PPU Banking Style ($B003)
+    uint8_t         ppu_style;
     // unused
     uint8_t         unused[3];
     // unused
@@ -33,8 +33,6 @@ typedef struct {
 enum {
     // B003
     SFC_18_B3_FROM_CHRROM = 1 << 4,
-    // F001
-    SFC_18_F1_IRQ_ENABLE = 1 << 1
 };
 
 
@@ -356,7 +354,7 @@ void sfc_mapper_18_write_high(sfc_famicom_t* famicom, uint16_t address, uint8_t 
         case 1:
             // IRQ Control
             mapper->irq_control = value;
-            mapper->irq_enable = value & SFC_18_F1_IRQ_ENABLE;
+            mapper->irq_enable = value & 2;
             if (mapper->irq_enable)
                 mapper->irq_counter = mapper->irq_reload;
             break;
@@ -378,7 +376,7 @@ void sfc_mapper_18_write_high(sfc_famicom_t* famicom, uint16_t address, uint8_t 
 /// </summary>
 /// <param name="famicom">The famicom.</param>
 /// <param name="line">The line.</param>
-static void sfc_mapper_18_hsyc(sfc_famicom_t* famicom, uint16_t line) {
+void sfc_mapper_18_hsyc(sfc_famicom_t* famicom, uint16_t line) {
     MAPPER;
     //if (!(mapper->irq_control & SFC_18_F1_IRQ_ENABLE)) return;
     if (!mapper->irq_enable) return;

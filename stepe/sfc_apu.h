@@ -9,11 +9,13 @@
 /// 
 /// </summary>
 enum sfc_channel_index {
+    // [VRC7] VRC7
+    SFC_VRC7_VRC7 = -3,
     // [VRC6] VRC6
     SFC_VRC6_VRC6 = -2,
     // 帧计数器/序列器
     SFC_FrameCounter = -1,
-    // [2A03] 总体
+    // 总体
     SFC_Overview = 0,
     // [2A03] 方波#1
     SFC_2A03_Square1,
@@ -31,7 +33,18 @@ enum sfc_channel_index {
     SFC_VRC6_Square2,
     // [VRC6] 锯齿波
     SFC_VRC6_Saw,
-
+    // [VRC7] FM声道#0
+    SFC_VRC7_FM0,
+    // [VRC7] FM声道#1
+    SFC_VRC7_FM1,
+    // [VRC7] FM声道#2
+    SFC_VRC7_FM2,
+    // [VRC7] FM声道#3
+    SFC_VRC7_FM3,
+    // [VRC7] FM声道#4
+    SFC_VRC7_FM4,
+    // [VRC7] FM声道#5
+    SFC_VRC7_FM5,
     // 总声道数量
     SFC_CHANNEL_COUNT
 } ;
@@ -237,6 +250,39 @@ typedef struct {
 } sfc_vrc6_data_t;
 
 
+/// <summary>
+/// VRC7 声道数据
+/// </summary>
+typedef struct {
+    // 频率 [9bit]
+    uint16_t    freq;
+    // 八度 [3bit]
+    uint8_t     octave;
+    // 开关 [1bit]
+    uint8_t     trigger;
+    // 延音 [1bit]
+    uint8_t     sustain;
+    // 乐器 [4bit]
+    uint8_t     instrument;
+    // 音量 [4bit]
+    uint8_t     volume;
+    // 未使用
+    uint8_t     unused[1];
+} sfc_vrc7_ch_t;
+
+
+/// <summary>
+/// VRC7数据
+/// </summary>
+typedef struct {
+    // 6个声道
+    sfc_vrc7_ch_t   ch[6];
+    // 寄存器选择
+    uint8_t         selected;
+    // 未使用
+    uint8_t         unused[3];
+} sfc_vrc7_data_t;
+
 
 /// <summary>
 /// APU寄存器数据
@@ -254,6 +300,8 @@ typedef struct {
     struct sfc_dmc_data_t       dmc;
     // VRC6
     sfc_vrc6_data_t             vrc6;
+    // VRC7
+    sfc_vrc7_data_t             vrc7;
     // 状态寄存器(写: 声道使能)
     uint8_t                     status_write;
     // 状态寄存器(读:)

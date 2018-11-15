@@ -76,7 +76,7 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>false</ConformanceMode>
-      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;SFC_BEFORE_EXECUTE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -153,6 +153,7 @@
     <ClCompile Include="sfc_mapper_026_vrc6b.c" />
     <ClCompile Include="sfc_mapper_031_nsfs.c" />
     <ClCompile Include="sfc_mapper_074_mmc3_mo.c" />
+    <ClCompile Include="sfc_mapper_085_vrc7.c" />
     <ClCompile Include="sfc_play_ez.c" />
     <ClCompile Include="sfc_ppu.c" />
     <ClCompile Include="sfc_render_ez.c" />
