@@ -274,18 +274,16 @@ extern inline void sfc_write_cpu_address4020(uint16_t address, uint8_t data, sfc
     case 0x10:
         // $4010 IL-- RRRR
         // TODO: PAL的场合
-        type = SFC_2A03_MDC;
-        //if (data & 0x80) {
-        //    printf("$4010: <IRQ>\n");
-        //}
+        type = SFC_2A03_DMC;
         famicom->apu.dmc.irq_loop = data >> 6;
         famicom->apu.dmc.period = SFC_DMC_PERIOD_LIST_NP[data & 0xF];
         break;
         //return;
     case 0x11:
         // $4011 -DDD DDDD
-        type = SFC_2A03_MDC;
+        type = SFC_2A03_DMC;
         famicom->apu.dmc.value = data & (uint8_t)0x7F;
+        //printf("[DMC]%d\n", data);
         break;
         //return;
     case 0x12:
@@ -388,26 +386,28 @@ void sfc_sweep_square(struct sfc_square_data_t* square, uint16_t one) {
     else {
         square->sweep_divider = square->sweep_period;
     sweep_it:
-        // 向上扫描
-        if (!square->sweep_negate) {
-            if (square->cur_period < (uint16_t)0x0800) {
-                const uint16_t target
-                    = square->cur_period
-                    + (square->cur_period >> square->sweep_shift)
-                    ;
-                square->cur_period = target;
+        // 有效位移
+        if (square->sweep_shift) {
+            // 向上扫描
+            if (!square->sweep_negate) {
+                if (square->cur_period < (uint16_t)0x0800) {
+                    const uint16_t target
+                        = square->cur_period
+                        + (square->cur_period >> square->sweep_shift)
+                        ;
+                    square->cur_period = target;
+                }
             }
-        }
-        // 向下扫描
-        else {
-            if (square->cur_period >= 8) {
-                uint16_t target
-                    = square->cur_period
-                    - (square->cur_period >> square->sweep_shift)
-                    ;
-                target -= one;
-                if (target == 0xffff) --target;
-                square->cur_period = target;
+            // 向下扫描
+            else {
+                if (square->cur_period >= 8) {
+                    uint16_t target
+                        = square->cur_period
+                        - (square->cur_period >> square->sweep_shift)
+                        ;
+                    target -= one;
+                    square->cur_period = target;
+                }
             }
         }
     }

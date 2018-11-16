@@ -90,6 +90,12 @@ sfc_ecode sfc_mapper_55_reset(sfc_famicom_t* famicom) {
 }
 
 
+// 默认写入
+extern void sfc_mapper_wrts_defualt(const sfc_famicom_t* famicom);
+// 默认读取
+extern void sfc_mapper_rrfs_defualt(sfc_famicom_t* famicom);
+
+
 /// <summary>
 /// VRC7: 写入RAM到流
 /// </summary>
@@ -101,6 +107,8 @@ static void sfc_mapper_55_write_ram(const sfc_famicom_t* famicom) {
         sfc_get_vrc7_patchc(famicom),
         sizeof(sfc_vrc7_internal_patch_set)
     );
+    // CHR-RAM数据写入流[拉格朗日点使用了CHR-RAM]
+    sfc_mapper_wrts_defualt(famicom);
 }
 
 /// <summary>
@@ -114,6 +122,8 @@ static void sfc_mapper_55_read_ram(sfc_famicom_t* famicom) {
         sfc_get_vrc7_patch(famicom),
         sizeof(sfc_vrc7_internal_patch_set)
     );
+    // 流中读取至CHR-RAM[拉格朗日点使用了CHR-RAM]
+    sfc_mapper_rrfs_defualt(famicom);
 }
 
 // 写入寄存器
@@ -161,6 +171,7 @@ static void sfc_mapper_55_mirroring(sfc_famicom_t* famicom, uint8_t value) {
 /// <param name="address">The address.</param>
 /// <param name="value">The value.</param>
 void sfc_mapper_55_write_high(sfc_famicom_t* famicom, uint16_t address, uint8_t value) {
+    uint16_t base;
     //printf("[$%04X] = $%02X\n", address, value);
 
     // VRC7: A12 A13 A14
@@ -168,9 +179,9 @@ void sfc_mapper_55_write_high(sfc_famicom_t* famicom, uint16_t address, uint8_t 
     // VRC7b:  A3
     const uint16_t vrc7a = address >> 4;
     const uint16_t vrc7b = address >> 3;
-    const uint16_t base = ((address >> 11) & 0xfffe) | ((vrc7a | vrc7b) & 1);
+    const uint16_t basic = ((address >> 11) & 0xfffe) | ((vrc7a | vrc7b) & 1);
 
-    switch (base & 0xf)
+    switch (base = basic & 0xf)
     {
         sfc_mapper55_t* mapper;
         uint16_t banks;
@@ -184,10 +195,10 @@ void sfc_mapper_55_write_high(sfc_famicom_t* famicom, uint16_t address, uint8_t 
         sfc_load_prgrom_8k(famicom, base, value % banks);
         break;
     case 0x3:
-        // Audio Register Select ($9010)
-        if (address & 0x10) famicom->apu.vrc7.selected = value;
         // Audio Register Write ($9030)
-        else sfc_mapper_55_regwrite(famicom, value);
+        if (address & 0x20) sfc_mapper_55_regwrite(famicom, value);
+        // Audio Register Select ($9010)
+        else famicom->apu.vrc7.selected = value;
         break;
     case 0x4:
     case 0x5:
@@ -284,6 +295,17 @@ void sfc_vrc7_reset(sfc_famicom_t* famicom) {
 // -----------------------------------------------------
 
 
+/// <summary>
+/// VRC7: Audio 触发
+/// </summary>
+/// <param name="op">The op.</param>
+/// <param name="changed">The changed.</param>
+static inline void sfc_vrc7_audio_trigger(
+    sfc_vrc7_operator_t* op, 
+    uint8_t changed, uint8_t trigger) {
+    if (!changed) return;
+
+}
 
 
 /// <summary>
@@ -311,8 +333,10 @@ static void sfc_mapper_55_regwrite(sfc_famicom_t* famicom, uint8_t value) {
         ch->octave = (value >> 1) & 7;
         ch->sustain = (value >> 5) & 1;
         const uint8_t trigger = (value >> 4) & 1;
-
+        const uint8_t changed = trigger ^ ch->trigger;
         ch->trigger = trigger;
+        sfc_vrc7_audio_trigger(&ch->carrier, changed, trigger);
+        sfc_vrc7_audio_trigger(&ch->modulator, changed, trigger);
     }
     // 30-35: 乐器音量
     else if (selected >= 0x30 && selected <= 0x35) {
@@ -322,3 +346,9 @@ static void sfc_mapper_55_regwrite(sfc_famicom_t* famicom, uint8_t value) {
         ch->instrument = (value >> 4) & 0xf;
     }
 }
+
+
+// 倍乘因子查找表(需要再除以2)
+static const uint8_t sfc_vrc7_multi_lut[] = {
+    1, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 20, 24, 24, 30, 30
+};

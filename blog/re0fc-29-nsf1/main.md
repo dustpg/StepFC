@@ -333,11 +333,11 @@ extern sfc_ecode sfc_mapper_1F_reset(sfc_famicom_t* famicom) {
             uint16_t i = famicom->rom_info.load_addr >> 12;
             i = i < 8 ? 0 : i - 8;
             // 终点
-            uint16_t count = (size_prgrom >> 12) + i;
+            uint16_t count = ((size_prgrom + 0xfff) >> 12) + i;
             if (count > 8) count = 8;
             // 处理
-            for (; i != count; ++i)
-                sfc_nsf_switch(famicom, i, (uint8_t)i);
+            for (uint8_t data = 0; i != count; ++i, ++data)
+                sfc_nsf_switch(famicom, i, data);
         }
     }
     // Mapper-031

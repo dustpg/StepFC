@@ -182,10 +182,6 @@ sfc_ecode sfc_famicom_reset(sfc_famicom_t* famicom) {
     // 重置mapper
     sfc_ecode ecode = famicom->mapper.reset(famicom);
     if (ecode) return ecode;
-    // 初始化寄存器
-    const uint8_t pcl = sfc_read_cpu_address(SFC_VERCTOR_RESET + 0, famicom);
-    const uint8_t pch = sfc_read_cpu_address(SFC_VERCTOR_RESET + 1, famicom);
-    famicom->registers.program_counter = (uint16_t)pcl | (uint16_t)pch << 8;
     famicom->registers.accumulator = 0;
     famicom->registers.x_index = 0;
     famicom->registers.y_index = 0;
@@ -196,6 +192,13 @@ sfc_ecode sfc_famicom_reset(sfc_famicom_t* famicom) {
     // NSF
     if (famicom->rom_info.song_count) {
         sfc_famicom_nsf_init(famicom, 0, 0);
+    }
+    // NES
+    else {
+        // 初始化寄存器
+        const uint8_t pcl = sfc_read_cpu_address(SFC_VERCTOR_RESET + 0, famicom);
+        const uint8_t pch = sfc_read_cpu_address(SFC_VERCTOR_RESET + 1, famicom);
+        famicom->registers.program_counter = (uint16_t)pcl | (uint16_t)pch << 8;
     }
     // 调色板
     // 名称表

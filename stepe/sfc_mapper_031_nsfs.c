@@ -48,11 +48,11 @@ extern sfc_ecode sfc_mapper_1F_reset(sfc_famicom_t* famicom) {
             uint16_t i = famicom->rom_info.load_addr >> 12;
             i = i < 8 ? 0 : i - 8;
             // 终点
-            uint16_t count = (size_prgrom >> 12) + i;
+            uint16_t count = ((size_prgrom + 0xfff) >> 12) + i;
             if (count > 8) count = 8;
             // 处理
-            for (; i != count; ++i)
-                sfc_nsf_switch(famicom, i, (uint8_t)i);
+            for (uint8_t data = 0; i != count; ++i, ++data)
+                sfc_nsf_switch(famicom, i, data);
         }
     }
     // Mapper-031
@@ -96,6 +96,11 @@ static void sfc_mapper_1F_write_high(sfc_famicom_t*f, uint16_t d, uint8_t v) {
 }
 
 
+// 默认写入
+extern void sfc_mapper_wrts_defualt(const sfc_famicom_t* famicom);
+// 默认读取
+extern void sfc_mapper_rrfs_defualt(sfc_famicom_t* famicom);
+
 /// <summary>
 /// NSFs: 写入RAM到流
 /// </summary>
@@ -110,6 +115,8 @@ static void sfc_mapper_1F_write_ram(const sfc_famicom_t* famicom) {
             sizeof(famicom->bus_memory)
         );
     }
+    // CHR-RAM -> 流
+    sfc_mapper_wrts_defualt(famicom);
 }
 
 /// <summary>
@@ -126,6 +133,8 @@ static void sfc_mapper_1F_read_ram(sfc_famicom_t* famicom) {
             sizeof(famicom->bus_memory)
         );
     }
+    // 流 -> CHR-RAM
+    sfc_mapper_rrfs_defualt(famicom);
 }
 
 /// <summary>

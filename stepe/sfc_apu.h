@@ -26,7 +26,7 @@ enum sfc_channel_index {
     // [2A03] 噪声
     SFC_2A03_Noise,
     // [2A03] DMC
-    SFC_2A03_MDC,
+    SFC_2A03_DMC,
     // [VRC6] 方波#1
     SFC_VRC6_Square1,
     // [VRC6] 方波#2
@@ -250,10 +250,25 @@ typedef struct {
 } sfc_vrc6_data_t;
 
 
+
+
+/// <summary>
+/// VRC7 FM算子
+/// </summary>
+typedef struct {
+    // 状态 IADSR
+    uint8_t     state;
+
+} sfc_vrc7_operator_t;
+
 /// <summary>
 /// VRC7 声道数据
 /// </summary>
 typedef struct {
+    // 载波
+    sfc_vrc7_operator_t carrier;
+    // 调制
+    sfc_vrc7_operator_t modulator;
     // 频率 [9bit]
     uint16_t    freq;
     // 八度 [3bit]

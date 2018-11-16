@@ -41,7 +41,7 @@ static void sfc_mapper_hsync_defualt(sfc_famicom_t* famicom, uint16_t line) {
 /// SFCs the mapper WRTS.
 /// </summary>
 /// <param name="famicom">The famicom.</param>
-static void sfc_mapper_wrts_defualt(const sfc_famicom_t* famicom) {
+void sfc_mapper_wrts_defualt(const sfc_famicom_t* famicom) {
     // PRG-RAM 不考虑
 
     // 没有CHR-ROM则表明全是CHR-RAM
@@ -58,7 +58,7 @@ static void sfc_mapper_wrts_defualt(const sfc_famicom_t* famicom) {
 /// SFCs the mapper WRTS.
 /// </summary>
 /// <param name="famicom">The famicom.</param>
-static void sfc_mapper_rrfs_defualt(sfc_famicom_t* famicom) {
+void sfc_mapper_rrfs_defualt(sfc_famicom_t* famicom) {
     // PRG-RAM 不考虑
 
     // 没有CHR-ROM则表明全是CHR-RAM
