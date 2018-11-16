@@ -260,7 +260,6 @@ static void make_samples(const uint32_t begin, const uint32_t end) {
     assert(g_states.noise.period);
     assert(g_states.dmc.period);
 
-    //const float square1p = g_states.square1.period ? (float)g_states.square1.period : 1.f;
     const float square1p = g_states.square1.period;
     const float square2p = g_states.square2.period;
     const float trianglep = g_states.triangle.period;
@@ -471,7 +470,7 @@ static void this_audio_event(void* arg, uint32_t cycle, enum sfc_channel_index t
     case SFC_2A03_Noise:
         g_states.noise.u32 = sfc_check_noise_state(g_famicom).u32;
         break;
-    case SFC_2A03_MDC:
+    case SFC_2A03_DMC:
         g_states.dmc = g_famicom->apu.dmc;
         break;
     case SFC_VRC6_Square1:
@@ -506,6 +505,11 @@ void submit_now_buffer(void*rgba) {
 
     //for (int i = 0; i != SAMPLES_PER_FRAME; ++i)
     //    buffer[i] = filter_this(buffer[i]);
+
+    //static FILE* file = 0;
+    //if (!file) file = fopen("output.raw", "wb");
+    //fwrite(buffer, 4, SAMPLES_PER_FRAME, file);
+
     // 跳过视频帧
     if (rgba) d2d_submit_wave(buffer, SAMPLES_PER_FRAME);
     xa2_submit_buffer(buffer, SAMPLES_PER_FRAME);
@@ -953,7 +957,16 @@ sfc_ecode this_load_nsf(sfc_rom_info_t* info, FILE* file) {
 /// <returns></returns>
 sfc_ecode this_load_rom(void* arg, sfc_rom_info_t* info) {
     assert(info->data_prgrom == NULL && "FREE FIRST");
-    FILE* const file = fopen("31_test_16.nes", "rb");
+    //FILE* const file = fopen("31_test_16.nes", "rb");
+    
+    //FILE* const file = fopen("D:/doc/fcrom/Lagrange Point (TC) Ver1.1.nes", "rb");
+    //FILE* const file = fopen("D:/doc/fcrom/Tiny Toon Adventures 2 - Montana Land e Youkoso (J).nes", "rb");
+    //FILE* const file = fopen("D:/doc/fcrom/Akumajou Densetsu (J).nes", "rb");
+    //FILE* const file = fopen("D:/doc/fcrom/Mouryou Senki Madara (Japan).nes", "rb");
+    
+    FILE* const file = fopen("D:/doc/fcrom/Cornered.nsf", "rb");
+    //FILE* const file = fopen("D:/doc/fcrom/Higurashi.nes", "rb");
+    //FILE* const file = fopen("D:/doc/fcrom/raf.nes", "rb");
     // 文本未找到
     if (!file) return SFC_ERROR_FILE_NOT_FOUND;
     //sfc_ecode code = SFC_ERROR_ILLEGAL_FILE;
