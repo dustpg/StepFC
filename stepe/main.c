@@ -957,16 +957,7 @@ sfc_ecode this_load_nsf(sfc_rom_info_t* info, FILE* file) {
 /// <returns></returns>
 sfc_ecode this_load_rom(void* arg, sfc_rom_info_t* info) {
     assert(info->data_prgrom == NULL && "FREE FIRST");
-    //FILE* const file = fopen("31_test_16.nes", "rb");
-    
-    //FILE* const file = fopen("D:/doc/fcrom/Lagrange Point (TC) Ver1.1.nes", "rb");
-    //FILE* const file = fopen("D:/doc/fcrom/Tiny Toon Adventures 2 - Montana Land e Youkoso (J).nes", "rb");
-    //FILE* const file = fopen("D:/doc/fcrom/Akumajou Densetsu (J).nes", "rb");
-    //FILE* const file = fopen("D:/doc/fcrom/Mouryou Senki Madara (Japan).nes", "rb");
-    
-    FILE* const file = fopen("D:/doc/fcrom/Cornered.nsf", "rb");
-    //FILE* const file = fopen("D:/doc/fcrom/Higurashi.nes", "rb");
-    //FILE* const file = fopen("D:/doc/fcrom/raf.nes", "rb");
+    FILE* const file = fopen("31_test_16.nes", "rb");
     // 文本未找到
     if (!file) return SFC_ERROR_FILE_NOT_FOUND;
     //sfc_ecode code = SFC_ERROR_ILLEGAL_FILE;
