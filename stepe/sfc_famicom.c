@@ -20,6 +20,9 @@ static void sfc_sl_stream(void*a, const uint8_t* b, uint32_t c) {}
 // 声明一个随便(SB)的函数指针类型
 typedef void(*sfc_funcptr_t)();
 
+// VRC7 初始化 LUT
+extern void sfc_vrc7_init_lut(void);
+
 /// <summary>
 /// StepFC: 初始化famicom
 /// </summary>
@@ -34,6 +37,8 @@ sfc_ecode sfc_famicom_init(
     assert(famicom && "bad famicom");
     // 清空数据
     memset(famicom, 0, sizeof(sfc_famicom_t));
+    // 生成VRC7用LUT
+    sfc_vrc7_init_lut();
     // 保留参数
     famicom->argument = argument;
     // 载入默认接口

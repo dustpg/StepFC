@@ -13,6 +13,7 @@
 enum {
     NTSC_CPU_RATE = 1789773,
     SAMPLES_PER_SEC = 44100,
+    VRC7_OUTPUT_PER_SEC = 49716,
     SAMPLES_PER_FRAME = SAMPLES_PER_SEC / 60,
     SAMPLES_ALIGNED = 8,
     SAMPLES_PER_FRAME_ALIGNED = (SAMPLES_PER_FRAME / SAMPLES_ALIGNED + 1) * SAMPLES_ALIGNED,
@@ -88,6 +89,8 @@ struct interface_audio_state {
     float vrc6_squ1_cycle       ;
     float vrc6_squ2_cycle       ;
     float vrc6_saw__cycle       ;
+
+    float                           vrc7_index;
 } g_states;
 
 
@@ -222,6 +225,8 @@ static void do_dmc() {
         }
     }
 }
+
+extern int32_t sfc_vrc7_49716hz(sfc_famicom_t*);
 
 // 生成样本
 static void make_samples(const uint32_t begin, const uint32_t end) {
@@ -412,7 +417,24 @@ static void make_samples(const uint32_t begin, const uint32_t end) {
 
         }
 
-        static float max_vol = 0.8f;
+        // VRC7
+        if (g_famicom->rom_info.extra_sound & SFC_NSF_EX_VCR7) {
+            const double adper = ((double)VRC7_OUTPUT_PER_SEC / (double)SAMPLES_PER_SEC);
+            g_states.vrc7_index += (float)(adper - 1.0);
+            int32_t vrc7 = sfc_vrc7_49716hz(g_famicom);
+            if (g_states.vrc7_index >= 1.f) {
+                g_states.vrc7_index -= 1.f;
+                const int32_t newvrc7 = sfc_vrc7_49716hz(g_famicom);
+                vrc7 += newvrc7;
+                vrc7 /= 2;
+            }
+            const double weight = 1.0;
+            output += (float)((double)vrc7 * weight / (double)(1 << 23));
+        }
+
+
+
+        static float max_vol = 1.0f;
         if (output > max_vol) max_vol = output;
 
         buffer[i] = output / max_vol
@@ -513,6 +535,19 @@ void submit_now_buffer(void*rgba) {
     // 跳过视频帧
     if (rgba) d2d_submit_wave(buffer, SAMPLES_PER_FRAME);
     xa2_submit_buffer(buffer, SAMPLES_PER_FRAME);
+}
+
+
+void debug_putaudio(float x) {
+    static float buf[1024];
+    static int index = 0;
+    static FILE* file = 0;
+    buf[index++] = x;
+    if (index == 1024) {
+        index = 0;
+        if (!file) file = fopen("output.raw", "wb");
+        fwrite(buf, 4, 1024, file);
+    }
 }
 
 /// <summary>
@@ -732,6 +767,7 @@ void get_cso_file_path(char path_input[PATH_BUFLEN]) {
         path_input[len] = 0;
         fclose(last_input_file);
         printf("Last path: [%s], enter 'N' to rewrite, other to skip\n", path_input);
+        return;
         const int ch = getchar();
         if (!(ch == 'N' || ch == 'n'))  return;
         // 清除输入缓存
@@ -1042,22 +1078,4 @@ sfc_ecode this_free_rom(void* arg, sfc_rom_info_t* info) {
 
 
 void sfc_before_execute(void* ctx, sfc_famicom_t* famicom) {
-    static int line = 0;
-    line++;
-    return;
-    char buf[SFC_DISASSEMBLY_BUF_LEN2];
-    const uint16_t pc = famicom->registers.program_counter;
-
-    if (line < 20000) return;
-
-    sfc_fc_disassembly(pc, famicom, buf);
-    printf(
-        "%4d - %s   A:%02X X:%02X Y:%02X P:%02X SP:%02X\n",
-        line, buf,
-        (int)famicom->registers.accumulator,
-        (int)famicom->registers.x_index,
-        (int)famicom->registers.y_index,
-        (int)famicom->registers.status,
-        (int)famicom->registers.stack_pointer
-    );
 }

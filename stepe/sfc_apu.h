@@ -251,13 +251,64 @@ typedef struct {
 
 
 
+// 可修改
+enum {
+#if 1
+    // VRC7 半正弦表位长
+    SFC_VRC7_HALF_SINE_LUT_BIT = 10,
+    // VRC7 AM 表位长
+    SFC_VRC7_AM_LUT_BIT = 8,
+    // VRC7 FM 表位长
+    SFC_VRC7_FM_LUT_BIT = 8,
+    // VRC7 Attack输出 表位长
+    SFC_VRC7_ATKOUT_LUT_BIT = 8,
+    // VRC7 衰减转线性查找表位长
+    SFC_VRC7_A2L_LUT_BIT = 15,
+#else
+    // VRC7 半正弦表位长
+    SFC_VRC7_HALF_SINE_LUT_BIT = 16,
+    // VRC7 AM 表位长
+    SFC_VRC7_AM_LUT_BIT = 16,
+    // VRC7 FM 表位长
+    SFC_VRC7_FM_LUT_BIT = 16,
+    // VRC7 Attack输出 表位长
+    SFC_VRC7_ATKOUT_LUT_BIT = 16,
+    // VRC7 衰减转线性查找表位长
+    SFC_VRC7_A2L_LUT_BIT = 16,
+#endif
+};
+
 
 /// <summary>
 /// VRC7 FM算子
 /// </summary>
 typedef struct {
-    // 状态 IADSR
-    uint8_t     state;
+    // 前一输出
+    int32_t     prev_output;
+    // 前一最终输出
+    int32_t     prev_final;
+    // [18bit] 相位
+    uint32_t    phase;
+    // [23bit] 包络发生器计数器
+    uint32_t    egc;
+    // Base 值
+    uint32_t    base;
+    // Key Scale 值
+    uint32_t    key_scale;
+    // 相位 速率
+    uint32_t    phase_rate;
+    // 包络状态 IADSR
+    uint32_t    state;
+    // Attack 速率
+    uint32_t    attack_rate;
+    // Decay 速率
+    uint32_t    decay_rate;
+    // Sustain 速率
+    uint32_t    sustain_rate;
+    // Release 速率
+    uint32_t    release_rate;
+    // Sustain 值
+    uint32_t    sustain_level;
 
 } sfc_vrc7_operator_t;
 
@@ -265,10 +316,10 @@ typedef struct {
 /// VRC7 声道数据
 /// </summary>
 typedef struct {
-    // 载波
-    sfc_vrc7_operator_t carrier;
     // 调制
     sfc_vrc7_operator_t modulator;
+    // 载波
+    sfc_vrc7_operator_t carrier;
     // 频率 [9bit]
     uint16_t    freq;
     // 八度 [3bit]
@@ -277,14 +328,20 @@ typedef struct {
     uint8_t     trigger;
     // 延音 [1bit]
     uint8_t     sustain;
-    // 乐器 [4bit]
-    uint8_t     instrument;
+    // 乐器 [4bit] 已经预乘8 [0XXX X000]
+    uint8_t     instrument8;
     // 音量 [4bit]
     uint8_t     volume;
-    // 未使用
-    uint8_t     unused[1];
+    // 控制信息 $2X 低四位
+    uint8_t     low4bit;
 } sfc_vrc7_ch_t;
 
+
+#ifdef SFC_FM_FLOAT
+typedef float sfc_vrc7_fm_t;
+#else
+typedef int32_t sfc_vrc7_fm_t;
+#endif
 
 /// <summary>
 /// VRC7数据
@@ -292,6 +349,14 @@ typedef struct {
 typedef struct {
     // 6个声道
     sfc_vrc7_ch_t   ch[6];
+    // [20bit] AM相位
+    uint32_t        am_phase;
+    // [20bit] FM相位
+    uint32_t        fm_phase;
+    // AM 输出
+    uint32_t        am_output;
+    // FM 输出
+    sfc_vrc7_fm_t   fm_output;
     // 寄存器选择
     uint8_t         selected;
     // 未使用

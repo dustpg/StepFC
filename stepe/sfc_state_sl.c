@@ -386,7 +386,13 @@ sfc_ecode sfc_famicom_load_state(sfc_famicom_t* famicom) {
         // 暴力写入
         famicom->registers = td.cpu_data;
         famicom->ppu.data = td.ppu_data;
+//#ifdef NDEBUG
         famicom->apu = td.apu_data;
+//#else
+        //sfc_vrc7_data_t vrc7 = famicom->apu.vrc7;
+        //famicom->apu = td.apu_data;
+        //famicom->apu.vrc7 = vrc7;
+//#endif
         famicom->mapper_buffer = td.mapper_data;
         memcpy(
             &famicom->button_index_1,
