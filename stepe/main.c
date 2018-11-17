@@ -767,7 +767,6 @@ void get_cso_file_path(char path_input[PATH_BUFLEN]) {
         path_input[len] = 0;
         fclose(last_input_file);
         printf("Last path: [%s], enter 'N' to rewrite, other to skip\n", path_input);
-        return;
         const int ch = getchar();
         if (!(ch == 'N' || ch == 'n'))  return;
         // 清除输入缓存
