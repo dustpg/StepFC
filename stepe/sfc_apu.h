@@ -295,8 +295,8 @@ typedef struct {
     uint32_t    base;
     // Key Scale 值
     uint32_t    key_scale;
-    // 相位 速率
-    uint32_t    phase_rate;
+    // 相位 速率 4倍以保证精度
+    uint32_t    phase_rate_x4;
     // 包络状态 IADSR
     uint32_t    state;
     // Attack 速率

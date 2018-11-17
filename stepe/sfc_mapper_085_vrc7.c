@@ -427,7 +427,7 @@ enum sfc_vrc7_config {
     SFC_VRC7_FM_LUTLEN = 1 << SFC_VRC7_FM_LUT_BIT,
     SFC_VRC7_FM_RS_BIT = 20 - SFC_VRC7_FM_LUT_BIT,
     SFC_VRC7_FM_MASK = SFC_VRC7_FM_LUTLEN - 1,
-    SFC_VRC7_INT_BITWIDTH = 20,
+    SFC_VRC7_INT_BITWIDTH = 18,
     // Attack 输出
     SFC_VRC7_AO_LUTLEN = 1 << SFC_VRC7_ATKOUT_LUT_BIT,
     SFC_VRC7_AO_RS_BIT = 23 - SFC_VRC7_ATKOUT_LUT_BIT,
@@ -556,13 +556,13 @@ static inline sfc_vrc7_fm_t sfc_vrc7_fm_calc(uint32_t phase) {
 /// <param name="left">The left.</param>
 /// <param name="right">The right.</param>
 /// <returns></returns>
-static inline uint32_t sfc_vrc7_fm_do(uint32_t left, sfc_vrc7_fm_t right) {
+static inline uint32_t sfc_vrc7_fm_do(uint32_t left_x4, sfc_vrc7_fm_t right) {
 #ifdef SFC_FM_FLOAT
-    return (uint32_t)((double)left * (double)right);
+    return (uint32_t)((double)left_x4 * (double)right * 0.25);
 #else
-    const int32_t ileft = (int32_t)left;
+    const int32_t ileft = (int32_t)(left_x4);
     const int32_t extra = (ileft * right) / (1 << SFC_VRC7_INT_BITWIDTH);
-    return (uint32_t)(ileft + extra);
+    return (uint32_t)(ileft + extra) >> 2;
 #endif
 }
 
@@ -704,13 +704,12 @@ static void sfc_vrc7_operator_changed(
     */
     const uint8_t* const patch = sfc_get_vrc7_patch(famicom) + ch->instrument8;
     const uint8_t first = patch[carrier];
-    const uint32_t phase_rate_x2
+    const uint32_t phase_rate_x
         = (uint32_t)ch->freq
         * (uint32_t)(1 << ch->octave)
         * (uint32_t)sfc_vrc7_multi_lut[first&0xf]
         ;
-    op->phase_rate = phase_rate_x2 >> 1;
-
+    op->phase_rate_x4 = phase_rate_x;
     /*
     这里列出一些数据之后会用上:
 
@@ -870,9 +869,9 @@ static int32_t sfc_vrc7_operator_ouput(
     
     // 使用FM
     if (patch[carrier] & 0x40)
-        op->phase += sfc_vrc7_fm_do(op->phase_rate / 2, famicom->apu.vrc7.fm_output);
+        op->phase += sfc_vrc7_fm_do(op->phase_rate_x4, famicom->apu.vrc7.fm_output);
     else
-        op->phase += op->phase_rate / 2;
+        op->phase += op->phase_rate_x4 >> 2;
 
     const uint32_t phase_secondary = op->phase + adj;
 
