@@ -1,5 +1,7 @@
 ### 拉格朗日点
 
+本文githgub[备份地址](https://github.com/dustpg/BlogFM/issues/44)
+
 之所以将游戏名称作为小标题, 自然是说到可乐妹的VRC7, 就不得不说'[拉格朗日点](http://bootgod.dyndns.org:7777/profile.php?id=3643)'了, 因为这是一款唯一使用了VRC7的游戏. 被不少人冠上'FC最强音乐'的帽子.
 
  当然实际上还有一款'[兔宝宝历险记2](http://bootgod.dyndns.org:7777/profile.php?id=3834)(日版)'也使用了VRC7, 不过'兔宝宝历险记2'没有使用到VRC7的扩展音频(实体卡带比前者小了不少, 可以看作前者使用了VRC7a, 后者使用了VRC7b). 
@@ -63,6 +65,7 @@ CHR $1C00-$1FFF: 1 KB switchable CHR ROM bank
 
 ### CHR Select 0…7 ($A000…$DFFF)
 
+
 Write to CPU address  |  1KB CHR bank affected
 ----------------------|---------------
 $A000           |  $0000-$03FF
@@ -73,6 +76,7 @@ $C000           |  $1000-$13FF
 $C008 or $C010  |  $1400-$17FF
 $D000           |  $1800-$1BFF
 $D008 or $D010  |  $1C00-$1FFF
+
 
 ### Mirroring Control ($E000)
 
@@ -97,7 +101,7 @@ $F008, $F010:  IRQ Acknowledge
 
 对比起VRC6起来, 简直不知道友好到哪里去! 根据地址线的规律, 可以使用:
 
-```
+```c
     const uint16_t vrc7a = address >> 4;
     const uint16_t vrc7b = address >> 3;
     const uint16_t base = (((address >> 11) & 0xfffe) | ((vrc7a | vrc7b) & 1)) & 0xf;
@@ -227,6 +231,7 @@ $05  |  AAAA DDDD  |  Carrier attack (A), decay (D)
 $06  |  SSSS RRRR  |  Modulator sustain (S), release (R)
 $07  |  SSSS RRRR  |  Carrier sustain (S), release (R)
 
+
 - vibrato, 一般作抖音, 频率的改变(FM), 使能位
 - tremolo, 一般作颤音, 音量的改变(AM), 使能位
 - attack,  起音, 用于ADSR包络
@@ -250,7 +255,7 @@ Register  |  Bitfield  |  Description
 ----------|------------|-------------
 $10-$15  |  LLLL LLLL  |  Channel low 8 bits of frequency
 $20-$25  |  --ST OOOH  |  Channel sustain (S), trigger (T), octave (O), high bit of frequency (H)
-$30-$35 |   IIII VVVV |   Channel instrument (I), volume (V)
+$30-$35  |  IIII VVVV  |   Channel instrument (I), volume (V)
 
 
  - $AB中, A就是上面三种情况, B就是声道编号: 0-5共计6声道.
@@ -491,7 +496,7 @@ Linear = 10 ^ (dB / -20 / scale)
  - 问题: 为什么之前的不需要重采样? 知道的小伙伴可以回复评论!
  - 方案1: 简单地可以舍弃掉中间错位的样本
  - 方案2: 再稍微好一点的, 上步舍去的样本于下一次做平均
- - 方案3: 第三个自然就是, 进行比较系统地进行重采样. 
+ - 方案3: 第三个自然就是, 进行比较系统地重采样. 
  - 例如先通过一个22kHz的低通滤波, 然后针对每个样本进行权重分配
  - 这里简单地平均一下就好了(方案2)
  - 最后....
@@ -499,7 +504,7 @@ Linear = 10 ^ (dB / -20 / scale)
  - 输出是一个20bit的数据, 不过可能带符号, 也就是21bit有符号.
  - 阉割版只有6个声道, 但是明显地, 应该有8个.
  - 也就是24bit有符号! 等等, 这不比CD音质还好?(内部全部使用双精度模拟的话肯定比CD音质好. 卡带上肯定不是, 不过, 还要什么自行车)
- - 以1.0为上限, 应该除以```(double)(1<<23)``` (单精度浮点捉襟见肘了), 理论最大指为0.75(6声道)
+ - 以1.0为上限, 应该除以```(double)(1<<23)``` (单精度浮点捉襟见肘了), 理论最大值为0.75(6声道)
  - 还是建议用户可调整
 
 ![vrc7](./vrc7.png)
@@ -584,7 +589,7 @@ static void sfc_mapper_55_read_ram(sfc_famicom_t* famicom) {
 
 ### FM
 
-第一个说FM是因为有两个考虑的地方, 深度与宽度, 其中如果采用的是浮点的话, '深度'就无需考虑了. 但是由于代码就这个地方使用了浮点太奇怪了.
+第一个说FM是因为有两个考虑的地方, 深度与宽度, 其中如果采用的是浮点的话, '深度'就无需考虑了. 但是代码就这一个地方使用了浮点也太奇怪了.
 
 ```
     for (int i = 0; i != SFC_VRC7_FM_LUTLEN; ++i) {
@@ -621,7 +626,7 @@ static inline uint32_t sfc_vrc7_fm_do(uint32_t left, sfc_vrc7_fm_t right) {
 }
 ```
 
- - 现在舍弃浮点的整数部分, 1.008中间可是很多位没有使用
+ - 现在舍弃浮点的整数部分, 1.008中间可是很多位浪费了
  - 即: ```a * 1.008``` -> ```a + a*0.008```
  - 这样就有很多位可以用了(可以用到20), 但是小心负数方向
 
@@ -644,6 +649,8 @@ static inline uint32_t sfc_vrc7_fm_do(uint32_t left, sfc_vrc7_fm_t right) {
 
 ```
 
+实际实现中, 由于有除以4的操作, 这样会丢失精度. 所以上面函数```uint32_t left```, 实际是还没有除以4的```uint32_t left_x4```
+
 
 ### 宽度
 
@@ -651,7 +658,7 @@ static inline uint32_t sfc_vrc7_fm_do(uint32_t left, sfc_vrc7_fm_t right) {
  - 半正弦表可以适当加大, 比如1024.
  - Attack输出表不必太大, 128都行, 自己用的256
  - 衰减转线性, 由于对数的原因, 这个表必须足够长不然精度不够
- - 评选标准大致是最后几个出现重复值, 或者连续
+ - 评选标准大致是最后几个出现重复值
 
 ![a2l1](./a2l1.png)
 
