@@ -428,7 +428,7 @@ static void make_samples(const uint32_t begin, const uint32_t end) {
                 vrc7 += newvrc7;
                 vrc7 /= 2;
             }
-            const double weight = 1.0;
+            const double weight = 2.0;
             output += (float)((double)vrc7 * weight / (double)(1 << 23));
         }
 

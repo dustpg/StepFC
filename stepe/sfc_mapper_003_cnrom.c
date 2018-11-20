@@ -32,7 +32,7 @@ static void sfc_mapper_03_write_high(sfc_famicom_t* famicom, uint16_t address, u
 }
 
 /// <summary>
-/// SFCs the load mapper 01.
+/// SFCs the load mapper 03.
 /// </summary>
 /// <param name="famicom">The famicom.</param>
 /// <returns></returns>

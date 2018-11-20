@@ -167,7 +167,7 @@ enum NSF_HEADER_FLAGS {
     */
     SFC_NSF_EX_VCR6 = 1 << 0,
     SFC_NSF_EX_VCR7 = 1 << 1,
-    SFC_NSF_EX__FDS = 1 << 2,
+    SFC_NSF_EX_FDS1 = 1 << 2,
     SFC_NSF_EX_MMC5 = 1 << 3,
     SFC_NSF_EX_N163 = 1 << 4,
     SFC_NSF_EX_FME7 = 1 << 5,
