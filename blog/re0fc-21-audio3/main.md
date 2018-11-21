@@ -367,7 +367,7 @@ unsigned xa2_buffer_left() ;
 
 ### DMC 跳跃
 
-之前4MB的PCM播放的ROM也可以正确播放了.
+之前4MB的PCM播放的ROM(搞事者转录的*寒蝉鸣泣之时-解*)也可以正确播放了.
 
 ![output](./output.png)
 
