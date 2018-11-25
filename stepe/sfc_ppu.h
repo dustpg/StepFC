@@ -53,6 +53,15 @@ enum sfc_ppu_flag_sprite_attr {
     SFC_SPATTR_Priority= 0x20, // 优先位
 };
 
+
+/// <summary>
+/// PPU Ez 用模式
+/// </summary>
+enum sfc_ppu_mode_under_ez {
+    SFC_EZPPU_Normal = 0,   // 正常模式
+    SFC_EXPPU_ExGrafix,     // MMC5-ExGrafix 模式
+};
+
 /// <summary>
 /// 
 /// </summary>
@@ -77,6 +86,8 @@ typedef struct {
     uint8_t         oamaddr;
     // 显存读取缓冲值
     uint8_t         pseudo;
+    // PPU模式 - EZ模式使用
+    uint8_t         ppu_mode;
     // 精灵调色板索引
     uint8_t         spindexes[0x20];
     // 精灵数据: 256B - 以32位对齐
@@ -94,7 +105,6 @@ typedef struct {
     uint8_t*            banks[0x4000 / 0x0400];
     // PPU 数据
     sfc_ppu_data_t      data;
-
 } sfc_ppu_t;
 
 // backup banks

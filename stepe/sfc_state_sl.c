@@ -78,10 +78,8 @@ typedef struct {
     uint32_t        ppu_cycle_lo;
     // PPU 周期数 高4字节
     uint32_t        ppu_cycle_hi;
-    // 16字节对齐/ 保留用
-    uint8_t         reserved1[8];
     // CPU BANK 高位偏移
-    uint32_t        cpu_hi_banks_offset[8];
+    uint32_t        cpu_h10_banks_offset[10];
     // PPU BANK 低位偏移
     uint32_t        ppu_lo_banks_offset[8];
     // PPU BANK 高位偏移
@@ -89,6 +87,42 @@ typedef struct {
 
 } sfc_state_header_basic_t;
 
+
+/// <summary>
+/// StepFC: 利用指针创建偏移量
+/// </summary>
+/// <param name="famicom">The famicom.</param>
+/// <param name="ptr">The PTR.</param>
+/// <returns></returns>
+static uint32_t sfc_make_offset(sfc_famicom_t* famicom, const uint8_t* ptr) {
+    const uint8_t* const fc0 = famicom->video_memory;
+    const uint8_t* const fc1 = (const uint8_t*)(famicom + 1);
+    // RAM
+    if (ptr > fc0 && ptr < fc1) {
+        const uintptr_t rv = ptr - fc0;
+        assert(rv < 0x10000000);
+        return (uint32_t)rv;
+    }
+    // ROM
+    else {
+        const uintptr_t rv = ptr - famicom->rom_info.data_prgrom;
+        assert(rv < 0x10000000);
+        return (uint32_t)rv | (uint32_t)0x80000000;
+    }
+}
+
+/// <summary>
+/// StepFC: 利用偏移量创建指针
+/// </summary>
+/// <param name="famicom">The famicom.</param>
+/// <param name="offset">The offset.</param>
+/// <returns></returns>
+static uint8_t* sfc_make_ptr(sfc_famicom_t* famicom, uint32_t offset) {
+    // ROM
+    if (offset & 0x80000000) return famicom->rom_info.data_prgrom + (offset & 0x7fffffff);
+     // RAM
+    else return famicom->video_memory + offset;
+}
 
 /// <summary>
 /// 文件尾 用于存放易变数据
@@ -104,8 +138,10 @@ typedef struct {
     uint32_t        mapper_seg_len;
     // 输入设备 数据段大小
     uint32_t        input_seg_len;
+    // NSF 数据段大小
+    uint32_t        nsf_seg_len;
     // 保留16字节对齐
-    uint32_t        reserved1[3];
+    uint32_t        reserved1[2];
 
 } sfc_state_tail_len_t;
 
@@ -140,6 +176,8 @@ typedef struct {
     sfc_mapper_buffer_t         mapper_data;
     // 输入设备数据
     sfc_sl_input_data_t         input_data;
+    // NSF状态
+    sfc_nsf_playstate_t         nsf_data;
     // 对齐用
     uint8_t                     unused[12];
 
@@ -188,11 +226,11 @@ void sfc_famicom_save_state(sfc_famicom_t* famicom) {
     const uint8_t ram_mask
         // 主RAM是肯定的
         = SL_CPU_MAIN_RAM_2KB
-        // 不缺这8KB
+        // 不缺这8KiB
         | SL_CPU_SRAM_8KB
         // VRAM是肯定的
         | SL_PPU_VRAM_2KB
-        // 不缺这2KB
+        // 不缺这2KiB
         | SL_PPU_EXVRAM_2KB
         ;
     // 判断用数据
@@ -210,21 +248,10 @@ void sfc_famicom_save_state(sfc_famicom_t* famicom) {
         basic.cpu_cycle_lo = famicom->cpu_cycle_count;
         basic.ram_mask = ram_mask;
         // BANKS 偏移量
-        for (int i = 0; i != 8; ++i)
-            basic.cpu_hi_banks_offset[i]
-            = famicom->prg_banks[8 + i]
-            - famicom->rom_info.data_prgrom
-            ;
-        for (int i = 0; i != 8; ++i)
-            basic.ppu_lo_banks_offset[i]
-            = famicom->ppu.banks[i]
-            - famicom->rom_info.data_chrrom
-            ;
-        for (int i = 0; i != 8; ++i)
-            basic.ppu_hi_banks_offset[i]
-            = famicom->ppu.banks[8 + i]
-            - famicom->video_memory
-            ;
+        for (int i = 0; i != 10; ++i)
+            basic.cpu_h10_banks_offset[i] = sfc_make_offset(famicom, famicom->prg_banks[6 + i]);
+        for (int i = 0; i != 16; ++i)
+            basic.ppu_lo_banks_offset[i] = sfc_make_offset(famicom, famicom->ppu.banks[i]);
         // 写入
         sfc_sl_write_stream(famicom, &basic, sizeof(basic));
     }
@@ -271,6 +298,8 @@ void sfc_famicom_save_state(sfc_famicom_t* famicom) {
         tail_len.apu_seg_len = sizeof(sfc_apu_register_t);
         tail_len.mapper_seg_len = sizeof(sfc_mapper_buffer_t);
         tail_len.input_seg_len = sizeof(sfc_sl_input_data_t);
+        tail_len.nsf_seg_len = sizeof(sfc_nsf_playstate_t);
+        
         sfc_sl_write_stream(
             famicom,
             &tail_len,
@@ -284,6 +313,7 @@ void sfc_famicom_save_state(sfc_famicom_t* famicom) {
         tail_data.ppu_data = famicom->ppu.data;
         tail_data.apu_data = famicom->apu;
         tail_data.mapper_data = famicom->mapper_buffer;
+        tail_data.nsf_data = famicom->nsf;
         memcpy(
             &tail_data.input_data.button_index_1,
             &famicom->button_index_1,
@@ -324,21 +354,10 @@ sfc_ecode sfc_famicom_load_state(sfc_famicom_t* famicom) {
         famicom->cpu_cycle_count = hb.cpu_cycle_lo;
         ram_mask = hb.ram_mask;
         // BANKS 偏移量
-        for (int i = 0; i != 8; ++i)
-            famicom->prg_banks[8 + i]
-            = hb.cpu_hi_banks_offset[i]
-            + famicom->rom_info.data_prgrom
-            ;
-        for (int i = 0; i != 8; ++i)
-            famicom->ppu.banks[i]
-            = famicom->rom_info.data_chrrom
-            + hb.ppu_lo_banks_offset[i]
-            ;
-        for (int i = 0; i != 8; ++i)
-            famicom->ppu.banks[8 + i]
-            = famicom->video_memory
-            + hb.ppu_hi_banks_offset[i]
-            ;
+        for (int i = 0; i != 10; ++i)
+            famicom->prg_banks[6 + i] = sfc_make_ptr(famicom, hb.cpu_h10_banks_offset[i]);
+        for (int i = 0; i != 16; ++i)
+            famicom->ppu.banks[i] = sfc_make_ptr(famicom, hb.ppu_lo_banks_offset[i]);
     }
     {
         // 主RAM
@@ -394,6 +413,7 @@ sfc_ecode sfc_famicom_load_state(sfc_famicom_t* famicom) {
         //famicom->apu.vrc7 = vrc7;
 //#endif
         famicom->mapper_buffer = td.mapper_data;
+        famicom->nsf = td.nsf_data;
         memcpy(
             &famicom->button_index_1,
             &td.input_data.button_index_1,

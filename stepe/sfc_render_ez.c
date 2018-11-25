@@ -10,6 +10,8 @@
 #define SFC_ALIGNAS(a) _Alignas(a)
 #endif
 
+//#define SFC_NO_SSE
+
 // NMI - 不可屏蔽中断
 extern inline void sfc_operation_NMI(sfc_famicom_t* famicom);
 
@@ -205,6 +207,34 @@ static inline void sfc_expand_backgorund_16(
     (*(__m128i*)output) = value;
 }
 
+/// <summary>
+/// SFCs the expand backgorund 16.
+/// </summary>
+/// <param name="p0">The p0.</param>
+/// <param name="p1">The p1.</param>
+/// <param name="high">The high.</param>
+/// <param name="output">The output.</param>
+static inline void sfc_expand_backgorund_16_ex(
+    uint8_t p0,
+    uint8_t p1,
+    uint8_t p2,
+    uint8_t p3,
+    uint8_t high0,
+    uint8_t high1,
+    uint8_t* output) {
+    const __m128i value1 = sfc_create_128_mask(p2, p0);
+    const __m128i value2 = sfc_create_128_mask(p3, p1);
+
+    __m128i value = _mm_or_si128(value1, value2);
+    value = _mm_or_si128(value, _mm_slli_epi32(value1, 1));
+    value = _mm_or_si128(value, _mm_slli_epi32(value2, 2));
+    value = _mm_or_si128(value, _mm_set_epi8(
+        high1, high1, high1, high1, high1, high1, high1, high1,
+        high0, high0, high0, high0, high0, high0, high0, high0
+        ));
+    (*(__m128i*)output) = value;
+}
+
 #endif
 
 /// <summary>
@@ -254,6 +284,40 @@ static inline void sfc_render_background_pixel16(
 #endif
 }
 
+
+/// <summary>
+/// StepFC: 简易模式渲染背景 - ExGrafix模式 - 以16像素为单位
+/// </summary>
+/// <param name="high0">The high0.</param>
+/// <param name="high1">The high1.</param>
+/// <param name="plane_left">The plane left.</param>
+/// <param name="plane_right">The plane right.</param>
+/// <param name="aligned_palette">The aligned palette.</param>
+static inline void sfc_render_background_pixel16_ex(
+    uint8_t high0,
+    uint8_t high1,
+    const uint8_t* plane_left,
+    const uint8_t* plane_right,
+    uint8_t* aligned_palette) {
+    const uint8_t plane0 = plane_left[0];
+    const uint8_t plane1 = plane_left[8];
+    const uint8_t plane2 = plane_right[0];
+    const uint8_t plane3 = plane_right[8];
+#ifdef SFC_NO_SSE
+    sfc_expand_backgorund_8(plane0, plane1, high0, aligned_palette + 0);
+    sfc_expand_backgorund_8(plane2, plane3, high1, aligned_palette + 8);
+#else
+    //if (high0 && high1 && high0 != high1) {
+    //    printf("MMC5-ExGrafix!\n");
+    //}
+    sfc_expand_backgorund_16_ex(plane0, plane1, plane2, plane3, high0, high1, aligned_palette);
+#endif
+}
+
+// MMC5 直接开刀
+extern inline uint8_t* sfc_mmc5_exram(sfc_famicom_t*);
+extern inline uint8_t sfc_mmc5_get_5130_hi(sfc_famicom_t* famicom);
+
 /// <summary>
 /// SFCs the render background scanline.
 /// </summary>
@@ -285,9 +349,6 @@ static void sfc_render_background_scanline(
     // 由于Y是240一换, 需要膜计算
     const uint16_t scrolly_index0 = scrolly / (uint16_t)240;
     const uint16_t scrolly_offset = scrolly % (uint16_t)240;
-
-    // 计算背景所使用的图样表
-    const uint8_t** const ppattern = &famicom->ppu.banks[famicom->ppu.data.ctrl & SFC_PPU2000_BgTabl ? 4 : 0];
     // 检测垂直偏移量确定使用图案表的前一半[8-9]还是后一半[10-11]
     const uint8_t* table[2];
 
@@ -296,7 +357,10 @@ static void sfc_render_background_scanline(
     table[1] = famicom->ppu.banks[first_buck+1];
     // 以16像素为单位扫描该行
     SFC_ALIGNAS(16) uint8_t aligned_buffer[SFC_WIDTH + 16 + 16];
-    {
+    // 正常模式
+    if (famicom->ppu.data.ppu_mode == SFC_EZPPU_Normal) {
+        // 计算背景所使用的图样表(拜1KiB模式所赐)
+        const uint8_t** const ppattern = &famicom->ppu.banks[famicom->ppu.data.ctrl & SFC_PPU2000_BgTabl ? 4 : 0];
         const uint8_t realy = (uint8_t)scrolly_offset;
         // 保险起见扫描16+1次
         for (uint16_t i = 0; i != 17; ++i) {
@@ -323,7 +387,49 @@ static void sfc_render_background_scanline(
                 aligned_buffer + (i << 4)
             );
         }
-        // 将数据复制过去
+    }
+    // MMC5-ExGrafix 模式
+    else {
+        const uint8_t* const exram = sfc_mmc5_exram(famicom);
+        const uint8_t realy = (uint8_t)scrolly_offset;
+        const uint8_t chrbank_hi = sfc_mmc5_get_5130_hi(famicom);
+        const uint8_t* const real_pattern = famicom->rom_info.data_chrrom;
+        // 保险起见扫描16+1次
+        for (uint16_t i = 0; i != 17; ++i) {
+            const uint16_t realx = scrollx + (i << 4);
+            //const uint8_t* nt = table[(realx >> 8) & 1];
+            const uint8_t xunit = (realx & (uint16_t)0xF0) >> 4;
+            // 获取32为单位的调色板索引字节
+            //const uint8_t attr = (nt + 32 * 30)[(realy >> 5 << 3) | (xunit >> 1)];
+            // 获取属性表内位偏移
+            //const uint8_t aoffset = ((uint8_t)(xunit & 1) << 1) | ((realy & 0x10) >> 2);
+            // 计算高两位
+            //const uint8_t high = (attr & (3 << aoffset)) >> aoffset << 3;
+
+            // 计算图样表位置
+            const uintptr_t offset = ((uint16_t)xunit << 1) + (uint16_t)(realy >> 3 << 5);
+            const uint8_t* too_young = exram + offset;
+            // 原始数据
+            const uint8_t* nt = table[(realx >> 8) & 1];
+            const uint8_t* raw_data = nt + offset;
+
+            const uint8_t too_young0 = too_young[0];
+            const uint8_t* const pattern0 = real_pattern + 4 * 1024 * ((too_young0 & 0x3f) | chrbank_hi);
+            const uint8_t too_young1 = too_young[1];
+            const uint8_t* const pattern1 = real_pattern + 4 * 1024 * ((too_young1 & 0x3f) | chrbank_hi);
+
+            // 渲染16个像素
+            sfc_render_background_pixel16_ex(
+                (too_young0 & 0xc0) >> 3,
+                (too_young1 & 0xc0) >> 3,
+                pattern0 + raw_data[0] * 16 + (realy & 7),
+                pattern1 + raw_data[1] * 16 + (realy & 7),
+                aligned_buffer + (i << 4)
+            );
+        }
+    }
+    // 将数据复制过去
+    {
         const uint8_t* const unaligned_buffer = aligned_buffer + (scrollx & 0x0f);
         memcpy(buffer, unaligned_buffer, SFC_WIDTH);
     }

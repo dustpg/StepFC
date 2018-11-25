@@ -267,6 +267,7 @@ void DoRender(uint32_t sync) noexcept {
             );
         }
         else {
+            ctx->SetTransform(D2D1::Matrix3x2F::Scale(3, 3));
             ctx->DrawBitmap(
                 g_data.d2d_bg,
                 nullptr,

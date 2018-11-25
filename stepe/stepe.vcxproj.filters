@@ -51,9 +51,6 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="main.c">
-      <Filter>src</Filter>
-    </ClCompile>
     <ClCompile Include="sfc_6502.c">
       <Filter>src</Filter>
     </ClCompile>
@@ -118,6 +115,15 @@
       <Filter>mapper</Filter>
     </ClCompile>
     <ClCompile Include="sfc_mapper_085_vrc7.c">
+      <Filter>mapper</Filter>
+    </ClCompile>
+    <ClCompile Include="sfc_mapper_020_fds.c">
+      <Filter>mapper</Filter>
+    </ClCompile>
+    <ClCompile Include="main.c">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="sfc_mapper_005_mmc5.c">
       <Filter>mapper</Filter>
     </ClCompile>
   </ItemGroup>

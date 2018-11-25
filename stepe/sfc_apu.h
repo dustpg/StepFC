@@ -45,6 +45,34 @@ enum sfc_channel_index {
     SFC_VRC7_FM4,
     // [VRC7] FM声道#5
     SFC_VRC7_FM5,
+    // [FDS1] 波形声道
+    SFC_FDS1_Wavefrom,
+    // [MMC5] 方波#1
+    SFC_MMC5_Square1,
+    // [MMC5] 方波#2
+    SFC_MMC5_Square2,
+    // [MMC5] PCM声道
+    SFC_MMC5_PCM,
+    // [N163] 波形#0
+    SFC_N163_Wavefrom0,
+    // [N163] 波形#1
+    SFC_N163_Wavefrom1,
+    // [N163] 波形#2
+    SFC_N163_Wavefrom2,
+    // [N163] 波形#3
+    SFC_N163_Wavefrom3,
+    // [N163] 波形#4
+    SFC_N163_Wavefrom4,
+    // [N163] 波形#5
+    SFC_N163_Wavefrom5,
+    // [N163] 波形#6
+    SFC_N163_Wavefrom6,
+    // [N163] 波形#7
+    SFC_N163_Wavefrom7,
+    // [FME7]
+    // [FME7]
+    // [FME7]
+    // [FME7]
     // 总声道数量
     SFC_CHANNEL_COUNT
 } ;
@@ -364,6 +392,75 @@ typedef struct {
 } sfc_vrc7_data_t;
 
 
+
+/// <summary>
+/// FDS 数据
+/// </summary>
+typedef struct {
+    // 音量包络当前时钟
+    uint32_t        volenv_clock;
+    // 调制包络当前时钟
+    uint32_t        modenv_clock;
+    // 波形输出用时钟
+    uint32_t        wavout_clock;
+    // 调制单元用时钟
+    uint32_t        mdunit_clock;
+    // 音量包络增长 TickPerClock
+    uint32_t        volenv_tpc;
+    // 调制包络增长 TickPerClock
+    uint32_t        modenv_tpc;
+    // [12bit] 基础频率     $4082-$4083
+    uint16_t        freq;
+    // [12bit] 基础频率-增益
+    int16_t         freq_gain;
+    // [12bit] 基础频率-已增益
+    uint16_t        freq_gained;
+    // [12bit] 调制频率     $4085-$4086
+    uint16_t        mod_freq;
+    // [8 bit] 音量包络     $4083 
+    uint8_t         volenv_4080;
+    // [2 bit] $4083 高2bit 相关标志位
+    uint8_t         flags_4083;
+    // [6 bit] 音量增益     $4080
+    uint8_t         volenv_gain;
+    // [5 bit] 音量增益钳制
+    uint8_t         volenv_gain_clamped;
+    // [8 bit] 调制包络     $4084
+    uint8_t         modenv_4084;
+    // [6 bit] 调制增益     $4084
+    uint8_t         modenv_gain;
+    // [7 bit] 调制计数(由于有符号利用高7bit实现)
+    int8_t          mod_counter_x2;
+    // [8 bit] 主包络速率 [默认0xE8]
+    uint8_t         masenv_speed;
+    // 调制使能
+    uint8_t         mod_enabled;
+    // 调制表位
+    uint8_t         modtbl_index;
+    // 允许写入
+    uint8_t         write_enable;
+    // 主音量  (除以30)
+    uint8_t         master_volume;
+    // 波索引位置
+    uint8_t         wavtbl_index;
+    // 波输出数据
+    uint8_t         waveout;
+
+} sfc_fds1_data_t;
+
+enum {
+    SFC_FDS_4080_GainMode       = 0x80,
+    SFC_FDS_4080_Increase       = 0x40,
+
+    SFC_FDS_4083_DisableEnv     = 0x40,
+    SFC_FDS_4083_HaltWave       = 0x80,
+
+    SFC_FDS_4084_GainMode       = 0x80,
+    SFC_FDS_4084_Increase       = 0x40,
+
+    SFC_FDS_MASTER_VOL_LCM = 30
+};
+
 /// <summary>
 /// APU寄存器数据
 /// </summary>
@@ -382,6 +479,8 @@ typedef struct {
     sfc_vrc6_data_t             vrc6;
     // VRC7
     sfc_vrc7_data_t             vrc7;
+    // FDS1
+    sfc_fds1_data_t             fds;
     // 状态寄存器(写: 声道使能)
     uint8_t                     status_write;
     // 状态寄存器(读:)

@@ -6,6 +6,7 @@
 /// </summary>
 const sfc_config_t SFC_CONFIG_NTSC = {
     1789773.f,
+    1789773,
     29830,
     60,
     1364,
@@ -20,6 +21,7 @@ const sfc_config_t SFC_CONFIG_NTSC = {
 /// </summary>
 const sfc_config_t SFC_CONFIG_PAL = {
     1662607.f,
+    1662607,
     33254,
     50,
     1362,

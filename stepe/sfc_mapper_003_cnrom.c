@@ -29,6 +29,7 @@ static void sfc_mapper_03_write_high(sfc_famicom_t* famicom, uint16_t address, u
     const int bank = (value % count_prgrom8kb) * 8;
     for (int i = 0; i != 8; ++i)
         sfc_load_chrrom_1k(famicom, i, bank +i );
+
 }
 
 /// <summary>

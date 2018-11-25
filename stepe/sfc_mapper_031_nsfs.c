@@ -22,6 +22,10 @@ static void sfc_nsf_switch(sfc_famicom_t* famicom, uint16_t addr, uint8_t data) 
     const uint16_t src = data;
     sfc_load_prgrom_4k(famicom, addr & 0x07, src%count);
 }
+ 
+// 初始化FDS
+extern void sfc_fds_init(sfc_famicom_t* famicom);
+
 
 /// <summary>
 /// StepFC: MAPPER 031 重置
@@ -35,18 +39,21 @@ extern sfc_ecode sfc_mapper_1F_reset(sfc_famicom_t* famicom) {
     if (famicom->rom_info.song_count) {
         uint8_t* const bs_init = famicom->rom_info.bankswitch_init;
         uint64_t bankswi; memcpy(&bankswi, bs_init, sizeof(bankswi));
+        // 计算起点
+        uint16_t i = famicom->rom_info.load_addr >> 12;
+        if (i < 8) {
+            // 目前不支持载入FDS
+            assert(!"UNSUPPORTED");
+            return SFC_ERROR_UNSUPPORTED;
+        }
+        i &= 7;
         // 使用切换
         if (bankswi) {
-            assert(famicom->rom_info.load_addr == 0x8000 && "NOT IMPL");
-            for (uint16_t i = 0; i != 8; ++i)
+            for (; i != 8; ++i)
                 sfc_nsf_switch(famicom, i, bs_init[i]);
         }
         // 直接载入
         else {
-            assert(famicom->rom_info.load_addr >= 0x8000 && "NOT IMPL");
-            // 起点
-            uint16_t i = famicom->rom_info.load_addr >> 12;
-            i = i < 8 ? 0 : i - 8;
             // 终点
             uint16_t count = ((size_prgrom + 0xfff) >> 12) + i;
             if (count > 8) count = 8;
@@ -64,8 +71,24 @@ extern sfc_ecode sfc_mapper_1F_reset(sfc_famicom_t* famicom) {
     // CHR-ROM
     for (int i = 0; i != 8; ++i)
         sfc_load_chrrom_1k(famicom, i, i);
+    // FDS
+    if (famicom->rom_info.extra_sound & SFC_NSF_EX_FDS1) {
+        sfc_fds_init(famicom);
+    }
     return SFC_ERROR_OK;
 }
+
+
+
+// VRC6
+extern void sfc_mapper_18_write_high(sfc_famicom_t*, uint16_t, uint8_t);
+// VRC7
+extern void sfc_mapper_55_write_high(sfc_famicom_t*, uint16_t, uint8_t);
+// FDS1
+extern void sfc_mapper_14_write_low(sfc_famicom_t*, uint16_t, uint8_t);
+
+
+#include <stdbool.h>
 
 
 /// <summary>
@@ -79,9 +102,9 @@ static void sfc_mapper_1F_write_low(sfc_famicom_t*famicom, uint16_t addr, uint8_
     if (addr >= 0x5000) {
         sfc_nsf_switch(famicom, addr, data);
     }
-    // ???
-    else {
-        assert(!"NOT IMPL");
+    // FDS
+    else if (famicom->rom_info.extra_sound & SFC_NSF_EX_FDS1) {
+        sfc_mapper_14_write_low(famicom, addr, data);
     }
 }
 
@@ -93,6 +116,26 @@ static void sfc_mapper_1F_write_low(sfc_famicom_t*famicom, uint16_t addr, uint8_
 /// <param name="v">The v.</param>
 static void sfc_mapper_1F_write_high(sfc_famicom_t*f, uint16_t d, uint8_t v) {
     //assert(!"CANNOT WRITE PRG-ROM");
+    // VRC6
+    if (f->rom_info.extra_sound & SFC_NSF_EX_VCR6) {
+        // $9000 - $9003(if VRC6 is enabled)
+        // $A000 - $A002(if VRC6 is enabled)
+        // $B000 - $B002(if VRC6 is enabled)
+        const bool r0 = d >= 0x9000 && d <= 0x9003;
+        const bool r1 = d >= 0xA000 && d <= 0xA002;
+        const bool r2 = d >= 0xB000 && d <= 0xB002;
+        if (r0 | r1 | r2)
+            sfc_mapper_18_write_high(f, d, v);
+    }
+    // VRC7
+    if (f->rom_info.extra_sound & SFC_NSF_EX_VCR7) {
+        // $9010 (if VRC7 is enabled)
+        // $9030 (if VRC7 is enabled)
+        const bool r0 = d == 0x9010;
+        const bool r1 = d == 0x9030;
+        if (r0 | r1)
+            sfc_mapper_55_write_high(f, d, v);
+    }
 }
 
 
@@ -152,10 +195,6 @@ extern inline sfc_ecode sfc_load_mapper_1F(sfc_famicom_t* famicom) {
 }
 
 
-// 跳转
-void sfc_cpu_long_jmp(uint16_t address, sfc_famicom_t* famicom);
-
-
 /// <summary>
 /// SFCs the famicom NSF initialize.
 /// </summary>
@@ -178,8 +217,22 @@ void sfc_famicom_nsf_init(sfc_famicom_t* famicom, uint8_t index, uint8_t pal) {
     famicom->registers.accumulator = index;
     // 变址器X为模式
     famicom->registers.x_index = pal;
+    // PLAY时钟周期
+    famicom->nsf.play_clock = 0xffffffff;
     // 调用INIT程序
-    sfc_cpu_long_jmp(famicom->rom_info.init_addr, famicom);
+    const uint16_t address = famicom->rom_info.init_addr;
+    famicom->registers.program_counter = 0x4106;
+    const uint32_t loop_point = 0x410A;
+    // JSR
+    famicom->bus_memory[0x106] = 0x20;
+    famicom->bus_memory[0x107] = (uint8_t)(address & 0xff);
+    famicom->bus_memory[0x108] = (uint8_t)(address >> 8);
+    // (HACK) HK2
+    famicom->bus_memory[0x109] = 0x02;
+    // JMP $410A
+    famicom->bus_memory[0x10A] = 0x4c;
+    famicom->bus_memory[0x10B] = (uint8_t)(loop_point & 0xff);
+    famicom->bus_memory[0x10C] = (uint8_t)(loop_point >> 8);
 }
 
 /// <summary>
@@ -187,7 +240,16 @@ void sfc_famicom_nsf_init(sfc_famicom_t* famicom, uint8_t index, uint8_t pal) {
 /// </summary>
 /// <param name="famicom">The famicom.</param>
 void sfc_famicom_nsf_play(sfc_famicom_t* famicom) {
-    // 调用PLAY程序
-    sfc_cpu_long_jmp(famicom->rom_info.play_addr, famicom);
+    const uint16_t address = famicom->rom_info.play_addr;
+    famicom->registers.program_counter = 0x4100;
+    const uint32_t loop_point = 0x4103;
+    // JSR
+    famicom->bus_memory[0x100] = 0x20;
+    famicom->bus_memory[0x101] = (uint8_t)(address & 0xff);
+    famicom->bus_memory[0x102] = (uint8_t)(address >> 8);
+    // JMP $4103
+    famicom->bus_memory[0x103] = 0x4c;
+    famicom->bus_memory[0x104] = (uint8_t)(loop_point & 0xff);
+    famicom->bus_memory[0x105] = (uint8_t)(loop_point >> 8);
 }
 

@@ -15,6 +15,8 @@ extern inline sfc_ecode sfc_load_mapper_02(sfc_famicom_t* famicom);
 extern inline sfc_ecode sfc_load_mapper_03(sfc_famicom_t* famicom);
 // mapper004 - TxROM
 extern inline sfc_ecode sfc_load_mapper_04(sfc_famicom_t* famicom);
+// mapper005 - ExROM
+extern inline sfc_ecode sfc_load_mapper_05(sfc_famicom_t* famicom);
 // mapper024 - VRC6a
 extern inline sfc_ecode sfc_load_mapper_18(sfc_famicom_t* famicom);
 // mapper026 - VRC6b
@@ -82,6 +84,18 @@ static void sfc_mapper_00_write_high(sfc_famicom_t*f, uint16_t d, uint8_t v) {
 }
 
 
+/// <summary>
+/// </summary>
+/// <param name="f">The f.</param>
+/// <param name="d">The d.</param>
+/// <param name="v">The v.</param>
+static uint8_t sfc_mapper_read_low(sfc_famicom_t*f, uint16_t d) {
+    if (d < 0x4200)
+        return f->bus_memory[d & 0x1ff];
+    return 0;
+}
+
+
 
 /// <summary>
 /// StepFC: 加载Mapper
@@ -92,6 +106,7 @@ static void sfc_mapper_00_write_high(sfc_famicom_t*f, uint16_t d, uint8_t v) {
 extern sfc_ecode sfc_load_mapper(sfc_famicom_t* famicom, uint8_t id) {
     memset(&famicom->mapper, 0, sizeof(famicom->mapper));
     // 载入默认接口
+    famicom->mapper.read_low = sfc_mapper_read_low;
     famicom->mapper.write_low = sfc_mapper_00_write_high;
     famicom->mapper.write_high = sfc_mapper_00_write_high;
     famicom->mapper.hsync = sfc_mapper_hsync_defualt;
@@ -104,6 +119,7 @@ extern sfc_ecode sfc_load_mapper(sfc_famicom_t* famicom, uint8_t id) {
         SFC_CASE_LOAD_MAPPER(02);
         SFC_CASE_LOAD_MAPPER(03);
         SFC_CASE_LOAD_MAPPER(04);
+        SFC_CASE_LOAD_MAPPER(05);
         SFC_CASE_LOAD_MAPPER(18);
         SFC_CASE_LOAD_MAPPER(1A);
         SFC_CASE_LOAD_MAPPER(1F);

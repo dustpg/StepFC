@@ -100,12 +100,17 @@ uint8_t sfc_read_cpu_address(uint16_t address, sfc_famicom_t* famicom) {
         // 高三位为2, [$4000, $6000): pAPU寄存器 扩展ROM区
         if (address < 0x4020)
             return sfc_read_cpu_address4020(address, famicom);
+        else return famicom->mapper.read_low(famicom, address);
+#if 0
+        else if (address < 0x4200)
+            return famicom->bus_memory[address & 0x1ff];
         //else assert(!"NOT IMPL");
         return 0;
+#endif
     case 3:
         // 高三位为3, [$6000, $8000): 存档 SRAM区
         //printf("$%04X[$%02X]\n", address, famicom->save_memory[address & (uint16_t)0x1fff]);
-        return famicom->save_memory[address & (uint16_t)0x1fff];
+        //return famicom->save_memory[address & (uint16_t)0x1fff];
     case 4: case 5: case 6: case 7:
         // 高一位为1, [$8000, $10000) 程序PRG-ROM区
         return famicom->prg_banks[address >> 12][address & (uint16_t)0x0fff];
@@ -162,32 +167,15 @@ void sfc_write_cpu_address(uint16_t address, uint8_t data, sfc_famicom_t* famico
     case 3:
         // 高三位为3, [$6000, $8000): 存档 SRAM区
         //printf("$%04X = $%02X\n", address, data);
-        famicom->save_memory[address & (uint16_t)0x1fff] = data;
+        //famicom->save_memory[address & (uint16_t)0x1fff] = data;
+        famicom->prg_banks[address >> 12][address & (uint16_t)0x0fff] = data;
         return;
     case 4: case 5: case 6: case 7:
         // 高一位为1, [$8000, $10000) 程序PRG-ROM区
         famicom->mapper.write_high(famicom, address, data);
         //assert(!"WARNING: PRG-ROM");
-        //famicom->prg_banks[address >> 13][address & (uint16_t)0x1fff] = data;
+        //famicom->prg_banks[address >> 12][address & (uint16_t)0xfff] = data;
         return;
     }
     assert(!"invalid address");
-}
-
-/// <summary>
-/// StepFC: NSF用长跳转
-/// </summary>
-/// <param name="address">The address.</param>
-/// <param name="famicom">The famicom.</param>
-void sfc_cpu_long_jmp(uint16_t address, sfc_famicom_t* famicom) {
-    famicom->registers.program_counter = 0x4100;
-    const uint32_t loop_point = 0x4103;
-    // JSR
-    famicom->bus_memory[0x100] = 0x20;
-    famicom->bus_memory[0x101] = (uint8_t)(address & 0xff);
-    famicom->bus_memory[0x102] = (uint8_t)(address >> 8);
-    // JMP $4103
-    famicom->bus_memory[0x103] = 0x4c;
-    famicom->bus_memory[0x104] = (uint8_t)(loop_point & 0xff);
-    famicom->bus_memory[0x105] = (uint8_t)(loop_point >> 8);
 }

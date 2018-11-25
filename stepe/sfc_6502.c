@@ -344,6 +344,17 @@ static inline void sfc_operation_UNK(uint16_t address, sfc_famicom_t* famicom, u
 
 SFC_FORCEINLINE
 /// <summary>
+/// HK2: Hack $02 - 用于提示NSF初始化
+/// </summary>
+/// <param name="address">The address.</param>
+/// <param name="famicom">The famicom.</param>
+static inline void sfc_operation_HK2(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
+    famicom->nsf.play_clock = famicom->rom_info.clock_per_play;
+}
+
+
+SFC_FORCEINLINE
+/// <summary>
 /// SHY
 /// </summary>
 /// <param name="address">The address.</param>
@@ -1455,7 +1466,7 @@ enum sfc_basic_cycle_data {
 /// SFCs the cpu execute one.
 /// </summary>
 /// <param name="famicom">The famicom.</param>
-void sfc_cpu_execute_one(sfc_famicom_t* famicom) {
+uint32_t sfc_cpu_execute_one(sfc_famicom_t* famicom) {
 #ifdef SFC_BEFORE_EXECUTE
     // 执行指令前调用
     sfc_before_execute(famicom->argument, famicom);
@@ -1466,7 +1477,7 @@ void sfc_cpu_execute_one(sfc_famicom_t* famicom) {
         if (famicom->registers.irq_counter == 0) {
             famicom->registers.irq_in_process = 1;
             sfc_operation_IRQ(famicom);
-            return;
+            return 7;
         }
     }
     // 正常处理
@@ -1474,7 +1485,7 @@ void sfc_cpu_execute_one(sfc_famicom_t* famicom) {
     uint32_t cycle_add = 0;
     switch (opcode)
     {
-        OP(00,IMP, BRK) OP(01,INX, ORA) OP(02,UNK, UNK) OP(03,INX, SLO) OP(04,ZPG, NOP) OP(05,ZPG, ORA) OP(06,ZPG, ASL) OP(07,ZPG, SLO)
+        OP(00,IMP, BRK) OP(01,INX, ORA) OP(02,IMP, HK2) OP(03,INX, SLO) OP(04,ZPG, NOP) OP(05,ZPG, ORA) OP(06,ZPG, ASL) OP(07,ZPG, SLO)
         OP(08,IMP, PHP) OP(09,IMM, ORA) OP(0A,IMP,ASLA) OP(0B,IMM, ANC) OP(0C,ABS, NOP) OP(0D,ABS, ORA) OP(0E,ABS, ASL) OP(0F,ABS, SLO)
         OP(10,REL, BPL) OP(11,INY, ORA) OP(12,UNK, UNK) OP(13,iny, SLO) OP(14,ZPX, NOP) OP(15,ZPX, ORA) OP(16,ZPX, ASL) OP(17,ZPX, SLO)
         OP(18,IMP, CLC) OP(19,ABY, ORA) OP(1A,IMP, NOP) OP(1B,aby, SLO) OP(1C,ABX, NOP) OP(1D,ABX, ORA) OP(1E,abx, ASL) OP(1F,abx, SLO)
@@ -1508,6 +1519,7 @@ void sfc_cpu_execute_one(sfc_famicom_t* famicom) {
         OP(F8,IMP, SED) OP(F9,ABY, SBC) OP(FA,IMP, NOP) OP(FB,aby, ISB) OP(FC,ABX, NOP) OP(FD,ABX, SBC) OP(FE,abx, INC) OP(FF,abx, ISB)
     }
     famicom->cpu_cycle_count += cycle_add;
+    return cycle_add;
 }
 
 /// <summary>

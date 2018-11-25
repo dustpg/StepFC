@@ -13,7 +13,7 @@ static sfc_ecode sfc_loadfree_rom(void* arg, sfc_rom_info_t* info) { return SFC_
 // 默认音频事件
 static void sfc_audio_changed(void*a, uint32_t b, enum sfc_channel_index c) {}
 // 默认SRAM读写事件
-static void sfc_save_load_sram(void*a, const sfc_rom_info_t*b, const uint8_t*c) {}
+static void sfc_save_load_sram(void*a, const sfc_rom_info_t*b, const uint8_t*c, uint32_t l) {}
 // 默认状态读写事件
 static void sfc_sl_stream(void*a, const uint8_t* b, uint32_t c) {}
 
@@ -77,11 +77,23 @@ sfc_ecode sfc_famicom_init(
 /// </summary>
 /// <param name="famicom">The famicom.</param>
 static inline void sfc_check_save_sram(sfc_famicom_t* famicom) {
-    if (famicom->rom_info.save_ram) {
+    if (famicom->rom_info.save_ram_d1_more8) {
+        uint8_t* ptr; uint32_t len;
+        // 使用扩展SRAM
+        if (famicom->rom_info.save_ram_d1_more8 & SFC_ROMINFO_SRAM_More8KiB) {
+            ptr = famicom->expansion_ram32;
+            len = sizeof(famicom->expansion_ram32);
+        }
+        // 使用标准SRAM
+        else {
+            ptr = famicom->save_memory;
+            len = sizeof(famicom->save_memory);
+        }
+        // 调用接口
         famicom->interfaces.save_sram(
             famicom->argument,
             &famicom->rom_info,
-            famicom->save_memory
+            ptr, len
         );
     }
 }
@@ -91,11 +103,23 @@ static inline void sfc_check_save_sram(sfc_famicom_t* famicom) {
 /// </summary>
 /// <param name="famicom">The famicom.</param>
 static inline void sfc_check_load_sram(sfc_famicom_t* famicom) {
-    if (famicom->rom_info.save_ram) {
+    if (famicom->rom_info.save_ram_d1_more8) {
+        uint8_t* ptr; uint32_t len;
+        // 使用扩展SRAM
+        if (famicom->rom_info.save_ram_d1_more8 & SFC_ROMINFO_SRAM_More8KiB) {
+            ptr = famicom->expansion_ram32;
+            len = sizeof(famicom->expansion_ram32);
+        }
+        // 使用标准SRAM
+        else {
+            ptr = famicom->save_memory;
+            len = sizeof(famicom->save_memory);
+        }
+        // 调用接口
         famicom->interfaces.load_sram(
             famicom->argument,
             &famicom->rom_info,
-            famicom->save_memory
+            ptr, len
         );
     }
 }
@@ -239,6 +263,13 @@ sfc_ecode sfc_load_new_rom(sfc_famicom_t* famicom) {
             &famicom->rom_info
         );
     }
+    // 载入新的Mapper
+    if (code == SFC_ERROR_OK) {
+        code = sfc_load_mapper(
+            famicom,
+            famicom->rom_info.mapper_number
+        );
+    }
     // 载入ROM后处理
     if (code == SFC_ERROR_OK) {
         // 计算HASH
@@ -247,13 +278,6 @@ sfc_ecode sfc_load_new_rom(sfc_famicom_t* famicom) {
         info->chrrom_crc32b = sfc_crc32b(0, info->data_chrrom, info->size_chrrom);
         // 载入SRAM
         sfc_check_load_sram(famicom);
-    }
-    // 载入新的Mapper
-    if (code == SFC_ERROR_OK) {
-        code = sfc_load_mapper(
-            famicom,
-            famicom->rom_info.mapper_number
-        );
     }
     // 首次重置
     if (code == SFC_ERROR_OK) {

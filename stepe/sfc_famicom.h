@@ -63,9 +63,9 @@ typedef struct {
     // 音频事件
     void(*audio_changed)(void*, uint32_t, enum sfc_channel_index);
     // 保存SRAM 8KB
-    void(*save_sram)(void*, const sfc_rom_info_t*, const uint8_t*);
+    void(*save_sram)(void*, const sfc_rom_info_t*, const uint8_t*, uint32_t);
     // 读取SRAM 8KB
-    void(*load_sram)(void*, const sfc_rom_info_t*, uint8_t*);
+    void(*load_sram)(void*, const sfc_rom_info_t*, uint8_t*, uint32_t len);
     // 状态保存 写入流
     void(*sl_write_stream)(void*, const uint8_t*, uint32_t len);
     // 状态读取 读取流
@@ -84,6 +84,8 @@ extern void sfc_before_execute(void*, sfc_famicom_t*);
 typedef struct {
     // Mapper 重置
     sfc_ecode(*reset)(sfc_famicom_t*);
+    // 读取低地址
+    uint8_t(*read_low)(sfc_famicom_t*, uint16_t);
     // 写入低地址
     void(*write_low)(sfc_famicom_t*, uint16_t, uint8_t);
     // 写入高地址
@@ -96,6 +98,15 @@ typedef struct {
     void(*read_ram_from_stream)(sfc_famicom_t*);
 } sfc_mapper_t;
 
+
+
+// NSF 播放状态
+typedef struct  {
+    // PLAY当前时钟周期
+    uint32_t        play_clock;
+    // 帧序列器时钟周期
+    uint32_t        framecounter_clock;
+} sfc_nsf_playstate_t;
 
 /// <summary>
 /// FC 模拟器主体
@@ -117,6 +128,8 @@ struct sfc_famicom {
     uint32_t            frame_counter;
     // CPU 周期计数
     uint32_t            cpu_cycle_count;
+    // NSF状态
+    sfc_nsf_playstate_t nsf;
     // APU
     sfc_apu_register_t  apu;
     // PPU
@@ -133,23 +146,32 @@ struct sfc_famicom {
     uint8_t             button_states[16];
     // 程序内存仓库(Bank)/窗口(Window)
     uint8_t*            prg_banks[0x10000 >> 12];
-    // BUS: 前256自定义[0-127, VRC7 PATCH用, 128-255, 未使用]
+#ifndef NDEBUG
+    // 调试用BANK
+    void*               debug_banks[16];
+#endif
+    // 自定义BUS: 00-3F 调制表  40-7F  波形表  80-82 FDS  100-10C NSF , 180-1FF VRC7
     uint8_t             bus_memory[512];
-    // 工作(work)/保存(save)内存
-    uint8_t             save_memory[8 * 1024];
     // 显存
     uint8_t             video_memory[2 * 1024];
     // 4屏用额外显存
     uint8_t             video_memory_ex[2 * 1024];
     // 主内存
     uint8_t             main_memory[2 * 1024];
+    // 工作(work)/保存(save)内存
+    uint8_t             save_memory[8 * 1024];
+    // 额外32KiB
+    uint8_t             expansion_ram32[32 * 1024];
 };
 
 
 // VRC7 PATCH用128字节
-static inline uint8_t* sfc_get_vrc7_patch(sfc_famicom_t* f) { return f->bus_memory; }
-static inline const uint8_t* sfc_get_vrc7_patchc(const sfc_famicom_t* f) { return f->bus_memory; }
-
+static inline const uint8_t* sfc_get_vrc7_patchc(const sfc_famicom_t* f) { return f->bus_memory + 0x180; }
+static inline uint8_t* sfc_get_vrc7_patch(sfc_famicom_t* f) { return f->bus_memory + 0x180; }
+// FDS调制用64字节
+static inline  int8_t* sfc_get_fds1_modtbl(sfc_famicom_t* f) { return (int8_t*)f->bus_memory; }
+// FDS波形用64字节
+static inline uint8_t* sfc_get_fds1_wavtbl(sfc_famicom_t* f) { return f->bus_memory + 64; }
 
 // 初始化
 sfc_ecode sfc_famicom_init(

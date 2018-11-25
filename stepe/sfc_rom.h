@@ -12,6 +12,12 @@ typedef struct {
     uint8_t*    data_prgrom;
     // CHR-ROM 角色只读存储器 数据指针
     uint8_t*    data_chrrom;
+    // PLAY每隔时钟周期 N
+    uint32_t    clock_per_play_n;
+    // PLAY每隔时钟周期 P
+    uint32_t    clock_per_play_p;
+    // PLAY每隔时钟周期 当前
+    uint32_t    clock_per_play;
     // PRG-ROM CRC32-b
     uint32_t    prgrom_crc32b;
     // CHR-ROM CRC32-b
@@ -26,8 +32,8 @@ typedef struct {
     uint8_t     vmirroring;
     // 是否FourScreen
     uint8_t     four_screen;
-    // 是否有SRAM(电池供电的)
-    uint8_t     save_ram;
+    // 是否有SRAM(电池供电的) D0, D1为1则为超过8KiB的WRAM
+    uint8_t     save_ram_d1_more8;
     // 保留以对齐
     uint8_t     reserved;
     // PAL/NTSC 位
@@ -50,7 +56,6 @@ typedef struct {
     char        artist[32];
     // 版权
     char        copyright[32];
-
 } sfc_rom_info_t;
 
 /// <summary>
@@ -85,7 +90,11 @@ enum {
     SFC_NES_VMIRROR = 0x01, 
     SFC_NES_SAVERAM = 0x02,
     SFC_NES_TRAINER = 0x04,
-    SFC_NES_4SCREEN = 0x08
+    SFC_NES_4SCREEN = 0x08,
+
+
+    SFC_ROMINFO_SRAM_HasSRAM  = 1,
+    SFC_ROMINFO_SRAM_More8KiB = 2,
 };
 
 // ROM control byte #2

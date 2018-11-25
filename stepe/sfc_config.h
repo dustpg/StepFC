@@ -14,7 +14,9 @@ enum sfc_config_constant {
 /// </summary>
 typedef struct {
     // CPU 主频 Hz
-    float           cpu_clock;
+    float           cpu_clock_f;
+    // CPU 主频 Hz
+    float           cpu_clock_i;
     // 每帧CPU执行周期(向上取整到最近的偶数)
     uint32_t        cpu_cycle_per_frame;
     // 屏幕刷新率

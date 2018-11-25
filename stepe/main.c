@@ -12,7 +12,8 @@
 
 enum {
     NTSC_CPU_RATE = 1789773,
-    SAMPLES_PER_SEC = 44100,
+    //SAMPLES_PER_SEC = 44100,
+    SAMPLES_PER_SEC = 48000,
     VRC7_OUTPUT_PER_SEC = 49716,
     SAMPLES_PER_FRAME = SAMPLES_PER_SEC / 60,
     SAMPLES_ALIGNED = 8,
@@ -20,7 +21,6 @@ enum {
     BASIC_BUFFER_COUNT = 16,
     BUFFER_MAX = 4
 };
-
 
 sfc_famicom_t* g_famicom = NULL;
 static float s_buffer[SAMPLES_PER_FRAME_ALIGNED * (BASIC_BUFFER_COUNT + 1)];
@@ -83,6 +83,8 @@ struct interface_audio_state {
     sfc_1storder_rc_hipass_filter_t hp_440Hz;
     sfc_1storder_rc_hipass_filter_t hp__90Hz;
 
+
+    sfc_1storder_rc_lopass_filter_t fds_lp2k;
 
     sfc_vrc6_data_t                 vrc6;
 
@@ -272,6 +274,8 @@ static void make_samples(const uint32_t begin, const uint32_t end) {
 
     const float dmc_p = g_states.dmc.period;
 
+    sfc_fds_ctx_t fds_ctx;
+    sfc_fds_samplemode_begin(g_famicom, &fds_ctx, cpu_cycle_per_sample);
 
     for (uint32_t i = begin; i != end; ++i) {
         // 方波#1, APU频率驱动
@@ -414,7 +418,6 @@ static void make_samples(const uint32_t begin, const uint32_t end) {
             }
 
             output += 0.00752f * (float)vrc6;
-
         }
 
         // VRC7
@@ -431,7 +434,14 @@ static void make_samples(const uint32_t begin, const uint32_t end) {
             const double weight = 2.0;
             output += (float)((double)vrc7 * weight / (double)(1 << 23));
         }
-
+        // FDS
+        if (g_famicom->rom_info.extra_sound & SFC_NSF_EX_FDS1) {
+            float out = sfc_fds_per_sample(g_famicom, &fds_ctx, cpu_cycle_per_sample);
+            //void debug_putaudio(float);
+            //debug_putaudio(out);
+            out = sfc_filter_rclp(&g_states.fds_lp2k, out * 1.41f);
+            output += out;
+        }
 
 
         static float max_vol = 1.0f;
@@ -441,6 +451,8 @@ static void make_samples(const uint32_t begin, const uint32_t end) {
             //* 2.f
             ;
     }
+    // 
+    sfc_fds_samplemode_end(g_famicom, &fds_ctx);
 }
 
 
@@ -588,27 +600,24 @@ extern uint32_t sfc_stdpalette[];
 /// <param name="famicom">The famicom.</param>
 void sfc_play_nsf_once(sfc_famicom_t* famicom) {
     ++famicom->frame_counter;
-    const uint32_t cpu_cycle_per_frame_4 = famicom->config.cpu_cycle_per_frame / 4;
-    // 1-3
-    for (uint32_t i = 0; i != 3; ++i) {
-        const uint32_t cpu_cycle_per_frame_this = cpu_cycle_per_frame_4 * i;
-        while (famicom->cpu_cycle_count < cpu_cycle_per_frame_this)
-            sfc_cpu_execute_one(famicom);
-        sfc_trigger_frame_counter(famicom);
-    }
-    // 4-U
-    const uint32_t cpu_cycle_per_frame_this = cpu_cycle_per_frame_4 * 3 / 4;
-    while (famicom->cpu_cycle_count < cpu_cycle_per_frame_this)
-        sfc_cpu_execute_one(famicom);
-
-    // VB
-    sfc_famicom_nsf_play(g_famicom);
-
-    // 4-D
     const uint32_t cpu_cycle_per_frame = famicom->config.cpu_cycle_per_frame;
-    while (famicom->cpu_cycle_count < cpu_cycle_per_frame)
-        sfc_cpu_execute_one(famicom);
-    sfc_trigger_frame_counter(famicom);
+    const uint32_t cpu_cycle_per_frame_4 = famicom->config.cpu_cycle_per_frame / 4;
+
+    while (famicom->cpu_cycle_count < cpu_cycle_per_frame) {
+        const uint32_t cycle = sfc_cpu_execute_one(famicom);
+        // PLAY
+        if (famicom->nsf.play_clock < cycle) {
+            famicom->nsf.play_clock += famicom->rom_info.clock_per_play;
+            sfc_famicom_nsf_play(famicom);
+        }
+        // FRAME COUNTER
+        if (famicom->nsf.framecounter_clock < cycle) {
+            famicom->nsf.framecounter_clock += cpu_cycle_per_frame_4;
+            sfc_trigger_frame_counter(famicom);
+        }
+        famicom->nsf.play_clock -= cycle;
+        famicom->nsf.framecounter_clock -= cycle;
+    }
 
     // END
     famicom->cpu_cycle_count = 0;
@@ -635,8 +644,10 @@ extern void main_render(void* rgba) {
         // 生成调色板数据
         uint32_t palette[32];
 
-        for (int i = 0; i != 32; ++i)
-            palette[i] = sfc_stdpalette[g_famicom->ppu.data.spindexes[i]];
+        for (int i = 0; i != 32; ++i) {
+            const uint8_t spindex = g_famicom->ppu.data.spindexes[i];
+            palette[i] = sfc_stdpalette[spindex];
+        }
         // 镜像数据
         palette[4 * 1] = palette[0];
         palette[4 * 2] = palette[0];
@@ -648,18 +659,15 @@ extern void main_render(void* rgba) {
 
         for (int y = 0; y != 240; ++y) {
             for (int x = 0; x != 256; ++x) {
-                *data = palette[buffer[y*(256+8)+x] >> 1];
+                *data = palette[buffer[y*(256 + 8) + x] >> 1];
                 ++data;
-                }
+            }
         }
 
     }
     play_audio(rgba);
 }
 
-
-// SRAM保存用文件头
-const char SFC_SRAM_THIS_HEADER[16] = "-StepFC-SRAMWRAM";
 
 /// <summary>
 /// 生成文件
@@ -678,20 +686,20 @@ static void sfc_make_file_name(
 /// <param name="arg">The argument.</param>
 /// <param name="info">The information.</param>
 /// <param name="ptr">The PTR.</param>
-void this_load_sram(void*arg, const sfc_rom_info_t* info, uint8_t* ptr) {
+void this_load_sram(void*arg, const sfc_rom_info_t* info, uint8_t* ptr, uint32_t len) {
     char buffer[256]; sfc_make_file_name(info, "save", buffer);
     FILE* const file = fopen(buffer, "rb");
     if (!file) return;
-    char header[sizeof(SFC_SRAM_THIS_HEADER)];
-    // 成功读取
-    if (fread(header, sizeof(header), 1, file)) {
-        // 检测文件头
-        if (!memcmp(header, SFC_SRAM_THIS_HEADER, sizeof(header))) {
-            const size_t len = sizeof(((sfc_famicom_t*)0)->save_memory);
-            const size_t read_count = fread(ptr, len, 1, file);
-            //int bk = 9;
-        }
+    fseek(file, 0, SEEK_END);
+    const uint32_t alllen = ftell(file);
+    fseek(file, 0, SEEK_SET);
+    // 长度匹配
+    if (alllen == len) {
+        const size_t read_count = fread(ptr, len, 1, file);
+        //int bk = 9;
+        assert(read_count && "ERROR HANDLE");
     }
+    else assert(!"BAD LENGTH");
     fclose(file);
 }
 
@@ -720,14 +728,13 @@ void sfc_create_dir(const char* dir) {
 /// <param name="arg">The argument.</param>
 /// <param name="info">The information.</param>
 /// <param name="ptr">The PTR.</param>
-void this_save_sram(void*arg, const sfc_rom_info_t* info, const uint8_t* ptr) {
+/// <param name="len">The length.</param>
+void this_save_sram(void*arg, const sfc_rom_info_t* info, const uint8_t* ptr, uint32_t len) {
     sfc_create_dir("save");
     char buffer[256]; sfc_make_file_name(info, "save", buffer);
     FILE* const file = fopen(buffer, "wb");
-    if (!file) return;
-    const size_t len = sizeof(((sfc_famicom_t*)0)->save_memory);
-    fwrite(SFC_SRAM_THIS_HEADER, sizeof(SFC_SRAM_THIS_HEADER), 1, file);
     const size_t count = fwrite(ptr, len, 1, file);
+    assert(count && "ERROR HANDLE");
     fclose(file);
 }
 
@@ -740,6 +747,8 @@ void init_global() {
     sfc_make_rclp(&g_states.lp_14kHz, SAMPLES_PER_SEC, 14000);
     sfc_make_rchp(&g_states.hp_440Hz, SAMPLES_PER_SEC, 440);
     sfc_make_rchp(&g_states.hp__90Hz, SAMPLES_PER_SEC, 90);
+
+    sfc_make_rclp(&g_states.fds_lp2k, SAMPLES_PER_SEC, 2000);
 
     g_states.square1.period = 1;
     g_states.square2.period = 1;
@@ -767,6 +776,7 @@ void get_cso_file_path(char path_input[PATH_BUFLEN]) {
         path_input[len] = 0;
         fclose(last_input_file);
         printf("Last path: [%s], enter 'N' to rewrite, other to skip\n", path_input);
+        return;
         const int ch = getchar();
         if (!(ch == 'N' || ch == 'n'))  return;
         // 清除输入缓存
@@ -966,8 +976,13 @@ sfc_ecode this_load_nsf(sfc_rom_info_t* info, FILE* file) {
         info->size_chrrom = 0;
         info->mapper_number = 0x1f;
         info->vmirroring = 0;
-        info->save_ram = 0;
+        info->save_ram_d1_more8 = 0;
         info->four_screen = 0;
+        // 播放速度提示
+        info->clock_per_play_n = (uint64_t)1789773 * (uint64_t)header.play_speed_ntsc_le / (uint64_t)1000000;
+        info->clock_per_play_p = (uint64_t)1662607 * (uint64_t)header.play_speed__pal_le / (uint64_t)1000000;
+        info->clock_per_play = info->clock_per_play_n;
+        printf("NSF NTSC RATE: %.02fHz\n", 1000000.0 / header.play_speed_ntsc_le);
         // NSF
         memcpy(info->name, &header.name, sizeof(info->name) * 3);
         memcpy(info->bankswitch_init, &header.bankswitch_init, sizeof(header.bankswitch_init));
@@ -977,6 +992,8 @@ sfc_ecode this_load_nsf(sfc_rom_info_t* info, FILE* file) {
         info->play_addr = header.play_addr_le;
         info->pal_ntsc_bits = header.pal_ntsc_bits;
         info->extra_sound = header.extra_sound;
+        // 状态
+
         return SFC_ERROR_OK;
     }
     fseek(file, 0, SEEK_SET);
@@ -1047,7 +1064,7 @@ sfc_ecode this_load_rom(void* arg, sfc_rom_info_t* info) {
                     ;
                 info->vmirroring = (nes_header.control1 & SFC_NES_VMIRROR) > 0;
                 info->four_screen = (nes_header.control1 & SFC_NES_4SCREEN) > 0;
-                info->save_ram = (nes_header.control1 & SFC_NES_SAVERAM) > 0;
+                info->save_ram_d1_more8 = (nes_header.control1 & SFC_NES_SAVERAM) > 0 ? SFC_ROMINFO_SRAM_HasSRAM : 0;
                 assert(!(nes_header.control1 & SFC_NES_TRAINER) && "unsupported");
                 assert(!(nes_header.control2 & SFC_NES_VS_UNISYSTEM) && "unsupported");
                 assert(!(nes_header.control2 & SFC_NES_Playchoice10) && "unsupported");
@@ -1077,4 +1094,5 @@ sfc_ecode this_free_rom(void* arg, sfc_rom_info_t* info) {
 
 
 void sfc_before_execute(void* ctx, sfc_famicom_t* famicom) {
+
 }

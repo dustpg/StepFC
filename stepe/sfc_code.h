@@ -14,4 +14,5 @@ typedef enum sfc_error_code {
     SFC_ERROR_OUT_OF_MEMORY,
     SFC_ERROR_VERSION_NOT_MATCHED,
     SFC_ERROR_BAD_ENDAIN,
+    SFC_ERROR_UNSUPPORTED,
 } sfc_ecode;

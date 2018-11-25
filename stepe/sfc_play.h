@@ -5,6 +5,11 @@
 #include <stdint.h>
 
 
+
+// -------------------------------------------------------
+//                         2A03
+// -------------------------------------------------------
+
 /// <summary>
 /// 方波状态
 /// </summary>
@@ -80,3 +85,31 @@ sfc_check_triangle_state(const sfc_famicom_t*);
 // 获取噪声状态
 extern sfc_noise_channel_state_t
 sfc_check_noise_state(const sfc_famicom_t*);
+
+
+
+
+// -------------------------------------------------------
+//                         FDS
+// -------------------------------------------------------
+
+
+
+// FDS 高级接口1
+float sfc_fds_get_output(sfc_famicom_t*);
+void sfc_fds_per_cpu_clock(sfc_famicom_t*);
+// FDS 高级接口2
+typedef struct {
+    float       volenv_clock;
+    float       volenv_tps;
+    float       modenv_clock;
+    float       modenv_tps;
+    float       wavout_clock;
+    float       mdunit_clock;
+    float       mdunit_rate;
+
+    float       cycle_remain;
+} sfc_fds_ctx_t;
+float sfc_fds_per_sample(sfc_famicom_t*, sfc_fds_ctx_t*, float cps);
+void sfc_fds_samplemode_begin(sfc_famicom_t*, sfc_fds_ctx_t*, float cps);
+void sfc_fds_samplemode_end(sfc_famicom_t*, sfc_fds_ctx_t*);
