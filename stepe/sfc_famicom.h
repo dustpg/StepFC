@@ -61,7 +61,7 @@ typedef struct {
     // ROM 加载器卸载
     sfc_ecode(*free_rom)(void*, sfc_rom_info_t*);
     // 音频事件
-    void(*audio_changed)(void*, uint32_t, enum sfc_channel_index);
+    void(*audio_change)(void*, uint32_t, enum sfc_channel_index);
     // 保存SRAM 8KB
     void(*save_sram)(void*, const sfc_rom_info_t*, const uint8_t*, uint32_t);
     // 读取SRAM 8KB

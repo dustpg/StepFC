@@ -275,7 +275,9 @@ static void make_samples(const uint32_t begin, const uint32_t end) {
     const float dmc_p = g_states.dmc.period;
 
     sfc_fds_ctx_t fds_ctx;
+    sfc_mmc5_ctx_t mmc5_ctx;
     sfc_fds_samplemode_begin(g_famicom, &fds_ctx, cpu_cycle_per_sample);
+    sfc_mmc5_samplemode_begin(g_famicom, &mmc5_ctx);
 
     for (uint32_t i = begin; i != end; ++i) {
         // 方波#1, APU频率驱动
@@ -443,6 +445,12 @@ static void make_samples(const uint32_t begin, const uint32_t end) {
             output += out;
         }
 
+        // MMC5
+        if (g_famicom->rom_info.extra_sound & SFC_NSF_EX_MMC5) {
+            sfc_mmc5_per_sample(g_famicom, &mmc5_ctx, cpu_cycle_per_sample);
+            output = 0.00752f * mmc5_ctx.squ1.output;
+            output = 0.00752f * mmc5_ctx.squ2.output;
+        }
 
         static float max_vol = 1.0f;
         if (output > max_vol) max_vol = output;
@@ -453,6 +461,7 @@ static void make_samples(const uint32_t begin, const uint32_t end) {
     }
     // 
     sfc_fds_samplemode_end(g_famicom, &fds_ctx);
+    sfc_mmc5_samplemode_end(g_famicom, &mmc5_ctx);
 }
 
 
@@ -477,13 +486,13 @@ static void this_audio_event(void* arg, uint32_t cycle, enum sfc_channel_index t
         g_states.dmc = g_famicom->apu.dmc;
         g_states.dmc_enable = g_famicom->apu.status_write & SFC_APU4015_WRITE_EnableDMC;
     case SFC_FrameCounter:
-        g_states.square1.u32 = sfc_check_square1_state(g_famicom).u32;
-        g_states.square2.u32 = sfc_check_square2_state(g_famicom).u32;
+        g_states.square1 = sfc_check_square1_state(g_famicom);
+        g_states.square2 = sfc_check_square2_state(g_famicom);
         g_states.triangle.u32 = sfc_check_triangle_state(g_famicom).u32;
         g_states.noise.u32 = sfc_check_noise_state(g_famicom).u32;
         break;
     case SFC_2A03_Square1:
-        g_states.square1.u32 = sfc_check_square1_state(g_famicom).u32;
+        g_states.square1 = sfc_check_square1_state(g_famicom);
         // 写入了$4003
         if (!g_famicom->apu.square1.seq_index) {
             g_famicom->apu.square1.seq_index = 1;
@@ -491,7 +500,7 @@ static void this_audio_event(void* arg, uint32_t cycle, enum sfc_channel_index t
         }
         break;
     case SFC_2A03_Square2:
-        g_states.square2.u32 = sfc_check_square2_state(g_famicom).u32;
+        g_states.square2 = sfc_check_square2_state(g_famicom);
         // 写入了$4004
         if (!g_famicom->apu.square2.seq_index) {
             g_famicom->apu.square2.seq_index = 1;
@@ -830,7 +839,7 @@ int main() {
     memset(s_buffer, 0, sizeof(s_buffer));
     sfc_interface_t interfaces = { NULL };
 
-    interfaces.audio_changed = this_audio_event;
+    interfaces.audio_change = this_audio_event;
     interfaces.load_sram = this_load_sram;
     interfaces.save_sram = this_save_sram;
     interfaces.sl_write_stream = sfc_sl_write_stream;
@@ -1094,5 +1103,20 @@ sfc_ecode this_free_rom(void* arg, sfc_rom_info_t* info) {
 
 
 void sfc_before_execute(void* ctx, sfc_famicom_t* famicom) {
-
+    static int line = 0;
+    line++;
+    //if (line < 188300) 
+        return;
+    char buf[SFC_DISASSEMBLY_BUF_LEN2];
+    const uint16_t pc = famicom->registers.program_counter;
+    sfc_fc_disassembly(pc, famicom, buf);
+    printf(
+        "%4d - %s   A:%02X X:%02X Y:%02X P:%02X SP:%02X\n",
+        line, buf,
+        (int)famicom->registers.accumulator,
+        (int)famicom->registers.x_index,
+        (int)famicom->registers.y_index,
+        (int)famicom->registers.status,
+        (int)famicom->registers.stack_pointer
+    );
 }

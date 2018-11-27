@@ -159,12 +159,12 @@ static void sfc_mapper_55_regwrite(sfc_famicom_t* famicom, uint8_t value) {
     const uint8_t selected = vrc7->selected;
     // 00-07: 自定义PATCH
     if (selected < 0x08) {
-        famicom->interfaces.audio_changed(famicom->argument, famicom->cpu_cycle_count, SFC_VRC7_VRC7);
+        famicom->interfaces.audio_change(famicom->argument, famicom->cpu_cycle_count, SFC_VRC7_VRC7);
         sfc_get_vrc7_patch(famicom)[selected] = value;
     }
     // 10-15: 声道低八位频率
     else if (selected >= 0x10 && selected <= 0x15) {
-        famicom->interfaces.audio_changed(famicom->argument, famicom->cpu_cycle_count, SFC_VRC7_FM0 + (selected & 0x7));
+        famicom->interfaces.audio_change(famicom->argument, famicom->cpu_cycle_count, SFC_VRC7_FM0 + (selected & 0x7));
         sfc_vrc7_ch_t* const ch = &famicom->apu.vrc7.ch[selected & 0x7];
         ch->freq = (ch->freq & 0xff00) | (uint16_t)value;
         sfc_vrc7_operator_changed(famicom, ch, &ch->modulator, 0);
@@ -172,7 +172,7 @@ static void sfc_mapper_55_regwrite(sfc_famicom_t* famicom, uint8_t value) {
     }
     // 20-25: 控制信息
     else if (selected >= 0x20 && selected <= 0x25) {
-        famicom->interfaces.audio_changed(famicom->argument, famicom->cpu_cycle_count, SFC_VRC7_FM0 + (selected & 0x7));
+        famicom->interfaces.audio_change(famicom->argument, famicom->cpu_cycle_count, SFC_VRC7_FM0 + (selected & 0x7));
         // --ST OOOH
         sfc_vrc7_ch_t* const ch = &famicom->apu.vrc7.ch[selected & 0x7];
         ch->freq = (ch->freq & 0xff) | ((uint16_t)(value & 1) << 8);
@@ -189,7 +189,7 @@ static void sfc_mapper_55_regwrite(sfc_famicom_t* famicom, uint8_t value) {
     }
     // 30-35: 乐器音量
     else if (selected >= 0x30 && selected <= 0x35) {
-        famicom->interfaces.audio_changed(famicom->argument, famicom->cpu_cycle_count, SFC_VRC7_FM0 + (selected & 0x7));
+        famicom->interfaces.audio_change(famicom->argument, famicom->cpu_cycle_count, SFC_VRC7_FM0 + (selected & 0x7));
         // IIII VVVV
         sfc_vrc7_ch_t* const ch = &famicom->apu.vrc7.ch[selected & 0x7];
         ch->volume = value & 0xf;
@@ -228,7 +228,7 @@ static void sfc_mapper_55_mirroring(sfc_famicom_t* famicom, uint8_t value) {
     // 静音VRC7
     if (value & 0x40) {
         if (famicom->rom_info.extra_sound & SFC_NSF_EX_VCR7) {
-            famicom->interfaces.audio_changed(famicom->argument, famicom->cpu_cycle_count, SFC_VRC7_VRC7);
+            famicom->interfaces.audio_change(famicom->argument, famicom->cpu_cycle_count, SFC_VRC7_VRC7);
             famicom->rom_info.extra_sound &= ~SFC_NSF_EX_VCR7;
             const uint8_t last = famicom->apu.vrc7.selected;
             memset(&famicom->apu.vrc7, 0, sizeof(famicom->apu.vrc7));
@@ -238,7 +238,7 @@ static void sfc_mapper_55_mirroring(sfc_famicom_t* famicom, uint8_t value) {
     // 设置VRC7
     else {
         if (!(famicom->rom_info.extra_sound & SFC_NSF_EX_VCR7)) {
-            famicom->interfaces.audio_changed(famicom->argument, famicom->cpu_cycle_count, SFC_VRC7_VRC7);
+            famicom->interfaces.audio_change(famicom->argument, famicom->cpu_cycle_count, SFC_VRC7_VRC7);
             famicom->rom_info.extra_sound |= SFC_NSF_EX_VCR7;
         }
     }

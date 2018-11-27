@@ -9,11 +9,12 @@
 /// 
 /// </summary>
 enum sfc_channel_index {
+    //SFC_MMC5_FakeFC = -4,
     // [VRC7] VRC7
     SFC_VRC7_VRC7 = -3,
     // [VRC6] VRC6
     SFC_VRC6_VRC6 = -2,
-    // 帧计数器/序列器
+    // 帧计数器/序列器/[MMC5] 伪帧序列器
     SFC_FrameCounter = -1,
     // 总体
     SFC_Overview = 0,
@@ -138,15 +139,15 @@ typedef struct {
 /// <summary>
 /// 方波寄存器/数据
 /// </summary>
-struct sfc_square_data_t {
+typedef struct {
     // 包络
     sfc_envelope_t  envelope;
     // 当前周期
     uint16_t        cur_period;
     // 序列索引
     uint8_t         seq_index;
-    // 未使用
-    uint8_t         unused;
+    // 未使用/MMC5 用于$5015
+    uint8_t         unused__mmc5_5015;
     // 长度计数器
     uint8_t         length_counter;
     // 控制寄存器
@@ -163,7 +164,8 @@ struct sfc_square_data_t {
     uint8_t         sweep_divider;
     // 扫描单元: 移位器
     uint8_t         sweep_shift;
-};
+
+} sfc_square_data_t;
 
 
 /// <summary>
@@ -461,14 +463,38 @@ enum {
     SFC_FDS_MASTER_VOL_LCM = 30
 };
 
+
+
+/// <summary>
+/// 
+/// </summary>
+typedef struct {
+    // 方波 #1
+    sfc_square_data_t       square1;
+    // 方波 #2
+    sfc_square_data_t       square2;
+    // 方波 #1 时钟
+    uint16_t                square1_clock;
+    // 方波 #2 时钟
+    uint16_t                square2_clock;
+    // PCM 输出
+    uint8_t                 pcm_output;
+    // PCM IRQ 使能
+    uint8_t                 pcm_irq_enable;
+    // PCM IRQ 触发
+    uint8_t                 pcm_irq_tri;
+    // PCM 写入掩码
+    uint8_t                 pcm_mask;
+} sfc_mmc5_data_t;
+
 /// <summary>
 /// APU寄存器数据
 /// </summary>
 typedef struct {
     // 方波 #1
-    struct sfc_square_data_t    square1;
+    sfc_square_data_t           square1;
     // 方波 #2
-    struct sfc_square_data_t    square2;
+    sfc_square_data_t           square2;
     // 三角波
     struct sfc_triangle_data_t  triangle;
     // 噪声
@@ -481,6 +507,8 @@ typedef struct {
     sfc_vrc7_data_t             vrc7;
     // FDS1
     sfc_fds1_data_t             fds;
+    // MMC5
+    sfc_mmc5_data_t             mmc5;
     // 状态寄存器(写: 声道使能)
     uint8_t                     status_write;
     // 状态寄存器(读:)

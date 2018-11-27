@@ -12,6 +12,10 @@
 
 //#define SFC_NO_SSE
 
+#ifndef NDEBUG
+static uint32_t s_dbg_framecounter = 0;
+#endif
+
 // NMI - 不可屏蔽中断
 extern inline void sfc_operation_NMI(sfc_famicom_t* famicom);
 
@@ -304,6 +308,23 @@ static inline void sfc_render_background_pixel16_ex(
     const uint8_t plane2 = plane_right[0];
     const uint8_t plane3 = plane_right[8];
 #ifdef SFC_NO_SSE
+    //static uint32_t fc = 0;
+
+    //static uint8_t data = 0;
+    //static int count = 0; ++count;
+    //if (count == 13) {
+    //    ++data;
+    //    count = 0;
+    //}
+    ////high1 = (data & 3) << 3;
+
+    //if (high0 && high1 && high0 != high1) {
+    //    if (fc != s_dbg_framecounter) {
+    //        fc = s_dbg_framecounter;
+    //        printf("[%04d]MMC5-ExGrafix!\n", fc);
+    //    }
+    //}
+
     sfc_expand_backgorund_8(plane0, plane1, high0, aligned_palette + 0);
     sfc_expand_backgorund_8(plane2, plane3, high1, aligned_palette + 8);
 #else
@@ -854,6 +875,9 @@ void sfc_render_frame_easy(sfc_famicom_t* famicom, uint8_t* buffer) {
     uint32_t end_cycle_count = 0;
     // 帧+1
     ++famicom->frame_counter;
+#ifndef NDEBUG
+    s_dbg_framecounter = famicom->frame_counter;
+#endif
     // 精灵0用命中测试缓存
     uint8_t sp0_hittest_buffer[SFC_WIDTH];
     sfc_sprite0_hittest(famicom, sp0_hittest_buffer);

@@ -98,7 +98,7 @@ static uint32_t sfc_make_offset(sfc_famicom_t* famicom, const uint8_t* ptr) {
     const uint8_t* const fc0 = famicom->video_memory;
     const uint8_t* const fc1 = (const uint8_t*)(famicom + 1);
     // RAM
-    if (ptr > fc0 && ptr < fc1) {
+    if (ptr >= fc0 && ptr < fc1) {
         const uintptr_t rv = ptr - fc0;
         assert(rv < 0x10000000);
         return (uint32_t)rv;

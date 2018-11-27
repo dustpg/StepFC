@@ -129,6 +129,8 @@ extern inline void sfc_operation_IRQ_try(sfc_famicom_t* famicom);
 /// <returns></returns>
 static sfc_ecode sfc_mapper_05_reset(sfc_famicom_t* famicom) {
     MAPPER;
+    // 支持MMC5
+    famicom->rom_info.extra_sound = SFC_NSF_EX_MMC5;
     // PRG模式3
     mapper->prg_mode = 3;
     // CHR模式3
@@ -208,6 +210,62 @@ static void sfc_mmc5_update_chrbank_x8(sfc_famicom_t* famicom) {
     }
 }
 
+
+/// <summary>
+/// SFCs the MMC5 update chrbank 16.
+/// </summary>
+/// <param name="famicom">The famicom.</param>
+static void sfc_mmc5_update_chrbank_16(sfc_famicom_t* famicom) {
+    MAPPER;
+    switch (mapper->chr_mode)
+    {
+    case 0:
+        // 8 KiB模式
+        sfc_load_chrrom_1k(famicom, 0, 8 * mapper->chrbank_16[3] + 0);
+        sfc_load_chrrom_1k(famicom, 1, 8 * mapper->chrbank_16[3] + 1);
+        sfc_load_chrrom_1k(famicom, 2, 8 * mapper->chrbank_16[3] + 2);
+        sfc_load_chrrom_1k(famicom, 3, 8 * mapper->chrbank_16[3] + 3);
+        sfc_load_chrrom_1k(famicom, 4, 8 * mapper->chrbank_16[3] + 5);
+        sfc_load_chrrom_1k(famicom, 5, 8 * mapper->chrbank_16[3] + 5);
+        sfc_load_chrrom_1k(famicom, 6, 8 * mapper->chrbank_16[3] + 6);
+        sfc_load_chrrom_1k(famicom, 7, 8 * mapper->chrbank_16[3] + 7);
+        break;
+    case 1:
+        // 4 KiB模式
+        sfc_load_chrrom_1k(famicom, 0, 4 * mapper->chrbank_16[3] + 0);
+        sfc_load_chrrom_1k(famicom, 1, 4 * mapper->chrbank_16[3] + 1);
+        sfc_load_chrrom_1k(famicom, 2, 4 * mapper->chrbank_16[3] + 2);
+        sfc_load_chrrom_1k(famicom, 3, 4 * mapper->chrbank_16[3] + 3);
+        sfc_load_chrrom_1k(famicom, 4, 4 * mapper->chrbank_16[3] + 0);
+        sfc_load_chrrom_1k(famicom, 5, 4 * mapper->chrbank_16[3] + 1);
+        sfc_load_chrrom_1k(famicom, 6, 4 * mapper->chrbank_16[3] + 2);
+        sfc_load_chrrom_1k(famicom, 7, 4 * mapper->chrbank_16[3] + 3);
+        break;
+    case 2:
+        // 2 KiB模式
+        sfc_load_chrrom_1k(famicom, 0, 2 * mapper->chrbank_16[1] + 0);
+        sfc_load_chrrom_1k(famicom, 1, 2 * mapper->chrbank_16[1] + 1);
+        sfc_load_chrrom_1k(famicom, 2, 2 * mapper->chrbank_16[3] + 0);
+        sfc_load_chrrom_1k(famicom, 3, 2 * mapper->chrbank_16[3] + 1);
+        sfc_load_chrrom_1k(famicom, 4, 2 * mapper->chrbank_16[1] + 0);
+        sfc_load_chrrom_1k(famicom, 5, 2 * mapper->chrbank_16[1] + 1);
+        sfc_load_chrrom_1k(famicom, 6, 2 * mapper->chrbank_16[3] + 0);
+        sfc_load_chrrom_1k(famicom, 7, 2 * mapper->chrbank_16[3] + 1);
+        break;
+    case 3:
+        // 1 KiB模式
+        sfc_load_chrrom_1k(famicom, 0, mapper->chrbank_16[0]);
+        sfc_load_chrrom_1k(famicom, 1, mapper->chrbank_16[1]);
+        sfc_load_chrrom_1k(famicom, 2, mapper->chrbank_16[2]);
+        sfc_load_chrrom_1k(famicom, 3, mapper->chrbank_16[3]);
+        sfc_load_chrrom_1k(famicom, 4, mapper->chrbank_16[0]);
+        sfc_load_chrrom_1k(famicom, 5, mapper->chrbank_16[1]);
+        sfc_load_chrrom_1k(famicom, 6, mapper->chrbank_16[2]);
+        sfc_load_chrrom_1k(famicom, 7, mapper->chrbank_16[3]);
+        break;
+    }
+}
+
 #include <stdbool.h>
 
 /// <summary>
@@ -217,8 +275,7 @@ static void sfc_mmc5_update_chrbank_x8(sfc_famicom_t* famicom) {
 /// <param name="value">The value.</param>
 /// <returns></returns>
 static inline bool sfc_mmc5_ppu_rendering(sfc_famicom_t*famicom, uint32_t value) {
-    return (value < SFC_HEIGHT)
-        && (famicom->ppu.data.mask & (SFC_PPU2001_Back | SFC_PPU2001_Sprite))
+    return (famicom->ppu.data.mask & (SFC_PPU2001_Back | SFC_PPU2001_Sprite))
         ;
 }
 
@@ -237,27 +294,29 @@ static void sfc_mapper_05_hsync(sfc_famicom_t* famicom, uint16_t value) {
     //    printf("Sprite 8x16 Mode: O%s\n", sp16 ? "n" : "ff");
     //}
 #endif
-    mapper->irq_status_f = value < SFC_HEIGHT ? SFC_MMC5_InFrame : 0;
+    mapper->irq_status_f = 0;
+    mapper->exram_write_mask_ppu = 0x00;
+    // 不可见扫描线
+    if (value >= SFC_HEIGHT) return;
+    mapper->irq_status_f = SFC_MMC5_InFrame;
     mapper->exram_write_mask_ppu 
         = sfc_mmc5_ppu_rendering(famicom, value)
         ? 0xff : 0x00
         ;
-    if ((uint16_t)mapper->irq_scanline == value) {
-        mapper->irq_status_p = SFC_MMC5_IRQPending;
-        if (mapper->irq_enable)
-            sfc_operation_IRQ_try(famicom);
+    // 写入N就会在第N+1条扫描线前端触发
+    // 这里是每条扫描线后触发水平同步所以就直接判断就行
+    if (value) {
+        if ((uint16_t)mapper->irq_scanline == value) {
+            mapper->irq_status_p = SFC_MMC5_IRQPending;
+            if (mapper->irq_enable)
+                sfc_operation_IRQ_try(famicom);
+        }
     }
+    // 第一行清除'Pending'
+    else mapper->irq_status_p = 0;
 }
 
 
-/// <summary>
-/// SFCs the MMC5 update chrbank 16.
-/// </summary>
-/// <param name="famicom">The famicom.</param>
-static void sfc_mmc5_update_chrbank_16(sfc_famicom_t* famicom) {
-    MAPPER;
-    assert(!"NOT IMPL");
-}
 
 
 /// <summary>
@@ -352,6 +411,16 @@ static inline void sfc_mmc5_load_go_on_8k(sfc_famicom_t* famicom, int des) {
 }
 
 
+// 方波#0
+extern inline sfc_square_set0(sfc_square_data_t* sq, uint8_t value);
+// 方波#1
+extern inline sfc_square_set1(sfc_square_data_t* sq, uint8_t value);
+// 方波#2
+extern inline sfc_square_set2(sfc_square_data_t* sq, uint8_t value);
+// 方波#3
+extern inline sfc_square_set3(sfc_square_data_t* sq, uint8_t value, uint8_t ok);
+
+
 /// <summary>
 /// SFCs the mapper 05 write low.
 /// </summary>
@@ -369,6 +438,64 @@ static void sfc_mapper_05_write_low(sfc_famicom_t* famicom, uint16_t address, ui
         color = 0;
         break;
 #endif
+    case 0x5000:
+        // Pulse 1 ($5000-$5003)
+        famicom->interfaces.audio_change(famicom->argument, famicom->cpu_cycle_count, SFC_MMC5_Square1);
+        sfc_square_set0(&famicom->apu.mmc5.square1, value);
+        break;
+    case 0x5002:
+        // Pulse 1 ($5000-$5003)
+        famicom->interfaces.audio_change(famicom->argument, famicom->cpu_cycle_count, SFC_MMC5_Square1);
+        sfc_square_set2(&famicom->apu.mmc5.square1, value);
+        break;
+    case 0x5003:
+        // Pulse 1 ($5000-$5003)
+        famicom->interfaces.audio_change(famicom->argument, famicom->cpu_cycle_count, SFC_MMC5_Square1);
+        sfc_square_set3(&famicom->apu.mmc5.square1, value, famicom->apu.mmc5.square1.unused__mmc5_5015);
+        break;
+    case 0x5004:
+        // Pulse 2 ($5004-$5007)
+        //{
+        //    static uint8_t debug_old = 0;
+        //    if (debug_old != value) printf("%02x\n", value);
+        //    debug_old = value;
+        //}
+        famicom->interfaces.audio_change(famicom->argument, famicom->cpu_cycle_count, SFC_MMC5_Square2);
+        sfc_square_set0(&famicom->apu.mmc5.square2, value);
+        break;
+    case 0x5006:
+        // Pulse 2 ($5004-$5007)
+        famicom->interfaces.audio_change(famicom->argument, famicom->cpu_cycle_count, SFC_MMC5_Square2);
+        sfc_square_set2(&famicom->apu.mmc5.square2, value);
+        break;
+    case 0x5007:
+        // Pulse 2 ($5004-$5007)
+        famicom->interfaces.audio_change(famicom->argument, famicom->cpu_cycle_count, SFC_MMC5_Square2);
+        sfc_square_set3(&famicom->apu.mmc5.square2, value, famicom->apu.mmc5.square2.unused__mmc5_5015);
+        //printf("%02x\n", value);
+        break;
+    case 0x5001:
+        // Pulse 1 扫描单元
+    case 0x5005:
+        // Pulse 2 扫描单元
+        break;
+    case 0x5010:
+        // PCM Mode/IRQ ($5010)
+        famicom->apu.mmc5.pcm_mask = value & 1 ? 0x00 : 0xff;
+        famicom->apu.mmc5.pcm_irq_enable = value & 0x80;
+        break;
+    case 0x5011:
+        // Raw PCM ($5011)
+        famicom->interfaces.audio_change(famicom->argument, famicom->cpu_cycle_count, SFC_MMC5_PCM);
+        famicom->apu.mmc5.pcm_output = value & famicom->apu.mmc5.pcm_mask;
+        break;
+    case 0x5015:
+        // Status ($5015, read/write)
+        if (!(famicom->apu.mmc5.square1.unused__mmc5_5015 = value & 1))
+            famicom->apu.mmc5.square1.length_counter = 0;
+        if (!(famicom->apu.mmc5.square2.unused__mmc5_5015 = value & 2))
+            famicom->apu.mmc5.square2.length_counter = 0;
+        break;
     case 0x5100:
         // PRG mode ($5100)
         mapper->prg_mode = value & 3;
@@ -388,20 +515,20 @@ static void sfc_mapper_05_write_low(sfc_famicom_t* famicom, uint16_t address, ui
     case 0x5104:
         // Extended RAM mode ($5104)
 #ifndef NDEBUG
-        printf("[%5d]MMC5: Extended RAM mode ($5104) = %02x\n", famicom->frame_counter, value & 3);
+        //printf("[%5d]MMC5: Extended RAM mode ($5104) = %02x\n", famicom->frame_counter, value & 3);
 #endif
         mapper->exram_mode = value & 3;
         mapper->exram_write_mask_mmc5 = 0x00;
         famicom->ppu.data.ppu_mode = SFC_EZPPU_Normal;
-        if (mapper->exram_mode == 1) {
-            mapper->exram_write_mask_mmc5 = 0xff;
+        if (mapper->exram_mode == 1) 
             famicom->ppu.data.ppu_mode = SFC_EXPPU_ExGrafix;
-        }
+        else if (mapper->exram_mode == 2)
+            mapper->exram_write_mask_mmc5 = 0xff;
         break;
     case 0x5105:
         // Nametable mapping ($5105)
 #ifndef NDEBUG
-        printf("[%5d]MMC5: Nametable mapping ($5105) = %02x\n", famicom->frame_counter, value);
+        //printf("[%5d]MMC5: Nametable mapping ($5105) = %02x\n", famicom->frame_counter, value);
 #endif
         sfc_mmc5_update_nametable(famicom, value);
         break;
@@ -504,7 +631,8 @@ static void sfc_mapper_05_write_low(sfc_famicom_t* famicom, uint16_t address, ui
     case 0x512B:
         // CHR Bankswitching B ($5128-$513B)
         mapper->chrbank_16[address & 3] = (uint16_t)value | ((uint16_t)mapper->chrbank_hi << 2);
-        assert(!"NOT IMPL");
+        //sfc_mmc5_update_chrbank_16(famicom);
+        //printf("[%5d]$%04x = %02x\n", famicom->frame_counter, address, value);
         break;
     case 0x5130:
         // Upper CHR Bank bits ($5130)
@@ -518,10 +646,12 @@ static void sfc_mapper_05_write_low(sfc_famicom_t* famicom, uint16_t address, ui
     case 0x5202:
         // Vertical Split Bank ($5202)
         // TODO: 实现Split模式
+        assert(value == 0 && "NOT IMPL");
         break;
     case 0x5203:
         // IRQ Counter ($5203)
         mapper->irq_scanline = value;
+        //printf("[%5d]IRQ Counter ($5203) = %02x\n", famicom->frame_counter, value);
         break;
     case 0x5204:
         // IRQ Status ($5204, read/write)
@@ -539,6 +669,9 @@ static void sfc_mapper_05_write_low(sfc_famicom_t* famicom, uint16_t address, ui
         break;
     default:
         if (address >= 0x5C00) {
+
+
+
             // XXX: 写入保护?
             assert(mapper->exram_mode != 3);
             //if (mapper->exram_mode != 3)
@@ -549,10 +682,6 @@ static void sfc_mapper_05_write_low(sfc_famicom_t* famicom, uint16_t address, ui
             sfc_mmc5_exram(famicom)[address & 0x3ff] = value & mask;
         }
         else assert(!"NOT IMPL");
-        break;
-    case 0x5010:
-    case 0x5015:
-        color = 0;
         break;
     }
 }
@@ -580,6 +709,16 @@ static uint8_t sfc_mapper_05_read_low(sfc_famicom_t* famicom, uint16_t address) 
     switch (address)
     {
         uint8_t value;
+    case 0x5010:
+        value = (famicom->apu.mmc5.pcm_mask & 1) | famicom->apu.mmc5.pcm_irq_tri;
+        famicom->apu.mmc5.pcm_irq_tri = 0;
+        return value;
+    case 0x5015:
+        // Status ($5015, read/write)
+        value = 0;
+        if (famicom->apu.mmc5.square1.length_counter) value |= 1;
+        if (famicom->apu.mmc5.square2.length_counter) value |= 2;
+        return value;
     case 0x5204:
         // IRQ Status ($5204, read/write)
         value = mapper->irq_status_f | mapper->irq_status_p;
@@ -592,6 +731,9 @@ static uint8_t sfc_mapper_05_read_low(sfc_famicom_t* famicom, uint16_t address) 
     case 0x5206:
         // Unsigned 8x8 to 16 Multiplier ($5205, $5206 read/write)
         return (uint8_t)((mapper->product >> 8) & 0xff);
+    default:
+        if (address >= 0x5C00) 
+            return sfc_mmc5_exram(famicom)[address & 0x3ff];
     }
     assert(!"NOT IMPL");
     return 0;

@@ -13,20 +13,17 @@
 /// <summary>
 /// 方波状态
 /// </summary>
-typedef union  {
-    // 结构体
-    struct {
-        // 方波 周期
-        uint16_t    period;
-        // 方波 音量
-        uint8_t     volume;
-        // 方波 占空比
-        uint8_t     duty;
-    };
-    // U32数据
-    uint32_t        u32;
+typedef struct {
+    // 方波 周期
+    uint16_t    period;
+    // 方波 音量
+    uint8_t     volume;
+    // 方波 占空比
+    uint8_t     duty;
 
-} sfc_square_channel_state_t;
+} sfc_square_ch_state_t;
+
+typedef sfc_square_ch_state_t sfc_square_channel_state_t;
 
 
 /// <summary>
@@ -113,3 +110,29 @@ typedef struct {
 float sfc_fds_per_sample(sfc_famicom_t*, sfc_fds_ctx_t*, float cps);
 void sfc_fds_samplemode_begin(sfc_famicom_t*, sfc_fds_ctx_t*, float cps);
 void sfc_fds_samplemode_end(sfc_famicom_t*, sfc_fds_ctx_t*);
+
+
+
+// -------------------------------------------------------
+//                         MMC5
+// -------------------------------------------------------
+
+typedef struct {
+    // 声道状态
+    sfc_square_ch_state_t   state;
+    // 方波 时钟周期 - 浮点误差修正
+    float                   clock;
+    // 方波 浮点周期
+    float                   period;
+    // 方波 输出音量
+    float                   output;
+}sfc_mmc5_square_ctx_t;
+
+typedef struct {
+    sfc_mmc5_square_ctx_t   squ1;
+    sfc_mmc5_square_ctx_t   squ2;
+} sfc_mmc5_ctx_t;
+
+void sfc_mmc5_per_sample(sfc_famicom_t*, sfc_mmc5_ctx_t*, float cps);
+void sfc_mmc5_samplemode_begin(sfc_famicom_t*, sfc_mmc5_ctx_t*);
+void sfc_mmc5_samplemode_end(sfc_famicom_t*, sfc_mmc5_ctx_t*);

@@ -248,7 +248,7 @@ void sfc_mapper_14_write_low(sfc_famicom_t* famicom, uint16_t address, uint8_t v
     if (address >= 0x4040 && address < 0x4080) {
         sfc_fds1_data_t* const fds = &famicom->apu.fds;
         if (fds->write_enable) {
-            famicom->interfaces.audio_changed(famicom->argument, famicom->cpu_cycle_count, SFC_FDS1_Wavefrom);
+            famicom->interfaces.audio_change(famicom->argument, famicom->cpu_cycle_count, SFC_FDS1_Wavefrom);
             sfc_get_fds1_wavtbl(famicom)[address & 0x3f] = (value & 0x3f) | 0x40;
             fds->wavtbl_index = 0;
             fds->waveout = sfc_get_fds1_wavtbl(famicom)[0] & 0x3f;
@@ -256,7 +256,7 @@ void sfc_mapper_14_write_low(sfc_famicom_t* famicom, uint16_t address, uint8_t v
     }
     // 后段数据
     else if (address <= 0x408a) {
-        famicom->interfaces.audio_changed(famicom->argument, famicom->cpu_cycle_count, SFC_FDS1_Wavefrom);
+        famicom->interfaces.audio_change(famicom->argument, famicom->cpu_cycle_count, SFC_FDS1_Wavefrom);
         sfc_fds1_data_t* const fds = &famicom->apu.fds;
         switch (address & 0xf)
         {

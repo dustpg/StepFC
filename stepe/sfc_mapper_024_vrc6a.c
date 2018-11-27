@@ -246,10 +246,10 @@ void sfc_mapper_18_write_high(sfc_famicom_t* famicom, uint16_t address, uint8_t 
             sfc_vrc6_update_squ1(&famicom->apu.vrc6);
             sfc_vrc6_update_squ2(&famicom->apu.vrc6);
             sfc_vrc6_update_saw(&famicom->apu.vrc6);
-            famicom->interfaces.audio_changed(famicom->argument, famicom->cpu_cycle_count, SFC_VRC6_VRC6);
+            famicom->interfaces.audio_change(famicom->argument, famicom->cpu_cycle_count, SFC_VRC6_VRC6);
             return;
         }
-        famicom->interfaces.audio_changed(famicom->argument, famicom->cpu_cycle_count, SFC_VRC6_Square1);
+        famicom->interfaces.audio_change(famicom->argument, famicom->cpu_cycle_count, SFC_VRC6_Square1);
         break;
     case 2:
         switch (address & 0x03)
@@ -285,7 +285,7 @@ void sfc_mapper_18_write_high(sfc_famicom_t* famicom, uint16_t address, uint8_t 
             sfc_vrc6_update_squ2(&famicom->apu.vrc6);
             break;
         }
-        famicom->interfaces.audio_changed(famicom->argument, famicom->cpu_cycle_count, SFC_VRC6_Square2);
+        famicom->interfaces.audio_change(famicom->argument, famicom->cpu_cycle_count, SFC_VRC6_Square2);
         break;
     case 3:
         // $B00x
@@ -323,7 +323,7 @@ void sfc_mapper_18_write_high(sfc_famicom_t* famicom, uint16_t address, uint8_t 
             sfc_mapper_18_chr_update(famicom);
             return;
         }
-        famicom->interfaces.audio_changed(famicom->argument, famicom->cpu_cycle_count, SFC_VRC6_Saw);
+        famicom->interfaces.audio_change(famicom->argument, famicom->cpu_cycle_count, SFC_VRC6_Saw);
         break;
     case 4:
         // 8k PRG Select ($C000-$C003)

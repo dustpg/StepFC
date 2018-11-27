@@ -44,7 +44,7 @@ sfc_ecode sfc_famicom_init(
     // 载入默认接口
     famicom->interfaces.load_rom = sfc_loadfree_rom;
     famicom->interfaces.free_rom = sfc_loadfree_rom;
-    famicom->interfaces.audio_changed = sfc_audio_changed;
+    famicom->interfaces.audio_change = sfc_audio_changed;
     famicom->interfaces.load_sram = sfc_save_load_sram;
     famicom->interfaces.save_sram = sfc_save_load_sram;
     famicom->interfaces.sl_write_stream = sfc_sl_stream;
