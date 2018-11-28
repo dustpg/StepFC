@@ -30,7 +30,7 @@ enum sfc_status_flag {
     SFC_FLAG_B = 1 << 4,    // 软件中断(BRK flag)
     SFC_FLAG_R = 1 << 5,    // 保留标记(Reserved), 一直为1
     SFC_FLAG_V = 1 << 6,    // 溢出标记(Overflow  flag)
-    SFC_FLAG_S = 1 << 7,    // 信号标记(Sign flag)
+    SFC_FLAG_S = 1 << 7,    // 符号标记(Sign flag)
     SFC_FLAG_N = SFC_FLAG_S,// 又叫(Negative Flag)
 };
 
