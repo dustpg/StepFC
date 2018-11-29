@@ -352,8 +352,9 @@ static void sfc_render_background_scanline(
     const uint8_t sp0[SFC_HEIGHT + (16)],
     uint8_t* buffer) {
     // 取消背景显示
+    // TODO: 取消显示应该渲染黑色
     if (!(famicom->ppu.data.mask & (uint8_t)SFC_PPU2001_Back)) return;
-
+    
     // 计算当前水平偏移量
     const uint16_t scrollx
         = (uint16_t)((famicom->ppu.data.v & (uint16_t)0x0400) ? 256 : 0)
@@ -857,6 +858,8 @@ static inline void sfc_render_sprites(sfc_famicom_t* famicom, uint8_t* buffer) {
 extern void sfc_trigger_frame_counter(sfc_famicom_t*);
 
 
+//extern uint8_t sp_backup[32] = { 0 };
+
 /// <summary>
 /// StepFC: 使用简易模式渲染一帧, 效率较高
 /// </summary>
@@ -916,7 +919,7 @@ void sfc_render_frame_easy(sfc_famicom_t* famicom, uint8_t* buffer) {
         if (i % 66 == 65)
             sfc_trigger_frame_counter(famicom);
     }
-    
+
     // 后渲染
     {
         end_cycle_count += per_scanline;

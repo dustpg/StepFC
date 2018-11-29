@@ -47,7 +47,7 @@ extern inline void sfc_operation_IRQ_try(sfc_famicom_t* famicom);
 /// <param name="famicom">The famicom.</param>
 /// <returns></returns>
 static inline sfc_mapper18_t* sfc_mapper(sfc_famicom_t* famicom) {
-    return (sfc_mapper18_t*)famicom->mapper_buffer.mapper04;
+    return (sfc_mapper18_t*)famicom->mapper_buffer.mapper18;
 }
 
 #define MAPPER sfc_mapper18_t* const mapper = sfc_mapper(famicom);

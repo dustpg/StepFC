@@ -32,6 +32,8 @@ uint8_t sfc_read_ppu_address(uint16_t address, sfc_ppu_t* ppu) {
     }
 }
 
+extern uint16_t dbg_scanline;
+
 /// <summary>
 /// StepFC: 写入PPU地址空间
 /// </summary>
@@ -49,6 +51,10 @@ void sfc_write_ppu_address(uint16_t address, uint8_t data, sfc_ppu_t* ppu) {
     }
     // 调色板索引
     else {
+        //if ((real_address & 0x1f) == 1)
+        //    printf("[%3d]$%04x = $%02x\n", dbg_scanline, real_address, data);
+        //if (dbg_scanline >= 240) return;
+
         // 独立地址
         if (real_address & (uint16_t)0x03) {
             ppu->data.spindexes[real_address & (uint16_t)0x1f] = data;

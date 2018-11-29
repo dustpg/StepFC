@@ -10,6 +10,8 @@
 /// </summary>
 enum sfc_channel_index {
     //SFC_MMC5_FakeFC = -4,
+    // [N163] N163
+    SFC_VRC7_N163 = -4,
     // [VRC7] VRC7
     SFC_VRC7_VRC7 = -3,
     // [VRC6] VRC6
@@ -487,6 +489,32 @@ typedef struct {
     uint8_t                 pcm_mask;
 } sfc_mmc5_data_t;
 
+
+
+/// <summary>
+/// 
+/// </summary>
+typedef struct {
+    // N163 周期计数器(0~15)
+    uint16_t    n163_clock;
+    // N163 当前声道
+    uint8_t     n163_current;
+    // N163 声道数量
+    uint8_t     n163_count;
+    // N163 声道最低编号
+    uint8_t     n163_lowest_id;
+    // 副权重(除以16)
+    uint8_t     subweight_div16;
+    // 写入地址
+    uint8_t     n163_addr;
+    // 地址递增
+    uint8_t     n163_inc;
+    // 当前输出
+    int8_t      ch_output[8];
+} sfc_n163_data_t;
+
+
+
 /// <summary>
 /// APU寄存器数据
 /// </summary>
@@ -509,6 +537,8 @@ typedef struct {
     sfc_fds1_data_t             fds;
     // MMC5
     sfc_mmc5_data_t             mmc5;
+    // N163
+    sfc_n163_data_t             n163;
     // 状态寄存器(写: 声道使能)
     uint8_t                     status_write;
     // 状态寄存器(读:)

@@ -24,7 +24,17 @@ static void sfc_nsf_switch(sfc_famicom_t* famicom, uint16_t addr, uint8_t data) 
 }
  
 // 初始化FDS
-extern void sfc_fds_init(sfc_famicom_t* famicom);
+extern void sfc_fds1_init(sfc_famicom_t* famicom);
+
+
+/// <summary>
+/// MMC5 5xxx: 原来8 KiB WRAM - 偏移4 KiB
+/// </summary>
+/// <param name="famicom">The famicom.</param>
+/// <returns></returns>
+static inline uint8_t* sfc_mmc5_5xxx(sfc_famicom_t* famicom) {
+    return famicom->save_memory + 1024 * 4;
+}
 
 
 /// <summary>
@@ -61,6 +71,17 @@ extern sfc_ecode sfc_mapper_1F_reset(sfc_famicom_t* famicom) {
             for (uint8_t data = 0; i != count; ++i, ++data)
                 sfc_nsf_switch(famicom, i, data);
         }
+
+        // FDS
+        if (famicom->rom_info.extra_sound & SFC_NSF_EX_FDS1) {
+            sfc_fds1_init(famicom);
+        }
+        // 同MMC5实现——扩展5xxx区域
+        famicom->prg_banks[5] = sfc_mmc5_5xxx(famicom);
+        // 将BANK3-WRAM使用扩展RAM代替
+        famicom->prg_banks[6] = famicom->expansion_ram32 + 4 * 1024 * 0;
+        famicom->prg_banks[7] = famicom->expansion_ram32 + 4 * 1024 * 4;
+
     }
     // Mapper-031
     else {
@@ -71,10 +92,6 @@ extern sfc_ecode sfc_mapper_1F_reset(sfc_famicom_t* famicom) {
     // CHR-ROM
     for (int i = 0; i != 8; ++i)
         sfc_load_chrrom_1k(famicom, i, i);
-    // FDS
-    if (famicom->rom_info.extra_sound & SFC_NSF_EX_FDS1) {
-        sfc_fds_init(famicom);
-    }
     return SFC_ERROR_OK;
 }
 
@@ -86,6 +103,9 @@ extern void sfc_mapper_18_write_high(sfc_famicom_t*, uint16_t, uint8_t);
 extern void sfc_mapper_55_write_high(sfc_famicom_t*, uint16_t, uint8_t);
 // FDS1
 extern void sfc_mapper_14_write_low(sfc_famicom_t*, uint16_t, uint8_t);
+// MMC5
+extern void sfc_mapper_05_write_low(sfc_famicom_t*, uint16_t, uint8_t);
+
 
 
 #include <stdbool.h>
@@ -98,12 +118,21 @@ extern void sfc_mapper_14_write_low(sfc_famicom_t*, uint16_t, uint8_t);
 /// <param name="addr">The addr.</param>
 /// <param name="data">The data.</param>
 static void sfc_mapper_1F_write_low(sfc_famicom_t*famicom, uint16_t addr, uint8_t data) {
+    const uint8_t ex_sound = famicom->rom_info.extra_sound;
+    // MMC5
+    if (ex_sound & SFC_NSF_EX_MMC5) {
+        // $5000 - $5FF5
+        if (addr >= 0x5000) {
+            sfc_mapper_05_write_low(famicom, addr, data);
+            if (addr <= 0x5FF5) return;
+        }
+    }
     // PRG bank select $5000-$5FFF
     if (addr >= 0x5000) {
         sfc_nsf_switch(famicom, addr, data);
     }
     // FDS
-    else if (famicom->rom_info.extra_sound & SFC_NSF_EX_FDS1) {
+    else if (ex_sound & SFC_NSF_EX_FDS1) {
         sfc_mapper_14_write_low(famicom, addr, data);
     }
 }
@@ -115,9 +144,10 @@ static void sfc_mapper_1F_write_low(sfc_famicom_t*famicom, uint16_t addr, uint8_
 /// <param name="d">The d.</param>
 /// <param name="v">The v.</param>
 static void sfc_mapper_1F_write_high(sfc_famicom_t*f, uint16_t d, uint8_t v) {
+    const uint8_t ex_sound = f->rom_info.extra_sound;
     //assert(!"CANNOT WRITE PRG-ROM");
     // VRC6
-    if (f->rom_info.extra_sound & SFC_NSF_EX_VCR6) {
+    if (ex_sound & SFC_NSF_EX_VCR6) {
         // $9000 - $9003(if VRC6 is enabled)
         // $A000 - $A002(if VRC6 is enabled)
         // $B000 - $B002(if VRC6 is enabled)
@@ -128,7 +158,7 @@ static void sfc_mapper_1F_write_high(sfc_famicom_t*f, uint16_t d, uint8_t v) {
             sfc_mapper_18_write_high(f, d, v);
     }
     // VRC7
-    if (f->rom_info.extra_sound & SFC_NSF_EX_VCR7) {
+    if (ex_sound & SFC_NSF_EX_VCR7) {
         // $9010 (if VRC7 is enabled)
         // $9030 (if VRC7 is enabled)
         const bool r0 = d == 0x9010;
@@ -157,7 +187,14 @@ static void sfc_mapper_1F_write_ram(const sfc_famicom_t* famicom) {
             famicom->bus_memory,
             sizeof(famicom->bus_memory)
         );
+        // 保存真正的WRAM/SRAM + 128字节N163内置RAM
+        famicom->interfaces.sl_write_stream(
+            famicom->argument,
+            famicom->expansion_ram32,
+            8 * 1024 + 128
+        );
     }
+
     // CHR-RAM -> 流
     sfc_mapper_wrts_defualt(famicom);
 }
@@ -174,6 +211,12 @@ static void sfc_mapper_1F_read_ram(sfc_famicom_t* famicom) {
             famicom->argument,
             famicom->bus_memory,
             sizeof(famicom->bus_memory)
+        );
+        // 保读取真正的WRAM/SRAM + 128字节N163内置RAM
+        famicom->interfaces.sl_read_stream(
+            famicom->argument,
+            famicom->expansion_ram32,
+            8 * 1024 + 128
         );
     }
     // 流 -> CHR-RAM

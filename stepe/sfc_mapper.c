@@ -17,6 +17,8 @@ extern inline sfc_ecode sfc_load_mapper_03(sfc_famicom_t* famicom);
 extern inline sfc_ecode sfc_load_mapper_04(sfc_famicom_t* famicom);
 // mapper005 - ExROM
 extern inline sfc_ecode sfc_load_mapper_05(sfc_famicom_t* famicom);
+// mapper019 - N163[N129]
+extern inline sfc_ecode sfc_load_mapper_13(sfc_famicom_t* famicom);
 // mapper024 - VRC6a
 extern inline sfc_ecode sfc_load_mapper_18(sfc_famicom_t* famicom);
 // mapper026 - VRC6b
@@ -121,6 +123,7 @@ extern sfc_ecode sfc_load_mapper(sfc_famicom_t* famicom, uint8_t id) {
         SFC_CASE_LOAD_MAPPER(04);
         SFC_CASE_LOAD_MAPPER(05);
         SFC_CASE_LOAD_MAPPER(18);
+        SFC_CASE_LOAD_MAPPER(13);
         SFC_CASE_LOAD_MAPPER(1A);
         SFC_CASE_LOAD_MAPPER(1F);
         SFC_CASE_LOAD_MAPPER(4A);

@@ -93,8 +93,8 @@ sfc_check_noise_state(const sfc_famicom_t*);
 
 
 // FDS 高级接口1
-float sfc_fds_get_output(sfc_famicom_t*);
-void sfc_fds_per_cpu_clock(sfc_famicom_t*);
+float sfc_fds1_get_output(sfc_famicom_t*);
+void sfc_fds1_per_cpu_clock(sfc_famicom_t*);
 // FDS 高级接口2
 typedef struct {
     float       volenv_clock;
@@ -106,10 +106,10 @@ typedef struct {
     float       mdunit_rate;
 
     float       cycle_remain;
-} sfc_fds_ctx_t;
-float sfc_fds_per_sample(sfc_famicom_t*, sfc_fds_ctx_t*, float cps);
-void sfc_fds_samplemode_begin(sfc_famicom_t*, sfc_fds_ctx_t*, float cps);
-void sfc_fds_samplemode_end(sfc_famicom_t*, sfc_fds_ctx_t*);
+} sfc_fds1_ctx_t;
+float sfc_fds1_per_sample(sfc_famicom_t*, sfc_fds1_ctx_t*, float cps);
+void sfc_fds1_samplemode_begin(sfc_famicom_t*, sfc_fds1_ctx_t*, float cps);
+void sfc_fds1_samplemode_end(sfc_famicom_t*, sfc_fds1_ctx_t*);
 
 
 
@@ -136,3 +136,19 @@ typedef struct {
 void sfc_mmc5_per_sample(sfc_famicom_t*, sfc_mmc5_ctx_t*, float cps);
 void sfc_mmc5_samplemode_begin(sfc_famicom_t*, sfc_mmc5_ctx_t*);
 void sfc_mmc5_samplemode_end(sfc_famicom_t*, sfc_mmc5_ctx_t*);
+
+
+
+// -------------------------------------------------------
+//                         N163
+// -------------------------------------------------------
+
+typedef struct {
+    float               clock;
+    float               subweight;
+    float               count;
+} sfc_n163_ctx_t;
+
+float sfc_n163_per_sample(sfc_famicom_t*, sfc_n163_ctx_t*, float cps);
+void sfc_n163_samplemode_begin(sfc_famicom_t*, sfc_n163_ctx_t*);
+void sfc_n163_samplemode_end(sfc_famicom_t*, sfc_n163_ctx_t*);

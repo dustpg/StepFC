@@ -150,6 +150,7 @@
     <ClCompile Include="sfc_mapper_003_cnrom.c" />
     <ClCompile Include="sfc_mapper_004_mmc3.c" />
     <ClCompile Include="sfc_mapper_005_mmc5.c" />
+    <ClCompile Include="sfc_mapper_019_n163.c" />
     <ClCompile Include="sfc_mapper_020_fds.c" />
     <ClCompile Include="sfc_mapper_024_vrc6a.c" />
     <ClCompile Include="sfc_mapper_026_vrc6b.c" />

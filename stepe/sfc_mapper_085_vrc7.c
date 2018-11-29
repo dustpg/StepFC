@@ -67,7 +67,7 @@ typedef struct {
 /// <param name="famicom">The famicom.</param>
 /// <returns></returns>
 static inline sfc_mapper55_t* sfc_mapper(sfc_famicom_t* famicom) {
-    return (sfc_mapper55_t*)famicom->mapper_buffer.mapper04;
+    return (sfc_mapper55_t*)famicom->mapper_buffer.mapper55;
 }
 
 #define MAPPER sfc_mapper55_t* const mapper = sfc_mapper(famicom);

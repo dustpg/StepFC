@@ -49,7 +49,7 @@ static const uint8_t sfc_master_vol_lut[] = {
 /// <param name="env">The env.</param>
 /// <param name="master">The master.</param>
 /// <returns></returns>
-static inline uint32_t sfc_fds_calc_envtpc(uint32_t env, uint32_t master) {
+static inline uint32_t sfc_fds1_calc_envtpc(uint32_t env, uint32_t master) {
     return 8 * (env + 1) * master;
 }
 
@@ -57,20 +57,20 @@ static inline uint32_t sfc_fds_calc_envtpc(uint32_t env, uint32_t master) {
 /// SFCs the FDS update volrate.
 /// </summary>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_fds_update_voltpc(sfc_famicom_t* famicom) {
+static inline void sfc_fds1_update_voltpc(sfc_famicom_t* famicom) {
     const uint32_t env = famicom->apu.fds.volenv_4080 & 0x3f;
     const uint32_t master = famicom->apu.fds.masenv_speed;
-    famicom->apu.fds.volenv_tpc = sfc_fds_calc_envtpc(env, master);
+    famicom->apu.fds.volenv_tpc = sfc_fds1_calc_envtpc(env, master);
 }
 
 /// <summary>
 /// SFCs the FDS update modrate.
 /// </summary>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_fds_update_modtpc(sfc_famicom_t* famicom) {
+static inline void sfc_fds1_update_modtpc(sfc_famicom_t* famicom) {
     const uint32_t env = famicom->apu.fds.modenv_4084 & 0x3f;
     const uint32_t master = famicom->apu.fds.masenv_speed;
-    famicom->apu.fds.volenv_tpc = sfc_fds_calc_envtpc(env, master);
+    famicom->apu.fds.volenv_tpc = sfc_fds1_calc_envtpc(env, master);
 }
 
 
@@ -78,7 +78,7 @@ static inline void sfc_fds_update_modtpc(sfc_famicom_t* famicom) {
 /// SFCs the FDS update volenv gain.
 /// </summary>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_fds_update_volenv_gain(sfc_famicom_t* famicom) {
+static inline void sfc_fds1_update_volenv_gain(sfc_famicom_t* famicom) {
     famicom->bus_memory[0x90] = famicom->apu.fds.volenv_gain | 0x40;
 }
 
@@ -86,7 +86,7 @@ static inline void sfc_fds_update_volenv_gain(sfc_famicom_t* famicom) {
 /// SFCs the FDS update modenv gain.
 /// </summary>
 /// <param name="famicom">The famicom.</param>
-static inline void sfc_fds_update_modenv_gain(sfc_famicom_t* famicom) {
+static inline void sfc_fds1_update_modenv_gain(sfc_famicom_t* famicom) {
     famicom->bus_memory[0x92] = famicom->apu.fds.modenv_gain | 0x40;
 }
 
@@ -95,7 +95,7 @@ static inline void sfc_fds_update_modenv_gain(sfc_famicom_t* famicom) {
 /// SFCs the FDS update freq gained.
 /// </summary>
 /// <param name="fds">The FDS.</param>
-static inline void sfc_fds_update_freq_gained(sfc_fds1_data_t* fds) {
+static inline void sfc_fds1_update_freq_gained(sfc_fds1_data_t* fds) {
     const int16_t gained = fds->freq + fds->freq_gain;
     fds->freq_gained = gained < 0 ? 0 : gained;
 }
@@ -117,7 +117,7 @@ extern sfc_ecode sfc_mapper_00_reset(sfc_famicom_t* famicom);
 /// <param name="gain">$4084 (6-bit unsigned mod gain)</param>
 /// <seealso cref="https://wiki.nesdev.com/w/index.php/FDS_audio#Unit_tick"/>
 /// <returns></returns>
-static int16_t sfc_fds_get_mod_pitch_gain(uint16_t pitch, int8_t counter, int8_t gain) {
+static int16_t sfc_fds1_get_mod_pitch_gain(uint16_t pitch, int8_t counter, int8_t gain) {
     // pitch   = $4082/4083 (12-bit unsigned pitch value)
     // counter = $4085 (7-bit signed mod counter)
     // gain    = $4084 (6-bit unsigned mod gain)
@@ -152,7 +152,7 @@ static int16_t sfc_fds_get_mod_pitch_gain(uint16_t pitch, int8_t counter, int8_t
 /// StepFC: FDS Tick一次音量包络
 /// </summary>
 /// <param name="famicom">The famicom.</param>
-void sfc_fds_tick_volenv(sfc_famicom_t* famicom) {
+void sfc_fds1_tick_volenv(sfc_famicom_t* famicom) {
     sfc_fds1_data_t* const fds = &famicom->apu.fds;
     assert(fds->flags_4083 == 0);
     assert((fds->volenv_4080 & SFC_FDS_4080_GainMode) == 0);
@@ -161,7 +161,7 @@ void sfc_fds_tick_volenv(sfc_famicom_t* famicom) {
         if (fds->volenv_gain < 32) {
             fds->volenv_gain++;
             fds->volenv_gain_clamped = fds->volenv_gain;
-            sfc_fds_update_volenv_gain(famicom);
+            sfc_fds1_update_volenv_gain(famicom);
         }
     }
     // 减
@@ -169,7 +169,7 @@ void sfc_fds_tick_volenv(sfc_famicom_t* famicom) {
         if (fds->volenv_gain) {
             fds->volenv_gain--;
             fds->volenv_gain_clamped = fds->volenv_gain;
-            sfc_fds_update_volenv_gain(famicom);
+            sfc_fds1_update_volenv_gain(famicom);
         }
     }
 }
@@ -178,7 +178,7 @@ void sfc_fds_tick_volenv(sfc_famicom_t* famicom) {
 /// StepFC: FDS Tick一次调制包络
 /// </summary>
 /// <param name="famicom">The famicom.</param>
-void sfc_fds_tick_modenv(sfc_famicom_t* famicom) {
+void sfc_fds1_tick_modenv(sfc_famicom_t* famicom) {
     sfc_fds1_data_t* const fds = &famicom->apu.fds;
     assert(fds->flags_4083 == 0);
     assert((fds->modenv_4084 & SFC_FDS_4084_GainMode) == 0);
@@ -186,14 +186,14 @@ void sfc_fds_tick_modenv(sfc_famicom_t* famicom) {
     if (fds->modenv_4084 & SFC_FDS_4084_Increase) {
         if (fds->modenv_gain < 32) {
             fds->modenv_gain++;
-            sfc_fds_update_modenv_gain(famicom);
+            sfc_fds1_update_modenv_gain(famicom);
         }
     }
     // 减
     else {
         if (fds->modenv_gain) {
             fds->modenv_gain--;
-            sfc_fds_update_modenv_gain(famicom);
+            sfc_fds1_update_modenv_gain(famicom);
         }
     }
 }
@@ -203,7 +203,7 @@ void sfc_fds_tick_modenv(sfc_famicom_t* famicom) {
 /// StepFC: FDS Tick一次波输出
 /// </summary>
 /// <param name="famicom">The famicom.</param>
-void sfc_fds_tick_waveout(sfc_famicom_t* famicom) {
+void sfc_fds1_tick_waveout(sfc_famicom_t* famicom) {
     assert((famicom->apu.fds.flags_4083 & SFC_FDS_4083_HaltWave) == 0);
     const uint8_t* const table = sfc_get_fds1_wavtbl(famicom);
     const uint8_t value = table[famicom->apu.fds.wavtbl_index++] & 0x3f;
@@ -217,7 +217,7 @@ void sfc_fds_tick_waveout(sfc_famicom_t* famicom) {
 /// StepFC: FDS Tick一次调制单元
 /// </summary>
 /// <param name="famicom">The famicom.</param>
-void sfc_fds_tick_modunit(sfc_famicom_t* famicom) {
+void sfc_fds1_tick_modunit(sfc_famicom_t* famicom) {
     assert(famicom->apu.fds.mod_enabled);
     const uint8_t* const table = sfc_get_fds1_modtbl(famicom);
     const int8_t value = table[famicom->apu.fds.modtbl_index++];
@@ -225,12 +225,12 @@ void sfc_fds_tick_modunit(sfc_famicom_t* famicom) {
     fds->modtbl_index &= 0x3f;
     fds->mod_counter_x2 += value;
 
-    fds->freq_gain = sfc_fds_get_mod_pitch_gain(
+    fds->freq_gain = sfc_fds1_get_mod_pitch_gain(
         fds->freq,
         fds->mod_counter_x2 / 2,
         fds->modenv_gain
     );
-    sfc_fds_update_freq_gained(fds);
+    sfc_fds1_update_freq_gained(fds);
 }
 
 /// <summary>
@@ -281,8 +281,8 @@ void sfc_mapper_14_write_low(sfc_famicom_t* famicom, uint16_t address, uint8_t v
                 ? 32
                 : fds->volenv_gain
                 ;
-            sfc_fds_update_volenv_gain(famicom);
-            sfc_fds_update_voltpc(famicom);
+            sfc_fds1_update_volenv_gain(famicom);
+            sfc_fds1_update_voltpc(famicom);
             fds->volenv_clock = fds->volenv_tpc;
             break;
         case 2:
@@ -291,7 +291,7 @@ void sfc_mapper_14_write_low(sfc_famicom_t* famicom, uint16_t address, uint8_t v
                 = (fds->freq & 0xf00)
                 | (uint16_t)value
                 ;
-            sfc_fds_update_freq_gained(fds);
+            sfc_fds1_update_freq_gained(fds);
             break;
         case 3:
             // Frequency high ($4083)
@@ -322,15 +322,15 @@ void sfc_mapper_14_write_low(sfc_famicom_t* famicom, uint16_t address, uint8_t v
                 fds->volenv_clock = fds->volenv_tpc;
                 fds->modenv_clock = fds->modenv_tpc;
             }
-            sfc_fds_update_freq_gained(fds);
+            sfc_fds1_update_freq_gained(fds);
             break;
         case 4:
             // Mod envelope ($4084)
             fds->modenv_4084 = value;
             if (value & SFC_FDS_4084_GainMode)
                 fds->modenv_gain = value & 0x3f;
-            sfc_fds_update_modenv_gain(famicom);
-            sfc_fds_update_modtpc(famicom);
+            sfc_fds1_update_modenv_gain(famicom);
+            sfc_fds1_update_modtpc(famicom);
             fds->modenv_clock = fds->modenv_tpc;
             break;
         case 5:
@@ -365,7 +365,7 @@ void sfc_mapper_14_write_low(sfc_famicom_t* famicom, uint16_t address, uint8_t v
                 fds->modenv_clock = 0;
                 fds->freq_gain = 0;
             }
-            sfc_fds_update_freq_gained(fds);
+            sfc_fds1_update_freq_gained(fds);
             break;
         case 8:
             // Mod table write ($4088)
@@ -395,8 +395,8 @@ void sfc_mapper_14_write_low(sfc_famicom_t* famicom, uint16_t address, uint8_t v
         case 0xa:
             // Envelope speed ($408A)
             fds->masenv_speed = value;
-            sfc_fds_update_voltpc(famicom);
-            sfc_fds_update_modtpc(famicom);
+            sfc_fds1_update_voltpc(famicom);
+            sfc_fds1_update_modtpc(famicom);
             break;
         }
     }
@@ -406,7 +406,7 @@ void sfc_mapper_14_write_low(sfc_famicom_t* famicom, uint16_t address, uint8_t v
 /// SFCs the FDS initialize.
 /// </summary>
 /// <param name="famicom">The famicom.</param>
-void sfc_fds_init(sfc_famicom_t* famicom) {
+void sfc_fds1_init(sfc_famicom_t* famicom) {
     // 主包络速率: $E8
     famicom->apu.fds.masenv_speed = 0xE8;
     // 禁用位为1
@@ -431,7 +431,7 @@ extern inline sfc_ecode sfc_load_mapper_14(sfc_famicom_t* famicom) {
     // FDS 扩展音频
     famicom->rom_info.extra_sound = SFC_NSF_EX_FDS1;
     // 初始化FDS
-    sfc_fds_init(famicom);
+    sfc_fds1_init(famicom);
     return SFC_ERROR_OK;
 }
 
@@ -447,7 +447,7 @@ extern inline sfc_ecode sfc_load_mapper_14(sfc_famicom_t* famicom) {
 /// </summary>
 /// <param name="famicom">The famicom.</param>
 /// <returns></returns>
-uint8_t sfc_fds_get_output_u6(sfc_famicom_t* famicom) {
+uint8_t sfc_fds1_get_output_u6(sfc_famicom_t* famicom) {
     const uint16_t volgain = famicom->apu.fds.volenv_gain_clamped;
     const uint16_t waveout = famicom->apu.fds.waveout;
     const uint16_t masterv = famicom->apu.fds.master_volume;
@@ -461,7 +461,7 @@ uint8_t sfc_fds_get_output_u6(sfc_famicom_t* famicom) {
 /// <param name="famicom">The famicom.</param>
 /// <param name="hold">The hold.</param>
 /// <returns></returns>
-float sfc_fds_get_output(sfc_famicom_t* famicom) {
+float sfc_fds1_get_output(sfc_famicom_t* famicom) {
     const uint16_t volgain = famicom->apu.fds.volenv_gain_clamped;
     const uint16_t waveout = famicom->apu.fds.waveout;
     const uint16_t masterv = famicom->apu.fds.master_volume;
@@ -477,7 +477,7 @@ float sfc_fds_get_output(sfc_famicom_t* famicom) {
 /// </summary>
 /// <param name="famicom">The famicom.</param>
 /// <returns></returns>
-void sfc_fds_per_cpu_clock(sfc_famicom_t* famicom) {
+void sfc_fds1_per_cpu_clock(sfc_famicom_t* famicom) {
     sfc_fds1_data_t* const fds = &famicom->apu.fds;
     // 处理包络
     if (!fds->flags_4083) {
@@ -486,7 +486,7 @@ void sfc_fds_per_cpu_clock(sfc_famicom_t* famicom) {
             if (fds->volenv_clock) --fds->volenv_clock;
             else {
                 fds->volenv_clock = fds->volenv_tpc;
-                sfc_fds_tick_volenv(famicom);
+                sfc_fds1_tick_volenv(famicom);
             }
         }
         // 调制包络
@@ -494,7 +494,7 @@ void sfc_fds_per_cpu_clock(sfc_famicom_t* famicom) {
             if (fds->modenv_clock) --fds->modenv_clock;
             else {
                 fds->modenv_clock = fds->modenv_tpc;
-                sfc_fds_tick_modenv(famicom);
+                sfc_fds1_tick_modenv(famicom);
             }
         }
     }
@@ -503,7 +503,7 @@ void sfc_fds_per_cpu_clock(sfc_famicom_t* famicom) {
         fds->wavout_clock += fds->freq_gained;
         if (fds->wavout_clock >> 16) {
             fds->wavout_clock &= 0xffff;
-            sfc_fds_tick_waveout(famicom);
+            sfc_fds1_tick_waveout(famicom);
         }
     }
     // 处理调制
@@ -511,7 +511,7 @@ void sfc_fds_per_cpu_clock(sfc_famicom_t* famicom) {
         fds->mdunit_clock += fds->mod_freq;
         if (fds->mdunit_clock >> 16) {
             fds->mdunit_clock &= 0xffff;
-            sfc_fds_tick_modunit(famicom);
+            sfc_fds1_tick_modunit(famicom);
         }
     }
 }
@@ -525,7 +525,7 @@ void sfc_fds_per_cpu_clock(sfc_famicom_t* famicom) {
 /// <param name="ctx">The CTX.</param>
 /// <param name="cps">clock per sample</param>
 /// <returns></returns>
-float sfc_fds_per_sample(sfc_famicom_t* famicom, sfc_fds_ctx_t* ctx, float cps) {
+float sfc_fds1_per_sample(sfc_famicom_t* famicom, sfc_fds1_ctx_t* ctx, float cps) {
 #ifdef SFC_FDS_PER_SAMPLE
     sfc_fds1_data_t* const fds = &famicom->apu.fds;
     // 处理包络
@@ -535,7 +535,7 @@ float sfc_fds_per_sample(sfc_famicom_t* famicom, sfc_fds_ctx_t* ctx, float cps) 
             ctx->volenv_clock -= cps;
             while (ctx->volenv_clock <= 0.f) {
                 ctx->volenv_clock += ctx->volenv_tps;
-                sfc_fds_tick_volenv(famicom);
+                sfc_fds1_tick_volenv(famicom);
             }
         }
         // 调制包络
@@ -543,7 +543,7 @@ float sfc_fds_per_sample(sfc_famicom_t* famicom, sfc_fds_ctx_t* ctx, float cps) 
             ctx->modenv_clock -= cps;
             while (ctx->modenv_clock <= 0.f) {
                 ctx->modenv_clock += ctx->modenv_tps;
-                sfc_fds_tick_modenv(famicom);
+                sfc_fds1_tick_modenv(famicom);
             }
         }
     }
@@ -556,8 +556,8 @@ float sfc_fds_per_sample(sfc_famicom_t* famicom, sfc_fds_ctx_t* ctx, float cps) 
         while (ctx->wavout_clock >= (float)0x10000) {
             ctx->wavout_clock -= (float)0x10000;
             ++avgcount;
-            output += sfc_fds_get_output(famicom);
-            sfc_fds_tick_waveout(famicom);
+            output += sfc_fds1_get_output(famicom);
+            sfc_fds1_tick_waveout(famicom);
         }
     }
     // 处理调制
@@ -565,10 +565,10 @@ float sfc_fds_per_sample(sfc_famicom_t* famicom, sfc_fds_ctx_t* ctx, float cps) 
         ctx->mdunit_clock += ctx->mdunit_rate;
         while (ctx->mdunit_clock >= (float)0x10000) {
             ctx->mdunit_clock -= (float)0x10000;
-            sfc_fds_tick_modunit(famicom);
+            sfc_fds1_tick_modunit(famicom);
         }
     }
-    output += sfc_fds_get_output(famicom);
+    output += sfc_fds1_get_output(famicom);
     return output / avgcount;
 #else
     ctx->cycle_remain += cps;
@@ -576,8 +576,8 @@ float sfc_fds_per_sample(sfc_famicom_t* famicom, sfc_fds_ctx_t* ctx, float cps) 
     float count = 0.f;
     while (ctx->cycle_remain >= 1.f) {
         ctx->cycle_remain -= 1.f;
-        sfc_fds_per_cpu_clock(famicom);
-        out += sfc_fds_get_output(famicom);
+        sfc_fds1_per_cpu_clock(famicom);
+        out += sfc_fds1_get_output(famicom);
         count++;
     }
     return out / count;
@@ -591,7 +591,7 @@ float sfc_fds_per_sample(sfc_famicom_t* famicom, sfc_fds_ctx_t* ctx, float cps) 
 /// <param name="famicom">The famicom.</param>
 /// <param name="ctx">The CTX.</param>
 /// <param name="cps">clock per sample</param>
-void sfc_fds_samplemode_begin(sfc_famicom_t* famicom, sfc_fds_ctx_t* ctx, float cps) {
+void sfc_fds1_samplemode_begin(sfc_famicom_t* famicom, sfc_fds1_ctx_t* ctx, float cps) {
 #ifdef SFC_FDS_PER_SAMPLE
     ctx->volenv_clock = (float)famicom->apu.fds.volenv_clock;
     ctx->volenv_tps   = (float)famicom->apu.fds.volenv_tpc;
@@ -611,7 +611,7 @@ void sfc_fds_samplemode_begin(sfc_famicom_t* famicom, sfc_fds_ctx_t* ctx, float 
 /// </summary>
 /// <param name="famicom">The famicom.</param>
 /// <param name="ctx">The CTX.</param>
-void sfc_fds_samplemode_end(sfc_famicom_t* famicom, sfc_fds_ctx_t* ctx) {
+void sfc_fds1_samplemode_end(sfc_famicom_t* famicom, sfc_fds1_ctx_t* ctx) {
 #ifdef SFC_FDS_PER_SAMPLE
     famicom->apu.fds.volenv_clock = (uint32_t)ctx->volenv_clock;
     famicom->apu.fds.modenv_clock = (uint32_t)ctx->modenv_clock;

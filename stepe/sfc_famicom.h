@@ -53,6 +53,16 @@ void sfc_fc_disassembly(
 
 
 /// <summary>
+/// 数据
+/// </summary>
+typedef struct {
+    // 地址
+    void*       address;
+    // 长度
+    uintptr_t   length;
+} sfc_data_set_t;
+
+/// <summary>
 /// StepFC: 扩展接口
 /// </summary>
 typedef struct {
@@ -62,10 +72,10 @@ typedef struct {
     sfc_ecode(*free_rom)(void*, sfc_rom_info_t*);
     // 音频事件
     void(*audio_change)(void*, uint32_t, enum sfc_channel_index);
-    // 保存SRAM 8KB
-    void(*save_sram)(void*, const sfc_rom_info_t*, const uint8_t*, uint32_t);
-    // 读取SRAM 8KB
-    void(*load_sram)(void*, const sfc_rom_info_t*, uint8_t*, uint32_t len);
+    // 保存SRAM
+    void(*save_sram)(void*, const sfc_rom_info_t*, const sfc_data_set_t*, uint32_t);
+    // 读取SRAM
+    void(*load_sram)(void*, const sfc_rom_info_t*, const sfc_data_set_t*, uint32_t);
     // 状态保存 写入流
     void(*sl_write_stream)(void*, const uint8_t*, uint32_t len);
     // 状态读取 读取流

@@ -690,6 +690,7 @@ SFC_FORCEINLINE
 /// <param name="address">The address.</param>
 /// <param name="famicom">The famicom.</param>
 static inline void sfc_operation_BRK(uint16_t address, sfc_famicom_t* famicom, uint32_t* const cycle) {
+    assert(!"BRK Code-00");
     const uint16_t pcp1 = SFC_PC + 1;
     const uint8_t pch = (uint8_t)((pcp1) >> 8);
     const uint8_t pcl = (uint8_t)pcp1;

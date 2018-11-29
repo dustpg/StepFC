@@ -33,7 +33,7 @@ typedef struct {
     // 是否FourScreen
     uint8_t     four_screen;
     // 是否有SRAM(电池供电的) D0, D1为1则为超过8KiB的WRAM
-    uint8_t     save_ram_d1_more8;
+    uint8_t     save_ram_flags;
     // 保留以对齐
     uint8_t     reserved;
     // PAL/NTSC 位
@@ -92,9 +92,12 @@ enum {
     SFC_NES_TRAINER = 0x04,
     SFC_NES_4SCREEN = 0x08,
 
-
-    SFC_ROMINFO_SRAM_HasSRAM  = 1,
-    SFC_ROMINFO_SRAM_More8KiB = 2,
+    // 需要储存进度SRAM-8KiB
+    SFC_ROMINFO_SRAM_HasSRAM  = 0x01,
+    // 该位为真的话, 储存的不是SRAM-8KiB而是扩展区的32KiB
+    SFC_ROMINFO_SRAM_More8KiB = 0x02,
+    // 该位为真的话, 储存SRAM-8KiB外, 还要储存扩展区的偏移8kiB后128字节
+    SFC_ROMINFO_SRAM_M128_Of8 = 0x04,
 };
 
 // ROM control byte #2

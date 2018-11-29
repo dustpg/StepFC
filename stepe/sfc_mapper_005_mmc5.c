@@ -89,6 +89,10 @@ typedef struct {
 } sfc_mapper05_t;
 
 
+#ifndef NDEBUG
+extern uint16_t dbg_scanline = 0;
+#endif
+
 enum {
     SFC_MMC5_RAM_WRITE = 6,
     SFC_MMC5_InFrame = 0x40,
@@ -101,7 +105,7 @@ enum {
 /// <param name="famicom">The famicom.</param>
 /// <returns></returns>
 static inline sfc_mapper05_t* sfc_mapper(sfc_famicom_t* famicom) {
-    return (sfc_mapper05_t*)famicom->mapper_buffer.mapper04;
+    return (sfc_mapper05_t*)famicom->mapper_buffer.mapper05;
 }
 
 #define MAPPER sfc_mapper05_t* const mapper = sfc_mapper(famicom);
@@ -293,11 +297,12 @@ static void sfc_mapper_05_hsync(sfc_famicom_t* famicom, uint16_t value) {
     //    debug_sp16 = sp16;
     //    printf("Sprite 8x16 Mode: O%s\n", sp16 ? "n" : "ff");
     //}
+    dbg_scanline = value;
 #endif
     mapper->irq_status_f = 0;
     mapper->exram_write_mask_ppu = 0x00;
     // 不可见扫描线
-    if (value >= SFC_HEIGHT) return;
+    if (value >= SFC_HEIGHT) return ;
     mapper->irq_status_f = SFC_MMC5_InFrame;
     mapper->exram_write_mask_ppu 
         = sfc_mmc5_ppu_rendering(famicom, value)
@@ -308,12 +313,13 @@ static void sfc_mapper_05_hsync(sfc_famicom_t* famicom, uint16_t value) {
     if (value) {
         if ((uint16_t)mapper->irq_scanline == value) {
             mapper->irq_status_p = SFC_MMC5_IRQPending;
-            if (mapper->irq_enable)
+            if (mapper->irq_enable) 
                 sfc_operation_IRQ_try(famicom);
         }
     }
     // 第一行清除'Pending'
     else mapper->irq_status_p = 0;
+    
 }
 
 
@@ -427,7 +433,7 @@ extern inline sfc_square_set3(sfc_square_data_t* sq, uint8_t value, uint8_t ok);
 /// <param name="famicom">The famicom.</param>
 /// <param name="address">The address.</param>
 /// <param name="value">The value.</param>
-static void sfc_mapper_05_write_low(sfc_famicom_t* famicom, uint16_t address, uint8_t value) {
+extern void sfc_mapper_05_write_low(sfc_famicom_t* famicom, uint16_t address, uint8_t value) {
     MAPPER;
     switch (address)
     {
@@ -515,7 +521,7 @@ static void sfc_mapper_05_write_low(sfc_famicom_t* famicom, uint16_t address, ui
     case 0x5104:
         // Extended RAM mode ($5104)
 #ifndef NDEBUG
-        //printf("[%5d]MMC5: Extended RAM mode ($5104) = %02x\n", famicom->frame_counter, value & 3);
+        printf("[%5d]MMC5: Extended RAM mode ($5104) = %02x\n", famicom->frame_counter, value & 3);
 #endif
         mapper->exram_mode = value & 3;
         mapper->exram_write_mask_mmc5 = 0x00;
@@ -623,16 +629,30 @@ static void sfc_mapper_05_write_low(sfc_famicom_t* famicom, uint16_t address, ui
         // CHR Bankswitching A ($5120-$5137)
         mapper->chrbank_x8[address & 7] = (uint16_t)value | ((uint16_t)mapper->chrbank_hi << 2);
         sfc_mmc5_update_chrbank_x8(famicom);
-        //printf("[%5d]$%04x = %02x\n", famicom->frame_counter, address, value);
+        //if (debug_irq_ed)
+        //    printf(
+        //        "[%5d@%3d]$%04x = %02x\n", 
+        //        famicom->frame_counter, 
+        //        debug_scanline,
+        //        address, value
+        //    );
         break;
     case 0x5128:
     case 0x5129:
     case 0x512A:
     case 0x512B:
         // CHR Bankswitching B ($5128-$513B)
+        // TODO: 实现MMC5'黑科技'
         mapper->chrbank_16[address & 3] = (uint16_t)value | ((uint16_t)mapper->chrbank_hi << 2);
         //sfc_mmc5_update_chrbank_16(famicom);
         //printf("[%5d]$%04x = %02x\n", famicom->frame_counter, address, value);
+        //if (debug_irq_ed)
+        //    printf(
+        //        "[%5d@%3d]$%04x = %02x\n",
+        //        famicom->frame_counter,
+        //        debug_scanline,
+        //        address, value
+        //    );
         break;
     case 0x5130:
         // Upper CHR Bank bits ($5130)
@@ -669,9 +689,6 @@ static void sfc_mapper_05_write_low(sfc_famicom_t* famicom, uint16_t address, ui
         break;
     default:
         if (address >= 0x5C00) {
-
-
-
             // XXX: 写入保护?
             assert(mapper->exram_mode != 3);
             //if (mapper->exram_mode != 3)
@@ -693,7 +710,6 @@ static void sfc_mapper_05_write_low(sfc_famicom_t* famicom, uint16_t address, ui
 /// <param name="address">The address.</param>
 /// <param name="value">The value.</param>
 static void sfc_mapper_05_write_high(sfc_famicom_t* famicom, uint16_t address, uint8_t value) {
-    assert(!"UNTESTED");
     assert(address < 0xe000);
     famicom->prg_banks[address >> 12][address & (uint16_t)0x0fff] = value;
 }
@@ -795,7 +811,7 @@ extern inline sfc_ecode sfc_load_mapper_05(sfc_famicom_t* famicom) {
     MAPPER;
     memset(mapper, 0, MAPPER_05_SIZE_IMPL);
     // 可能超过8KiB的SRAM
-    if (famicom->rom_info.save_ram_d1_more8)
-        famicom->rom_info.save_ram_d1_more8 |= SFC_ROMINFO_SRAM_More8KiB;
+    if (famicom->rom_info.save_ram_flags)
+        famicom->rom_info.save_ram_flags |= SFC_ROMINFO_SRAM_More8KiB;
     return SFC_ERROR_OK;
 }

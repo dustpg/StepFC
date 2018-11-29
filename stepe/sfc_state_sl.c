@@ -100,12 +100,14 @@ static uint32_t sfc_make_offset(sfc_famicom_t* famicom, const uint8_t* ptr) {
     // RAM
     if (ptr >= fc0 && ptr < fc1) {
         const uintptr_t rv = ptr - fc0;
+        // 256 MiB
         assert(rv < 0x10000000);
         return (uint32_t)rv;
     }
     // ROM
     else {
         const uintptr_t rv = ptr - famicom->rom_info.data_prgrom;
+        // 256 MiB
         assert(rv < 0x10000000);
         return (uint32_t)rv | (uint32_t)0x80000000;
     }
@@ -117,7 +119,7 @@ static uint32_t sfc_make_offset(sfc_famicom_t* famicom, const uint8_t* ptr) {
 /// <param name="famicom">The famicom.</param>
 /// <param name="offset">The offset.</param>
 /// <returns></returns>
-static uint8_t* sfc_make_ptr(sfc_famicom_t* famicom, uint32_t offset) {
+static uint8_t* sfc_make_pointer(sfc_famicom_t* famicom, uint32_t offset) {
     // ROM
     if (offset & 0x80000000) return famicom->rom_info.data_prgrom + (offset & 0x7fffffff);
      // RAM
@@ -355,9 +357,9 @@ sfc_ecode sfc_famicom_load_state(sfc_famicom_t* famicom) {
         ram_mask = hb.ram_mask;
         // BANKS 偏移量
         for (int i = 0; i != 10; ++i)
-            famicom->prg_banks[6 + i] = sfc_make_ptr(famicom, hb.cpu_h10_banks_offset[i]);
+            famicom->prg_banks[6 + i] = sfc_make_pointer(famicom, hb.cpu_h10_banks_offset[i]);
         for (int i = 0; i != 16; ++i)
-            famicom->ppu.banks[i] = sfc_make_ptr(famicom, hb.ppu_lo_banks_offset[i]);
+            famicom->ppu.banks[i] = sfc_make_pointer(famicom, hb.ppu_lo_banks_offset[i]);
     }
     {
         // 主RAM
