@@ -146,9 +146,30 @@ void sfc_mmc5_samplemode_end(sfc_famicom_t*, sfc_mmc5_ctx_t*);
 typedef struct {
     float               clock;
     float               subweight;
-    float               count;
 } sfc_n163_ctx_t;
 
-float sfc_n163_per_sample(sfc_famicom_t*, sfc_n163_ctx_t*, float cps);
+float sfc_n163_per_sample(sfc_famicom_t*, sfc_n163_ctx_t*, float cps, uint8_t mode);
 void sfc_n163_samplemode_begin(sfc_famicom_t*, sfc_n163_ctx_t*);
 void sfc_n163_samplemode_end(sfc_famicom_t*, sfc_n163_ctx_t*);
+
+
+
+// -------------------------------------------------------
+//                         FME-7(5B)
+// -------------------------------------------------------
+
+
+typedef struct {
+    struct sfc_fme7_tone_s {
+        float           period;
+        float           clock;
+    }                   ch[3];
+    float               noise_period;
+    float               noise_clock;
+    float               env_period;
+    float               env_clock;
+} sfc_fme7_ctx_t;
+
+float sfc_fme7_per_sample(sfc_famicom_t*, sfc_fme7_ctx_t*, float cps);
+void sfc_fme7_samplemode_begin(sfc_famicom_t*, sfc_fme7_ctx_t*);
+void sfc_fme7_samplemode_end(sfc_famicom_t*, sfc_fme7_ctx_t*);

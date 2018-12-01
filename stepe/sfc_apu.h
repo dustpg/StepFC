@@ -9,7 +9,8 @@
 /// 
 /// </summary>
 enum sfc_channel_index {
-    //SFC_MMC5_FakeFC = -4,
+    // [Sunsoft 5B] FME7
+    SFC_FME7_Sun5B = -5,
     // [N163] N163
     SFC_VRC7_N163 = -4,
     // [VRC7] VRC7
@@ -72,10 +73,12 @@ enum sfc_channel_index {
     SFC_N163_Wavefrom6,
     // [N163] 波形#7
     SFC_N163_Wavefrom7,
-    // [FME7]
-    // [FME7]
-    // [FME7]
-    // [FME7]
+    // [FME7] 声道A
+    SFC_FME7_ChannelA,
+    // [FME7] 声道B
+    SFC_FME7_ChannelB,
+    // [FME7] 声道C
+    SFC_FME7_ChannelC,
     // 总声道数量
     SFC_CHANNEL_COUNT
 } ;
@@ -173,7 +176,7 @@ typedef struct {
 /// <summary>
 /// 三角波寄存器/数据
 /// </summary>
-struct sfc_triangle_data_t {
+typedef struct {
     // 当前周期
     uint16_t        cur_period;
     // 长度计数器
@@ -186,12 +189,12 @@ struct sfc_triangle_data_t {
     uint8_t         flag_reload;
     // 长度计数器/线性计数器暂停值
     uint8_t         flag_halt;
-};
+} sfc_triangle_data_t;
 
 /// <summary>
 /// 
 /// </summary>
-struct sfc_noise_data_t {
+typedef struct  {
     // 包络
     sfc_envelope_t  envelope;
     // 线性反馈移位寄存器(暂时没用到)
@@ -200,12 +203,13 @@ struct sfc_noise_data_t {
     uint8_t         length_counter;
     // 短模式[D7] 周期索引[D0-D3]
     uint8_t         short_mode__period_index;
-};
+
+} sfc_noise_data_t;
 
 /// <summary>
 /// 
 /// </summary>
-struct sfc_dmc_data_t {
+typedef struct {
     // 原始地址
     uint16_t        orgaddr;
     // 当前地址
@@ -226,7 +230,8 @@ struct sfc_dmc_data_t {
     uint8_t         count;
     // 字节数据
     uint8_t         data;
-};
+
+} sfc_dmc_data_t;
 
 
 /// <summary>
@@ -496,7 +501,7 @@ typedef struct {
 /// </summary>
 typedef struct {
     // N163 周期计数器(0~15)
-    uint16_t    n163_clock;
+    uint8_t     n163_clock;
     // N163 当前声道
     uint8_t     n163_current;
     // N163 声道数量
@@ -509,46 +514,101 @@ typedef struct {
     uint8_t     n163_addr;
     // 地址递增
     uint8_t     n163_inc;
+    // 历史输出位置
+    uint16_t    history_index;
     // 当前输出
     int8_t      ch_output[8];
+    // 历史输出
+    int8_t      history_output[8];
 } sfc_n163_data_t;
 
 
+/// <summary>
+/// Sunsoft 5B 声道
+/// </summary>
+typedef struct {
+    // 时钟
+    uint16_t        clock;
+    // 周期
+    uint16_t        period;
+    // 音量
+    uint16_t        volume;
+    // 噪声
+    uint8_t         tone;
+    // 噪声
+    uint8_t         noise;
+    // 禁用
+    uint8_t         disable;
+    // 包络
+    uint8_t         env;
+    // 方波值
+    uint8_t         square;
+    // 不同声道使用不同
+    union {
+        // [0]    寄存器选择
+        uint8_t     a0_reg_select;
+    }               ;
+} sfc_sunsoft5b_ch_t;
+
+typedef struct {
+    // 线性反馈移位寄存器
+    uint32_t            lfsr;
+    // 声道
+    sfc_sunsoft5b_ch_t  ch[3];
+    // 包络时钟
+    uint16_t            env_clock;
+    // 包络周期
+    uint16_t            env_period;
+    // 包络音量
+    uint16_t            env_volume;
+    // 噪声时钟
+    uint16_t            noise_clock;
+    // 噪声周期
+    uint8_t             noise_period;
+    // 包络形状
+    uint8_t             evn_shape;
+    // 包络索引
+    uint8_t             evn_index;
+    // 包络重复
+    uint8_t             evn_repeat;
+} sfc_fme7_data_t;
 
 /// <summary>
 /// APU寄存器数据
 /// </summary>
 typedef struct {
     // 方波 #1
-    sfc_square_data_t           square1;
+    sfc_square_data_t       square1;
     // 方波 #2
-    sfc_square_data_t           square2;
+    sfc_square_data_t       square2;
     // 三角波
-    struct sfc_triangle_data_t  triangle;
+    sfc_triangle_data_t     triangle;
     // 噪声
-    struct sfc_noise_data_t     noise;
+    sfc_noise_data_t        noise;
     // DMC
-    struct sfc_dmc_data_t       dmc;
+    sfc_dmc_data_t          dmc;
     // VRC6
-    sfc_vrc6_data_t             vrc6;
+    sfc_vrc6_data_t         vrc6;
     // VRC7
-    sfc_vrc7_data_t             vrc7;
+    sfc_vrc7_data_t         vrc7;
     // FDS1
-    sfc_fds1_data_t             fds;
+    sfc_fds1_data_t         fds;
     // MMC5
-    sfc_mmc5_data_t             mmc5;
+    sfc_mmc5_data_t         mmc5;
     // N163
-    sfc_n163_data_t             n163;
+    sfc_n163_data_t         n163;
+    // FME7
+    sfc_fme7_data_t         fme7;
     // 状态寄存器(写: 声道使能)
-    uint8_t                     status_write;
+    uint8_t                 status_write;
     // 状态寄存器(读:)
-    //uint8_t                     status_read;
-    // 帧计数器写入寄存器
-    uint8_t                     frame_counter;
+    //uint8_t                 status_read;
+    // 帧计数器(序列器)写入寄存器
+    uint8_t                 frame_counter;
     // 帧中断标志
-    uint8_t                     frame_interrupt;
+    uint8_t                 frame_interrupt;
     // 步数计数
-    uint8_t                     frame_step;
+    uint8_t                 frame_step;
 
 } sfc_apu_register_t;
 
@@ -566,14 +626,25 @@ void sfc_trigger_frame_counter(sfc_famicom_t*);
 
 // LFSR 长模式
 static inline uint16_t sfc_lfsr_long(uint16_t v) {
-    const uint16_t a = v & 1;
-    const uint16_t b = (v >> 1) & 1;
-    return (uint16_t)(v >> 1) | (uint16_t)((a ^ b) << 14);
+    const uint16_t bit = ((v >> 0) ^ (v >> 1)) & 1;
+    return (uint16_t)(v >> 1) | (uint16_t)(bit << 14);
 }
 
 // LFSR 短模式
 static inline uint16_t sfc_lfsr_short(uint16_t v) {
-    const uint16_t a = v & 1;
-    const uint16_t b = (v >> 6) & 1;
-    return (uint16_t)(v >> 1) | (uint16_t)((a ^ b) << 14);
+    const uint16_t bit = ((v >> 0) ^ (v >> 6)) & 1;
+    return (uint16_t)(v >> 1) | (uint16_t)(bit << 14);
+}
+
+
+// LFSR FME7模式 - Galois LFSR
+static inline uint32_t sfc_lfsr_fme7(uint32_t v) {
+    // D16 D13
+    const uint32_t bit = v & 1; v >>= 1;
+    // 实现1
+    //if (bit) v ^= (uint32_t)0x12000;
+    // 实现2
+    const uint32_t mask = (uint32_t)(-(int32_t)bit);
+    v ^= mask & (uint32_t)0x12000;
+    return v;
 }

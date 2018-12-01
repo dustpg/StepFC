@@ -25,6 +25,8 @@ extern inline sfc_ecode sfc_load_mapper_18(sfc_famicom_t* famicom);
 extern inline sfc_ecode sfc_load_mapper_1A(sfc_famicom_t* famicom);
 // mapper031 - NSF 子集
 extern inline sfc_ecode sfc_load_mapper_1F(sfc_famicom_t* famicom);
+// mapper069 - FME-7
+extern inline sfc_ecode sfc_load_mapper_45(sfc_famicom_t* famicom);
 // mapper074 - MMC3 魔改
 extern inline sfc_ecode sfc_load_mapper_4A(sfc_famicom_t* famicom);
 // mapper085 - VRC7
@@ -126,6 +128,7 @@ extern sfc_ecode sfc_load_mapper(sfc_famicom_t* famicom, uint8_t id) {
         SFC_CASE_LOAD_MAPPER(13);
         SFC_CASE_LOAD_MAPPER(1A);
         SFC_CASE_LOAD_MAPPER(1F);
+        SFC_CASE_LOAD_MAPPER(45);
         SFC_CASE_LOAD_MAPPER(4A);
         SFC_CASE_LOAD_MAPPER(55);
     }

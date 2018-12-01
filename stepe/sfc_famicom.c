@@ -22,6 +22,9 @@ typedef void(*sfc_funcptr_t)();
 
 // VRC7 初始化 LUT
 extern void sfc_vrc7_init_lut(void);
+// FME7 初始化 LUT
+extern void sfc_fme7_init_lut(void);
+
 
 /// <summary>
 /// StepFC: 初始化famicom
@@ -39,6 +42,8 @@ sfc_ecode sfc_famicom_init(
     memset(famicom, 0, sizeof(sfc_famicom_t));
     // 生成VRC7用LUT
     sfc_vrc7_init_lut();
+    // 生成FME7用LUT
+    sfc_fme7_init_lut();
     // 保留参数
     famicom->argument = argument;
     // 载入默认接口

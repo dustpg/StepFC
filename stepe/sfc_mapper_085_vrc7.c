@@ -291,6 +291,7 @@ void sfc_mapper_55_write_high(sfc_famicom_t* famicom, uint16_t address, uint8_t 
     case 0xa:
     case 0xb:
         // CHR Select 0…7 ($A000…$DFFF)
+        // TODO: 非二次幂的情况
         banks = (famicom->rom_info.size_chrrom >> 10) - 1;
         sfc_load_chrrom_1k(famicom, base - 4, value & banks);
         break;

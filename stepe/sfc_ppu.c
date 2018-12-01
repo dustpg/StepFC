@@ -55,6 +55,7 @@ void sfc_write_ppu_address(uint16_t address, uint8_t data, sfc_ppu_t* ppu) {
         //    printf("[%3d]$%04x = $%02x\n", dbg_scanline, real_address, data);
         //if (dbg_scanline >= 240) return;
 
+
         // 独立地址
         if (real_address & (uint16_t)0x03) {
             ppu->data.spindexes[real_address & (uint16_t)0x1f] = data;

@@ -109,7 +109,7 @@ uint8_t sfc_read_cpu_address(uint16_t address, sfc_famicom_t* famicom) {
 #endif
     case 3:
         // 高三位为3, [$6000, $8000): 存档 SRAM区
-        //printf("$%04X[$%02X]\n", address, famicom->save_memory[address & (uint16_t)0x1fff]);
+        //printf("$%04X[$%02X]\n", address, famicom->prg_banks[address >> 12][address & (uint16_t)0x0fff]);
         //return famicom->save_memory[address & (uint16_t)0x1fff];
     case 4: case 5: case 6: case 7:
         // 高一位为1, [$8000, $10000) 程序PRG-ROM区

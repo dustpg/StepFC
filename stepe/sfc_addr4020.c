@@ -605,4 +605,6 @@ void sfc_apu_on_reset(sfc_apu_register_t* apu) {
     // 噪音的LFSR 初始化为1
     apu->noise.lfsr = 1;
     apu->dmc.period = SFC_DMC_PERIOD_LIST_NP[0];
+    // FME-7 噪音的LFSR 初始化为1
+    apu->fme7.lfsr = 1;
 }

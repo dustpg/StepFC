@@ -81,7 +81,8 @@ extern sfc_ecode sfc_mapper_1F_reset(sfc_famicom_t* famicom) {
         // 将BANK3-WRAM使用扩展RAM代替
         famicom->prg_banks[6] = famicom->expansion_ram32 + 4 * 1024 * 0;
         famicom->prg_banks[7] = famicom->expansion_ram32 + 4 * 1024 * 4;
-
+        // N163: 副权重
+        famicom->apu.n163.subweight_div16 = 6 * 16;
     }
     // Mapper-031
     else {

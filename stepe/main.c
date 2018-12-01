@@ -71,7 +71,7 @@ struct interface_audio_state {
     sfc_triangle_channel_state_t    triangle;
     sfc_noise_channel_state_t       noise;
 
-    struct sfc_dmc_data_t           dmc;
+    sfc_dmc_data_t           dmc;
 
     uint16_t                        lfsr;
     uint8_t                         square1_seq_index;
@@ -93,6 +93,7 @@ struct interface_audio_state {
     float vrc6_saw__cycle       ;
 
     float                           vrc7_index;
+    float                           max_vol;
 } g_states;
 
 
@@ -274,12 +275,14 @@ static void make_samples(const uint32_t begin, const uint32_t end) {
 
     const float dmc_p = g_states.dmc.period;
 
-    sfc_fds1_ctx_t fds_ctx;
+    sfc_fds1_ctx_t fds1_ctx;
     sfc_mmc5_ctx_t mmc5_ctx;
     sfc_n163_ctx_t n163_ctx;
-    sfc_fds1_samplemode_begin(g_famicom, &fds_ctx, cpu_cycle_per_sample);
+    sfc_fme7_ctx_t fme7_ctx;
+    sfc_fds1_samplemode_begin(g_famicom, &fds1_ctx, cpu_cycle_per_sample);
     sfc_mmc5_samplemode_begin(g_famicom, &mmc5_ctx);
     sfc_n163_samplemode_begin(g_famicom, &n163_ctx);
+    sfc_fme7_samplemode_begin(g_famicom, &fme7_ctx);
 
     for (uint32_t i = begin; i != end; ++i) {
         // 方波#1, APU频率驱动
@@ -440,7 +443,7 @@ static void make_samples(const uint32_t begin, const uint32_t end) {
         }
         // FDS
         if (g_famicom->rom_info.extra_sound & SFC_NSF_EX_FDS1) {
-            float out = sfc_fds1_per_sample(g_famicom, &fds_ctx, cpu_cycle_per_sample);
+            float out = sfc_fds1_per_sample(g_famicom, &fds1_ctx, cpu_cycle_per_sample);
             //void debug_putaudio(float);
             //debug_putaudio(out);
             out = sfc_filter_rclp(&g_states.fds_lp2k, out * 1.41f);
@@ -456,21 +459,26 @@ static void make_samples(const uint32_t begin, const uint32_t end) {
         }
         // N163
         if (g_famicom->rom_info.extra_sound & SFC_NSF_EX_N163) {
-            const auto out = sfc_n163_per_sample(g_famicom, &n163_ctx, cpu_cycle_per_sample);
-            output += out * (0.00752f * 0.33f * n163_ctx.subweight / n163_ctx.count);
+            // 3声道模式
+            const float out = sfc_n163_per_sample(g_famicom, &n163_ctx, cpu_cycle_per_sample, 3);
+            output += out * (0.00752f / 16.f) * n163_ctx.subweight;
         }
+        // FME7
+        if (g_famicom->rom_info.extra_sound & SFC_NSF_EX_FME7) {
+            const float out = sfc_fme7_per_sample(g_famicom, &fme7_ctx, cpu_cycle_per_sample);
+            output = out;
+        }
+        if (output > g_states.max_vol) g_states.max_vol = output;
 
-        static float max_vol = 1.0f;
-        if (output > max_vol) max_vol = output;
-
-        buffer[i] = output / max_vol
+        buffer[i] = output / g_states.max_vol
             //* 2.f
             ;
     }
     // 
-    sfc_fds1_samplemode_end(g_famicom, &fds_ctx);
+    sfc_fds1_samplemode_end(g_famicom, &fds1_ctx);
     sfc_mmc5_samplemode_end(g_famicom, &mmc5_ctx);
     sfc_n163_samplemode_end(g_famicom, &n163_ctx);
+    sfc_fme7_samplemode_end(g_famicom, &fme7_ctx);
 }
 
 
@@ -798,6 +806,8 @@ void init_global() {
     g_states.lfsr = 1;
 
     g_states.dmc.period = 500;
+
+    g_states.max_vol = 1.f;
 }
 
 
@@ -813,7 +823,7 @@ void get_cso_file_path(char path_input[PATH_BUFLEN]) {
     // 上次输入的东西?
     FILE* const last_input_file = fopen("last_input.ini", "rb");
     if (last_input_file) {
-        const auto len = fread(path_input, 1, PATH_BUFLEN-1, last_input_file);
+        const size_t len = fread(path_input, 1, PATH_BUFLEN-1, last_input_file);
         path_input[len] = 0;
         fclose(last_input_file);
         printf("Last path: [%s], enter 'N' to rewrite, other to skip\n", path_input);
@@ -843,6 +853,8 @@ void get_cso_file_path(char path_input[PATH_BUFLEN]) {
 
 sfc_ecode this_load_rom(void* arg, sfc_rom_info_t* info);
 sfc_ecode this_free_rom(void* arg, sfc_rom_info_t* info);
+
+
 
 /// <summary>
 /// 应用程序入口
@@ -902,16 +914,6 @@ int main() {
 }
 
 
-/// <summary>
-/// Users the input.
-/// </summary>
-/// <param name="index">The index.</param>
-/// <param name="data">The data.</param>
-void user_input(int index, unsigned char data) {
-    assert(index >= 0 && index < 16);
-    if (IB_IS_REPLAY) return;
-    g_famicom->button_states[index] = data;
-}
 
 /// <summary>
 /// 接口: 写入流
@@ -1133,17 +1135,30 @@ sfc_ecode this_free_rom(void* arg, sfc_rom_info_t* info) {
     return SFC_ERROR_OK;
 }
 
+int g_debug_line = 0;
+int g_debug_return = 1;
+
+
+/// <summary>
+/// Users the input.
+/// </summary>
+/// <param name="index">The index.</param>
+/// <param name="data">The data.</param>
+void user_input(int index, unsigned char data) {
+    assert(index >= 0 && index < 16);
+    if (IB_IS_REPLAY) return;
+    g_famicom->button_states[index] = data;
+}
 
 void sfc_before_execute(void* ctx, sfc_famicom_t* famicom) {
-    static int line = 0;
-    line++;
-    if (line < 100 || 1) return;
+    g_debug_line++;
+    if (g_debug_line < 0x77f70 || g_debug_return) return;
     char buf[SFC_DISASSEMBLY_BUF_LEN2];
     const uint16_t pc = famicom->registers.program_counter;
     sfc_fc_disassembly(pc, famicom, buf);
     printf(
         "%4d - %s   A:%02X X:%02X Y:%02X P:%02X SP:%02X\n",
-        line, buf,
+        g_debug_line, buf,
         (int)famicom->registers.accumulator,
         (int)famicom->registers.x_index,
         (int)famicom->registers.y_index,

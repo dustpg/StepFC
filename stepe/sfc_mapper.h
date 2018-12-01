@@ -11,6 +11,7 @@ enum {
     SFC_MAPPER_05_SIZE = 64,
     SFC_MAPPER_13_SIZE = 4,
     SFC_MAPPER_18_SIZE = 16,
+    SFC_MAPPER_45_SIZE = 4,
     SFC_MAPPER_55_SIZE = 4,
 };
 
@@ -28,6 +29,8 @@ typedef union {
     uint8_t         mapper13[SFC_MAPPER_13_SIZE];
     // Mapper 18
     uint8_t         mapper18[SFC_MAPPER_18_SIZE];
+    // Mapper 45
+    uint8_t         mapper45[SFC_MAPPER_45_SIZE];
     // Mapper 55
     uint8_t         mapper55[SFC_MAPPER_55_SIZE];
 

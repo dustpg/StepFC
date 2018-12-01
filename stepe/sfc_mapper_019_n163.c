@@ -213,6 +213,7 @@ static void sfc_mapper_13_write_high(sfc_famicom_t* famicom, uint16_t address, u
 static void sfc_mapper_13_hsync(sfc_famicom_t* famicom, uint16_t value) {
     MAPPER;
     if (mapper->irq_enable && !(mapper->irq_counter & 0x8000)) {
+        // 每根扫描线可以视为113.66周期
         const uint16_t count = (value % 3) ? 114 : 113;
         mapper->irq_counter += count;
         if (mapper->irq_counter & 0x8000) {
@@ -270,12 +271,12 @@ static sfc_ecode sfc_mapper_13_reset(sfc_famicom_t* famicom) {
     famicom->apu.n163.n163_current = 0;
     famicom->apu.n163.n163_count = 1;
     famicom->apu.n163.n163_lowest_id = 7;
-    famicom->apu.n163.subweight_div16 = 16;
+    // TODO: Submapper处理副权重
+    famicom->apu.n163.subweight_div16 = 6 * 16;
 
     for (int i = 0; i != 8; ++i)
         sfc_load_chrrom_1k(famicom, i, i);
 
-    // TODO: Submapper处理副权重
     return SFC_ERROR_OK;
 }
 
@@ -348,6 +349,7 @@ extern inline sfc_ecode sfc_load_mapper_13(sfc_famicom_t* famicom) {
 //                                N163
 // ----------------------------------------------------------------------------
 
+#include "sfc_play.h"
 
 enum {
     //SFC_N163_LowFrequency = 0,
@@ -414,6 +416,9 @@ void sfc_n163_update_ch(sfc_famicom_t* famicom, uint8_t ch) {
     const int8_t sample = sfc_n163_sample(famicom, ((phase >> 16) + offset) & 0xFF);
     const int8_t output = (sample - 8) * volume;
     famicom->apu.n163.ch_output[ch] = output;
+    // 载入历史
+    famicom->apu.n163.history_output[famicom->apu.n163.history_index++] = output;
+    famicom->apu.n163.history_index &= 7;
     // 写回相位
     chn[SFC_N163_7D] = (phase >> 16) & 0xff;
     chn[SFC_N163_7B] = (phase >> 8) & 0xff;
@@ -431,4 +436,49 @@ extern void sfc_n163_update(sfc_famicom_t* famicom) {
     if (famicom->apu.n163.n163_current < famicom->apu.n163.n163_lowest_id)
         famicom->apu.n163.n163_current = 7;
     sfc_n163_update_ch(famicom, famicom->apu.n163.n163_current);
+}
+
+
+/// <summary>
+/// SFCs the N163 per sample.
+/// </summary>
+/// <param name="famicom">The famicom.</param>
+/// <param name="ctx">The CTX.</param>
+/// <param name="cps">The CPS.</param>
+/// <param name="mode">The mode.</param>
+/// <returns></returns>
+float sfc_n163_per_sample(sfc_famicom_t * famicom, sfc_n163_ctx_t * ctx, float cps, uint8_t mode) {
+    ctx->clock += cps;
+    while (ctx->clock >= 15.f) {
+        ctx->clock -= 15.f;
+        sfc_n163_update(famicom);
+    }
+
+    int16_t output = 0;
+    const uint8_t start_index = famicom->apu.n163.history_index - mode;
+    for (uint8_t i = 0; i != mode; ++i) {
+        const uint8_t now_index = (start_index + i) & 7;
+        output += famicom->apu.n163.history_output[now_index];
+    }
+    return (float)output / (float)mode;
+}
+
+
+/// <summary>
+/// SFCs the MMC5 samplemode begin.
+/// </summary>
+/// <param name="famicom">The famicom.</param>
+/// <param name="ctx">The CTX.</param>
+void sfc_n163_samplemode_begin(sfc_famicom_t* famicom, sfc_n163_ctx_t* ctx) {
+    ctx->clock = (float)famicom->apu.n163.n163_clock;
+    ctx->subweight = (float)famicom->apu.n163.subweight_div16 / 16.f;
+}
+
+/// <summary>
+/// SFCs the N163 samplemode end.
+/// </summary>
+/// <param name="famicom">The famicom.</param>
+/// <param name="ctx">The CTX.</param>
+void sfc_n163_samplemode_end(sfc_famicom_t* famicom, sfc_n163_ctx_t* ctx) {
+    famicom->apu.n163.n163_clock = (uint8_t)ctx->clock;
 }
