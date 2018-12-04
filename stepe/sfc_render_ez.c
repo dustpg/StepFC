@@ -949,10 +949,6 @@ void sfc_render_frame_easy(sfc_famicom_t* famicom, uint8_t* buffer) {
     }
     // 结束
     famicom->ppu.data.status = 0;
-    // 垂直空白结束
-    if (famicom->ppu.data.mask & (uint8_t)SFC_PPU2001_Back) {
-        sfc_ppu_do_end_of_vblank(&famicom->ppu);
-    }
     // 第4次触发
     sfc_trigger_frame_counter(famicom);
 
@@ -972,6 +968,11 @@ void sfc_render_frame_easy(sfc_famicom_t* famicom, uint8_t* buffer) {
 
         // 水平同步
         famicom->mapper.hsync(famicom, vblank_line + 1 + SCAN_LINE_COUNT);
+    }
+
+    // 垂直空白结束
+    if (famicom->ppu.data.mask & (uint8_t)SFC_PPU2001_Back) {
+        sfc_ppu_do_end_of_vblank(&famicom->ppu);
     }
 
     // 重置计数器(32位整数太短了)
