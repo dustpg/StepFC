@@ -4,7 +4,7 @@
 
 之所以将游戏名称作为小标题, 自然是说到可乐妹的VRC7, 就不得不说'[拉格朗日点](http://bootgod.dyndns.org:7777/profile.php?id=3643)'了, 因为这是一款唯一使用了VRC7的游戏. 被不少人冠上'FC最强音乐'的帽子.
 
- 当然实际上还有一款'[兔宝宝历险记2](http://bootgod.dyndns.org:7777/profile.php?id=3834)(日版)'也使用了VRC7, 不过'兔宝宝历险记2'没有使用到VRC7的扩展音频(实体卡带比前者小了不少, 可以看作前者使用了VRC7a, 后者使用了VRC7b). 
+ 当然实际上还有一款'[兔宝宝历险记2](http://bootgod.dyndns.org:7777/profile.php?id=3834)(日版)'也使用了VRC7, 不过'兔宝宝历险记2'没有使用到VRC7的扩展音源(实体卡带比前者小了不少, 可以看作前者使用了VRC7a, 后者使用了VRC7b). 
 
 
 ### BANK
@@ -119,9 +119,9 @@ $F008, $F010:  IRQ Acknowledge
 根本原因还是IRQ实现有问题(废话), APU禁用IRQ后依然触发了已经挂起的IRQ. 目前先将挂起的IRQ清除掉, 以后好好研究一下IRQ.
 
 
-### VRC7 扩展音频
+### VRC7 扩展音源
 
-VRC7拥有6个FM合成音频声道, 实现了Yamaha YM2413 OPLL的一个功能子集(阉割版). 似乎叫做'Yamaha DS1001', 下面为了方便描述, VRC7与'Yamaha DS1001'在描述上等价.
+VRC7拥有6个FM合成音源声道, 实现了Yamaha YM2413 OPLL的一个功能子集(阉割版). 似乎叫做'Yamaha DS1001', 下面为了方便描述, VRC7与'Yamaha DS1001'在描述上等价.
 
 前面有一个寄存器```Mirroring Control ($E000)```, 其中```Silence```位为1的话, 会让VRC7部分静音并清空相关数据状态.
 

@@ -73,7 +73,7 @@ typedef struct {
     uint16_t    play_speed__pal_le;
     // PAL/NTSC 位
     uint8_t     pal_ntsc_bits;
-    // 扩展音频 位
+    // 扩展音源 位
     uint8_t     extra_sound;
     // 扩展位
     uint8_t     expansion[4];
@@ -282,6 +282,7 @@ famicom->bus_memory[0x105] = (uint8_t)(loop_point >> 8);
 ```
 
 ### 帧内处理
+
 之前实现的'ez'模式是处理视频+音频的, 这里只有音频所以可以适当简化, 一般来说, 同步点就是垂直空白触发的NMI. 一般地, 程序会利用垂直同步播放音频保证同步. 而NSF播放'感觉'不用太精确:
 
 ```
@@ -358,7 +359,7 @@ extern sfc_ecode sfc_mapper_1F_reset(sfc_famicom_t* famicom) {
 
 .
 
-通过wiki, 我们知道NSF自然是可以使用扩展音频的, 这不奇怪. 但是**NSF允许混用不同的扩展音频**! 例如```2A03+VRC6+FDS+MMC5+FME7```, 所以, 好戏才刚刚开始呢!
+通过wiki, 我们知道NSF自然是可以使用扩展音源的, 这不奇怪. 但是**NSF允许混用不同的扩展音源**! 例如```2A03+VRC6+FDS+MMC5+FME7```, 所以, 好戏才刚刚开始呢!
 
 ### REF 
 

@@ -6,7 +6,7 @@
  - VRC6a(Mapper-024), 用于[恶魔城传说(恶魔城3)](http://bootgod.dyndns.org:7777/profile.php?id=3316)
  - VRC6b(Mapper-026), 用于[魍魎戦記MADARA, Esper Dream II](http://bootgod.dyndns.org:7777/search.php?keywords=26&kwtype=pcb)
 
-当然所述为日版(FC), NES版由于老任的策略不能使用自己搭载扩展音频的卡带. 
+当然所述为日版(FC), NES版由于老任的策略不能使用自己搭载扩展音源的卡带. 
 
 
 ### BANK

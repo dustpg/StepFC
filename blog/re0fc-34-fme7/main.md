@@ -2,7 +2,7 @@
 
 本文githubg[备份地址](https://github.com/dustpg/BlogFM/issues/48)
 
-其实FME-7并不是NSF扩展音频所支持的芯片名称, 而是其变种——Sunsoft 5B. Sunsoft FMT-7, 5A以及5B共用一个Mapper编号——69. 由于格式原因, 程序中FME7代指Mapper069, 包括(甚至特指)Sunsoft 5B, 但是其实FME7是5B的子集.
+其实FME-7并不是NSF扩展音源所支持的芯片名称, 而是其变种——Sunsoft 5B. Sunsoft FMT-7, 5A以及5B共用一个Mapper编号——69. 由于格式原因, 程序中FME7代指Mapper069, 包括(甚至特指)Sunsoft 5B, 但是其实FME7是5B的子集.
 
 
 ### Sun电子
@@ -14,7 +14,7 @@ Sun电子在FC时代出了很多不错的作品, 但其实在这里都不重要,
 
 ### 吉米克!
 
-《[Gimmick!](http://bootgod.dyndns.org:7777/profile.php?id=2695)》, 感觉和 *拉格朗日点* 很相似——唯一一个使用了独立扩展音频的游戏, 一个是VRC7, 一个是5B.
+《[Gimmick!](http://bootgod.dyndns.org:7777/profile.php?id=2695)》, 感觉和 *拉格朗日点* 很相似——唯一一个使用了独立扩展音源的游戏, 一个是VRC7, 一个是5B.
 
 但是其实 *吉米克!* 也没有完全了利用5B的机能——没有使用到噪音发生器和包络发生器.
 
@@ -149,7 +149,7 @@ Sun电子出品的《蝙蝠侠》难度比较高, 反正小时候没通关就是
 
 
 
-### 5B扩展音频
+### 5B扩展音源
 
 FME7写入高地址有两个空缺的位置, 就是为音频准备的. 硬件方面是Yamaha YM2149F(出现了, 又是雅马哈)的一种.
 
