@@ -217,11 +217,11 @@ static void sfc_mapper_55_mirroring(sfc_famicom_t* famicom, uint8_t value) {
 
     0: 2(SFC_NT_MIR_Vertical)
     1: 3(SFC_NT_MIR_Horizontal)
-    2: 1(SFC_NT_MIR_SingleLow)
-    3: 2(SFC_NT_MIR_SingleHigh)
+    2: 0(SFC_NT_MIR_SingleLow)
+    3: 1(SFC_NT_MIR_SingleHigh)
     */
 
-    const sfc_nametable_mirroring_mode mode = ((value & 2) ^ 2) | (value & 1);
+    const sfc_nametable_mirroring_mode mode = (value & 3) ^ 2;
     sfc_switch_nametable_mirroring(famicom, mode);
 
 
@@ -935,7 +935,7 @@ static inline uint32_t sfc_vrc7_modulator_adj(sfc_famicom_t* famicom, sfc_vrc7_c
 /// StepFC: VRC7 每周期(49716Hz)
 /// </summary>
 /// <param name="famicom">The famicom.</param>
-int32_t sfc_vrc7_49716hz(sfc_famicom_t* famicom) {
+void sfc_vrc7_49716hz(sfc_famicom_t* famicom, int32_t output[]) {
     sfc_vrc7_data_t* const vrc7 = &famicom->apu.vrc7;
     // 计算AM/FM
     /*
@@ -953,16 +953,17 @@ int32_t sfc_vrc7_49716hz(sfc_famicom_t* famicom) {
     vrc7->fm_phase += 105;
     vrc7->fm_output = sfc_vrc7_fm_calc(vrc7->fm_phase);
 
-    int32_t output = 0;
+    //int32_t output = 0;
     // 处理所有声道
     for (int i = 0; i != 6; ++i) {
         sfc_vrc7_ch_t* const ch = vrc7->ch + i;
         const uint32_t ma = sfc_vrc7_modulator_adj(famicom, ch);
         const uint32_t mo = sfc_vrc7_operator_ouput(famicom, ch, &ch->modulator, ma, 0);
         const  int32_t co = sfc_vrc7_operator_ouput(famicom, ch, &ch->carrier, mo, 1);
-        output += co;
+        //output += co;
+        output[i] = co;
     }
-    return output;
+    //return output;
 }
 
 
@@ -971,3 +972,38 @@ int32_t sfc_vrc7_49716hz(sfc_famicom_t* famicom) {
 //                   VRC7 Float Mode
 // -----------------------------------------------------
 
+
+
+// -----------------------------------------------------
+//                   VRC7 Play
+// -----------------------------------------------------
+
+#include "sfc_play.h"
+
+enum { VRC7_CPUCYCLE_PER_VRC7 = SFC_FIXED(36) };
+
+/// <summary>
+/// StepFC: VRC7 整型采样模式 - 开始
+/// </summary>
+/// <param name="famicom">The famicom.</param>
+/// <param name="ctx">The CTX.</param>
+/// <param name="chw">The CHW.</param>
+/// <param name="cps">The CPS.</param>
+void sfc_vrc7_smi_sample(sfc_famicom_t* famicom, sfc_vrc7_smi_ctx_t* ctx, const float chw[], sfc_fixed_t cps) {
+    int32_t vrc7_output[6];
+
+    // 36CPU周期
+    ctx->clock += cps;
+    while (ctx->clock >= VRC7_CPUCYCLE_PER_VRC7) {
+        ctx->clock -= VRC7_CPUCYCLE_PER_VRC7;
+        sfc_vrc7_49716hz(famicom, vrc7_output);
+    }
+    // TODO: 弃值
+    ctx->mixed = 0.f;
+    for (int i = 0; i != 6; ++i) {
+        const double v = (double)vrc7_output[i] / (double)(1 << 23);
+        const float chv = (float)v * chw[i];
+        ctx->output[i] = chv;
+        ctx->mixed += chv;
+    }
+}

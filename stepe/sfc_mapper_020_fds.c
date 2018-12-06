@@ -8,6 +8,7 @@
 #include <stdio.h>
 #endif
 
+// 内部处理模式(由于调制可能存在样本内部误差)
 #define SFC_FDS_PER_SAMPLE
 
 // ------------------------------- MAPPER 020 FDS
@@ -26,7 +27,7 @@ static const int8_t sfc_modtbl_lut[] = {
         6 = %110 --> -2
         7 = %111 --> -1
 */
-    0, 2, 4, 8, 0, -8, -4, -2
+    0, 2, 4, 8, 1, -8, -4, -2
 };
 
 /// <summary>
@@ -220,11 +221,11 @@ void sfc_fds1_tick_waveout(sfc_famicom_t* famicom) {
 void sfc_fds1_tick_modunit(sfc_famicom_t* famicom) {
     assert(famicom->apu.fds.mod_enabled);
     const uint8_t* const table = sfc_get_fds1_modtbl(famicom);
-    const int8_t value = table[famicom->apu.fds.modtbl_index++];
     sfc_fds1_data_t* const fds = &famicom->apu.fds;
+    const int8_t value = table[famicom->apu.fds.modtbl_index++];
     fds->modtbl_index &= 0x3f;
-    fds->mod_counter_x2 += value;
-
+    if (value & 1) fds->mod_counter_x2 = 0;
+    else  fds->mod_counter_x2 += value;
     fds->freq_gain = sfc_fds1_get_mod_pitch_gain(
         fds->freq,
         fds->mod_counter_x2 / 2,
@@ -362,7 +363,7 @@ void sfc_mapper_14_write_low(sfc_famicom_t* famicom, uint16_t address, uint8_t v
             if (!fds->mod_freq) fds->mod_enabled = 0;
             // 重置相关
             if (value & 0x80) {
-                fds->modenv_clock = 0;
+                fds->mdunit_clock = 0;
                 fds->freq_gain = 0;
             }
             sfc_fds1_update_freq_gained(fds);
@@ -428,7 +429,7 @@ extern inline sfc_ecode sfc_load_mapper_14(sfc_famicom_t* famicom) {
     famicom->mapper.write_low = sfc_mapper_14_write_low;
     // TODO: FDS 支持, 相关初始化代码移至RESET
 
-    // FDS 扩展音频
+    // FDS 扩展音源
     famicom->rom_info.extra_sound = SFC_NSF_EX_FDS1;
     // 初始化FDS
     sfc_fds1_init(famicom);
@@ -466,11 +467,12 @@ float sfc_fds1_get_output(sfc_famicom_t* famicom) {
     const uint16_t waveout = famicom->apu.fds.waveout;
     const uint16_t masterv = famicom->apu.fds.master_volume;
     const uint16_t fds_out = volgain * waveout * masterv;
-    const double weight = 2.4 * 0.00752 * 16.0 / 64.0;
+    const double weight = 2.4 * 0.1494 / 63.0;
     const double factor = 1.0 / ((1 << 5) * SFC_FDS_MASTER_VOL_LCM / weight);
     return (float)fds_out * (float)factor;
 }
 
+#ifdef SFC_SMF_DEFINED
 
 /// <summary>
 /// StepFC: FDS高级接口[1] - 处理每个CPU周期
@@ -516,8 +518,6 @@ void sfc_fds1_per_cpu_clock(sfc_famicom_t* famicom) {
     }
 }
 
-
-
 /// <summary>
 /// StepFC: FDS高级接口[2] - 输出每个样本
 /// </summary>
@@ -562,7 +562,7 @@ float sfc_fds1_per_sample(sfc_famicom_t* famicom, sfc_fds1_ctx_t* ctx, float cps
     }
     // 处理调制
     if (fds->mod_enabled) {
-        ctx->mdunit_clock += ctx->mdunit_rate;
+        ctx->mdunit_clock += ctx->mdunit_rate * cps;
         while (ctx->mdunit_clock >= (float)0x10000) {
             ctx->mdunit_clock -= (float)0x10000;
             sfc_fds1_tick_modunit(famicom);
@@ -582,7 +582,6 @@ float sfc_fds1_per_sample(sfc_famicom_t* famicom, sfc_fds1_ctx_t* ctx, float cps
     }
     return out / count;
 #endif
-
 }
 
 /// <summary>
@@ -590,8 +589,7 @@ float sfc_fds1_per_sample(sfc_famicom_t* famicom, sfc_fds1_ctx_t* ctx, float cps
 /// </summary>
 /// <param name="famicom">The famicom.</param>
 /// <param name="ctx">The CTX.</param>
-/// <param name="cps">clock per sample</param>
-void sfc_fds1_samplemode_begin(sfc_famicom_t* famicom, sfc_fds1_ctx_t* ctx, float cps) {
+void sfc_fds1_samplemode_begin(sfc_famicom_t* famicom, sfc_fds1_ctx_t* ctx) {
 #ifdef SFC_FDS_PER_SAMPLE
     ctx->volenv_clock = (float)famicom->apu.fds.volenv_clock;
     ctx->volenv_tps   = (float)famicom->apu.fds.volenv_tpc;
@@ -600,7 +598,7 @@ void sfc_fds1_samplemode_begin(sfc_famicom_t* famicom, sfc_fds1_ctx_t* ctx, floa
 
     ctx->wavout_clock = (float)famicom->apu.fds.wavout_clock;
     ctx->mdunit_clock = (float)famicom->apu.fds.mdunit_clock;
-    ctx->mdunit_rate  = cps * (float)famicom->apu.fds.mod_freq;
+    ctx->mdunit_rate  = (float)famicom->apu.fds.mod_freq;
 #else
     ctx->cycle_remain = 0.f;
 #endif
@@ -617,5 +615,82 @@ void sfc_fds1_samplemode_end(sfc_famicom_t* famicom, sfc_fds1_ctx_t* ctx) {
     famicom->apu.fds.modenv_clock = (uint32_t)ctx->modenv_clock;
     famicom->apu.fds.wavout_clock = (uint32_t)ctx->wavout_clock;
     famicom->apu.fds.mdunit_clock = (uint32_t)ctx->mdunit_clock;
+#else
+    if (ctx->cycle_remain >= 0.5f)
+        sfc_fds1_per_cpu_clock(famicom);
 #endif
 }
+
+
+#endif
+
+/// <summary>
+/// StepFC: FDS1 整型采样模式 - 采样
+/// </summary>
+/// <param name="famicom">The famicom.</param>
+/// <param name="ctx">The CTX.</param>
+/// <param name="chw">The CHW.</param>
+/// <param name="cps">The CPS.</param>
+void sfc_fds1_smi_sample(sfc_famicom_t* famicom, sfc_fds1_smi_ctx_t* ctx, const float chw[], sfc_fixed_t cps) {
+#ifdef SFC_FDS_PER_SAMPLE
+    sfc_fds1_data_t* const fds = &famicom->apu.fds;
+    // 处理包络
+    if (!fds->flags_4083) {
+        // 音量包络
+        if (!(fds->volenv_4080 & SFC_FDS_4080_GainMode)) {
+            const uint32_t clock = sfc_fixed_add(&ctx->volenv_clock, cps);
+            // 每次不足就tick
+            while (fds->volenv_clock <= clock) {
+                ctx->volenv_clock += fds->volenv_tpc;
+                sfc_fds1_tick_volenv(famicom);
+            }
+            fds->volenv_clock -= clock;
+        }
+        // 调制包络
+        if (!(fds->modenv_4084 & SFC_FDS_4084_GainMode)) {
+            const uint32_t clock = sfc_fixed_add(&ctx->modenv_clock, cps);
+            // 每次不足就tick
+            while (fds->modenv_clock <= clock) {
+                fds->modenv_clock += fds->modenv_tpc;
+                sfc_fds1_tick_modenv(famicom);
+            }
+            fds->modenv_clock -= clock;
+        }
+    }
+    //float output = 0.f;
+    //float avgcount = 1.f;
+    // 处理波输出
+    if (!(fds->flags_4083 & SFC_FDS_4083_HaltWave)) {
+        const uint32_t clock = sfc_fixed_add(&ctx->wavout_clock, cps);
+
+        const uint32_t rate = clock * fds->freq_gained;
+        fds->wavout_clock += rate;
+
+        while (fds->wavout_clock >= 0x10000) {
+            fds->wavout_clock -= 0x10000;
+            //++avgcount;
+            //output += sfc_fds1_get_output(famicom);
+            sfc_fds1_tick_waveout(famicom);
+        }
+    }
+    // 处理调制
+    if (fds->mod_enabled) {
+        const uint32_t clock = sfc_fixed_add(&ctx->mdunit_clock, cps);
+
+        const uint32_t rate = clock * famicom->apu.fds.mod_freq;
+        fds->mdunit_clock += rate;
+        while (fds->mdunit_clock >= 0x10000) {
+            fds->mdunit_clock -= 0x10000;
+            sfc_fds1_tick_modunit(famicom);
+        }
+    }
+    // 输出
+    //output += sfc_fds1_get_output(famicom);
+    //ctx->output =  output * chw[0] / avgcount;
+    ctx->output = (float)sfc_fds1_get_output_u6(famicom);
+    ctx->output *= chw[0];
+#else
+    assert(!"NOT IMPL");
+#endif
+}
+

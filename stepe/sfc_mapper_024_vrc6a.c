@@ -52,19 +52,28 @@ static inline sfc_mapper18_t* sfc_mapper(sfc_famicom_t* famicom) {
 
 #define MAPPER sfc_mapper18_t* const mapper = sfc_mapper(famicom);
 
-// 更新周期1
+/// <summary>
+/// 更新周期-方波1
+/// </summary>
+/// <param name="vrc6">The VRC6.</param>
 static inline void sfc_vrc6_update_squ1(sfc_vrc6_data_t* vrc6) {
-    vrc6->square1.period = vrc6->square1.period_raw >> vrc6->freq_ctrl;
+    vrc6->square1.period = (vrc6->square1.period_raw >> vrc6->freq_ctrl) + 1;
 }
 
-// 更新周期2
+/// <summary>
+/// 更新周期-方波2
+/// </summary>
+/// <param name="vrc6">The VRC6.</param>
 static inline void sfc_vrc6_update_squ2(sfc_vrc6_data_t* vrc6) {
-    vrc6->square2.period = vrc6->square2.period_raw >> vrc6->freq_ctrl;
+    vrc6->square2.period = (vrc6->square2.period_raw >> vrc6->freq_ctrl) + 1;
 }
 
-// 更新周期3
+/// <summary>
+/// 更新周期-锯齿
+/// </summary>
+/// <param name="vrc6">The VRC6.</param>
 static inline void sfc_vrc6_update_saw(sfc_vrc6_data_t* vrc6) {
-    vrc6->saw.period = vrc6->saw.period_raw >> vrc6->freq_ctrl;
+    vrc6->saw.period = (vrc6->saw.period_raw >> vrc6->freq_ctrl) + 1;
 }
 
 /// <summary>
@@ -211,11 +220,13 @@ void sfc_mapper_18_write_high(sfc_famicom_t* famicom, uint16_t address, uint8_t 
         {
         case 0:
             // Pulse 1 duty and volume
+            famicom->interfaces.audio_change(famicom->argument, famicom->cpu_cycle_count, SFC_VRC6_Square1);
             famicom->apu.vrc6.square1.duty = value >> 4;
             famicom->apu.vrc6.square1.volume = value & 0x0f;
             break;
         case 1:
             // Pulse 1 period low
+            famicom->interfaces.audio_change(famicom->argument, famicom->cpu_cycle_count, SFC_VRC6_Square1);
             famicom->apu.vrc6.square1.period_raw
                 = (famicom->apu.vrc6.square1.period_raw & 0xff00)
                 | (uint16_t)value;
@@ -224,6 +235,7 @@ void sfc_mapper_18_write_high(sfc_famicom_t* famicom, uint16_t address, uint8_t 
             break;
         case 2:
             // Pulse 1 period high
+            famicom->interfaces.audio_change(famicom->argument, famicom->cpu_cycle_count, SFC_VRC6_Square1);
             famicom->apu.vrc6.square1.period_raw
                 = (famicom->apu.vrc6.square1.period_raw & 0x00ff)
                 | (((uint16_t)value & 0x0f) << 8)
@@ -236,6 +248,7 @@ void sfc_mapper_18_write_high(sfc_famicom_t* famicom, uint16_t address, uint8_t 
             sfc_vrc6_update_squ1(&famicom->apu.vrc6);
             break;
         case 3:
+            famicom->interfaces.audio_change(famicom->argument, famicom->cpu_cycle_count, SFC_VRC6_VRC6);
             // Frequency Control ($9003)
             famicom->apu.vrc6.halt = value & 1;
             famicom->apu.vrc6.freq_ctrl
@@ -246,12 +259,11 @@ void sfc_mapper_18_write_high(sfc_famicom_t* famicom, uint16_t address, uint8_t 
             sfc_vrc6_update_squ1(&famicom->apu.vrc6);
             sfc_vrc6_update_squ2(&famicom->apu.vrc6);
             sfc_vrc6_update_saw(&famicom->apu.vrc6);
-            famicom->interfaces.audio_change(famicom->argument, famicom->cpu_cycle_count, SFC_VRC6_VRC6);
-            return;
+            break;
         }
-        famicom->interfaces.audio_change(famicom->argument, famicom->cpu_cycle_count, SFC_VRC6_Square1);
         break;
     case 2:
+        famicom->interfaces.audio_change(famicom->argument, famicom->cpu_cycle_count, SFC_VRC6_Square2);
         switch (address & 0x03)
         {
         case 0:
@@ -285,18 +297,19 @@ void sfc_mapper_18_write_high(sfc_famicom_t* famicom, uint16_t address, uint8_t 
             sfc_vrc6_update_squ2(&famicom->apu.vrc6);
             break;
         }
-        famicom->interfaces.audio_change(famicom->argument, famicom->cpu_cycle_count, SFC_VRC6_Square2);
         break;
     case 3:
         // $B00x
         switch (address & 0x03)
         {
         case 0:
+            famicom->interfaces.audio_change(famicom->argument, famicom->cpu_cycle_count, SFC_VRC6_Saw);
             // Saw Accum Rate ($B000)
             famicom->apu.vrc6.saw.rate = value & 0x3f;
             break;
         case 1:
-            // Pulse 2 period low
+            famicom->interfaces.audio_change(famicom->argument, famicom->cpu_cycle_count, SFC_VRC6_Saw);
+            // Saw period low
             famicom->apu.vrc6.saw.period_raw
                 = (famicom->apu.vrc6.saw.period_raw & 0x0f00)
                 | (uint16_t)value;
@@ -304,7 +317,8 @@ void sfc_mapper_18_write_high(sfc_famicom_t* famicom, uint16_t address, uint8_t 
             sfc_vrc6_update_saw(&famicom->apu.vrc6);
             break;
         case 2:
-            // Pulse 2 period high
+            famicom->interfaces.audio_change(famicom->argument, famicom->cpu_cycle_count, SFC_VRC6_Saw);
+            // Saw period high
             famicom->apu.vrc6.saw.period_raw
                 = (famicom->apu.vrc6.saw.period_raw & 0x00ff)
                 | (((uint16_t)value & 0x0f) << 8)
@@ -321,9 +335,8 @@ void sfc_mapper_18_write_high(sfc_famicom_t* famicom, uint16_t address, uint8_t 
             sfc_mapper(famicom)->ppu_style = value;
             assert((value & SFC_18_B3_FROM_CHRROM) == 0 && "unsupported");
             sfc_mapper_18_chr_update(famicom);
-            return;
+            break;
         }
-        famicom->interfaces.audio_change(famicom->argument, famicom->cpu_cycle_count, SFC_VRC6_Saw);
         break;
     case 4:
         // 8k PRG Select ($C000-$C003)
@@ -406,4 +419,65 @@ extern inline sfc_ecode sfc_load_mapper_18(sfc_famicom_t* famicom) {
     MAPPER;
     memset(mapper, 0, MAPPER_18_SIZE_IMPL);
     return SFC_ERROR_OK;
+}
+
+
+// ----------------------------------------------------------------------------
+//                              VRC6 Play 
+// ----------------------------------------------------------------------------
+
+#include "sfc_play.h"
+
+/// <summary>
+/// StepFC: VRC6 整型采样模式 - 采样
+/// </summary>
+/// <param name="famicom">The famicom.</param>
+/// <param name="ctx">The CTX.</param>
+/// <param name="chw">The CHW.</param>
+/// <param name="cps">The CPS.</param>
+void sfc_vrc6_smi_sample(sfc_famicom_t* famicom, sfc_vrc6_smi_ctx_t* ctx, const float chw[], sfc_fixed_t cps) {
+    sfc_vrc6_data_t* const vrc6 = &famicom->apu.vrc6;
+    ctx->square1_output = 0.f;
+    ctx->square2_output = 0.f;
+    ctx->sawtooth_output = 0.f;
+    // 方波#1
+    if (vrc6->square1.enable) {
+        const uint16_t clock = sfc_fixed_add(&ctx->sq1_clock, cps);
+        vrc6->square1.clock += clock;
+        const uint16_t count = vrc6->square1.clock / vrc6->square1.period;
+        vrc6->square1.clock -= count * vrc6->square1.period;
+        vrc6->square1.index = (vrc6->square1.index + count) & 0xf;
+        // 输出音量
+        const uint8_t vol = vrc6->square1.index <= vrc6->square1.duty ? vrc6->square1.volume : 0;
+        ctx->square1_output = (float)vol * chw[0];
+    }
+    // 方波#2
+    if (vrc6->square2.enable) {
+        const uint16_t clock = sfc_fixed_add(&ctx->sq2_clock, cps);
+        vrc6->square2.clock += clock;
+        const uint16_t count = vrc6->square2.clock / vrc6->square2.period;
+        vrc6->square2.clock -= count * vrc6->square2.period;
+        vrc6->square2.index = (vrc6->square2.index + count) & 0xf;
+        // 输出音量
+        const uint8_t vol = vrc6->square2.index <= vrc6->square2.duty ? vrc6->square2.volume : 0;
+        ctx->square2_output = (float)vol * chw[1];
+    }
+    // 锯齿波 - 认为 CPU频率/2 驱动
+    if (vrc6->saw.enable) {
+        const uint16_t clock = sfc_fixed_add(&ctx->saw_clock, cps);
+        vrc6->saw.clock += clock;
+        // 避免误差, 认为周期加倍即可
+        const uint16_t periodx2 = vrc6->saw.period * 2;
+        const uint16_t count = vrc6->saw.clock / periodx2;
+        vrc6->saw.clock -= count * periodx2;
+        vrc6->saw.accumulator += vrc6->saw.rate * (uint8_t)count;
+        vrc6->saw.count += count;
+        if (vrc6->saw.count >= 7) {
+            // TOD: 高频处理: CPU/14 = 100kHz+
+            //vrc6->saw.count -= 7;
+            vrc6->saw.accumulator = 0;
+            vrc6->saw.count = 0;
+        }
+        ctx->sawtooth_output = (float)(vrc6->saw.accumulator >> 3) * chw[2];
+    }
 }

@@ -38,7 +38,7 @@ typedef struct {
     uint8_t     reserved;
     // PAL/NTSC 位
     uint8_t     pal_ntsc_bits;
-    // 扩展音频 位
+    // 扩展音源 位
     uint8_t     extra_sound;
     // 曲子数量(>0表示NSF)
     uint8_t     song_count;
@@ -148,7 +148,7 @@ typedef struct {
     uint16_t    play_speed__pal_le;
     // PAL/NTSC 位
     uint8_t     pal_ntsc_bits;
-    // 扩展音频 位
+    // 扩展音源 位
     uint8_t     extra_sound;
     // 扩展位
     uint8_t     expansion[4];

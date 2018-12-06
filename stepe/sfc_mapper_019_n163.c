@@ -10,6 +10,11 @@
 
 // ------------------------------- MAPPER 019 - N129/N163
 
+#define SFC_N163_IT1
+#define SFC_N163_IT2
+//#define SFC_N163_IT1 * 2
+//#define SFC_N163_IT2 / 2
+
 typedef struct {
     // IRQ 计数器
     uint16_t    irq_counter;
@@ -152,7 +157,7 @@ void sfc_mapper_13_write_low(sfc_famicom_t* famicom, uint16_t address, uint8_t v
 /// <param name="famicom">The famicom.</param>
 /// <param name="address">The address.</param>
 /// <param name="value">The value.</param>
-static void sfc_mapper_13_write_high(sfc_famicom_t* famicom, uint16_t address, uint8_t value) {
+void sfc_mapper_13_write_high(sfc_famicom_t* famicom, uint16_t address, uint8_t value) {
     MAPPER;
     uint16_t addr0;
     // 取D11-D14
@@ -218,7 +223,7 @@ static void sfc_mapper_13_hsync(sfc_famicom_t* famicom, uint16_t value) {
         mapper->irq_counter += count;
         if (mapper->irq_counter & 0x8000) {
             sfc_operation_IRQ_try(famicom);
-            printf("N163: IRQ triggered@scanline: %d\n", value);
+            //printf("N163: IRQ triggered@scanline: %d\n", value);
         }
     }
 }
@@ -377,7 +382,7 @@ enum {
 /// <param name="famicom">The famicom.</param>
 /// <param name="ch">The ch.</param>
 void sfc_n163_update_ch(sfc_famicom_t* famicom, uint8_t ch) {
-    assert(ch && ch < 8 && "out of range");
+    assert(ch < 8 && "out of range");
     /*
      https://wiki.nesdev.com/w/index.php/Namco_163_audio
      * w[$80] = the 163's internal memory
@@ -411,13 +416,15 @@ void sfc_n163_update_ch(sfc_famicom_t* famicom, uint8_t ch) {
     const uint8_t offset = chn[SFC_N163_7E];
     const int8_t volume = chn[SFC_N163_7F] & 0x0F;
 
-    phase = (phase + freq) % (length << 16);
+    phase = (phase + freq SFC_N163_IT2) % (length << 16);
 
     const int8_t sample = sfc_n163_sample(famicom, ((phase >> 16) + offset) & 0xFF);
     const int8_t output = (sample - 8) * volume;
     famicom->apu.n163.ch_output[ch] = output;
     // 载入历史
-    famicom->apu.n163.history_output[famicom->apu.n163.history_index++] = output;
+    famicom->apu.n163.history[famicom->apu.n163.history_index].output = output;
+    famicom->apu.n163.history[famicom->apu.n163.history_index].index = ch;
+    famicom->apu.n163.history_index++;
     famicom->apu.n163.history_index &= 7;
     // 写回相位
     chn[SFC_N163_7D] = (phase >> 16) & 0xff;
@@ -425,19 +432,30 @@ void sfc_n163_update_ch(sfc_famicom_t* famicom, uint8_t ch) {
     chn[SFC_N163_79] = (phase >> 0) & 0xff;
 }
 
+//void debug_putaudio(float x);
+//static int16_t last = 0;
+//static uint8_t counter = 0;
 
 /// <summary>
 /// SFCs the N163 update.
 /// </summary>
 /// <param name="famicom">The famicom.</param>
 extern void sfc_n163_update(sfc_famicom_t* famicom) {
-    --famicom->apu.n163.n163_current;
-    famicom->apu.n163.n163_current &= 7;
-    if (famicom->apu.n163.n163_current < famicom->apu.n163.n163_lowest_id)
-        famicom->apu.n163.n163_current = 7;
-    sfc_n163_update_ch(famicom, famicom->apu.n163.n163_current);
+    uint8_t* const index = &famicom->apu.n163.n163_current;
+    --*index;
+    *index &= 7;
+    if (*index < famicom->apu.n163.n163_lowest_id) *index = 7;
+    sfc_n163_update_ch(famicom, *index);
+    //const int8_t data = famicom->apu.n163.ch_output[*index];
+    //++counter;
+    //if (counter & 1) last = data;
+    //else {
+    //    last += data;
+    //    debug_putaudio((float)last / 256.f);
+    //}
 }
 
+#ifdef SFC_SMF_DEFINED
 
 /// <summary>
 /// SFCs the N163 per sample.
@@ -448,7 +466,7 @@ extern void sfc_n163_update(sfc_famicom_t* famicom) {
 /// <param name="mode">The mode.</param>
 /// <returns></returns>
 float sfc_n163_per_sample(sfc_famicom_t * famicom, sfc_n163_ctx_t * ctx, float cps, uint8_t mode) {
-    ctx->clock += cps;
+    ctx->clock += cps SFC_N163_IT1;
     while (ctx->clock >= 15.f) {
         ctx->clock -= 15.f;
         sfc_n163_update(famicom);
@@ -458,7 +476,7 @@ float sfc_n163_per_sample(sfc_famicom_t * famicom, sfc_n163_ctx_t * ctx, float c
     const uint8_t start_index = famicom->apu.n163.history_index - mode;
     for (uint8_t i = 0; i != mode; ++i) {
         const uint8_t now_index = (start_index + i) & 7;
-        output += famicom->apu.n163.history_output[now_index];
+        output += famicom->apu.n163.history[now_index].output;
     }
     return (float)output / (float)mode;
 }
@@ -481,4 +499,43 @@ void sfc_n163_samplemode_begin(sfc_famicom_t* famicom, sfc_n163_ctx_t* ctx) {
 /// <param name="ctx">The CTX.</param>
 void sfc_n163_samplemode_end(sfc_famicom_t* famicom, sfc_n163_ctx_t* ctx) {
     famicom->apu.n163.n163_clock = (uint8_t)ctx->clock;
+}
+
+#endif
+
+
+/// <summary>
+/// StepFC: N163 整型采样模式 - 采样
+/// </summary>
+/// <param name="famicom">The famicom.</param>
+/// <param name="ctx">The CTX.</param>
+/// <param name="chw">The CHW.</param>
+/// <param name="cps">The CPS.</param>
+void sfc_n163_smi_sample(sfc_famicom_t* famicom, sfc_n163_smi_ctx_t* ctx, const float chw[], sfc_fixed_t cps, uint8_t mode) {
+    const uint8_t clock = sfc_fixed_add(&ctx->clock, cps SFC_N163_IT1);
+    famicom->apu.n163.n163_clock += clock;
+    // 每15周期更新一次
+    while (famicom->apu.n163.n163_clock >= 15) {
+        famicom->apu.n163.n163_clock -= 15;
+        sfc_n163_update(famicom);
+    }
+    // 输出声道
+    float output = 0;
+    const uint8_t start_index = famicom->apu.n163.history_index - mode;
+    for (uint8_t i = 0; i != mode; ++i) {
+        const uint8_t now_index = (start_index + i) & 7;
+        const int8_t chn_out = famicom->apu.n163.history[now_index].output;
+        const uint8_t chn_id = famicom->apu.n163.history[now_index].index;
+        output += chw[chn_id] * (float)chn_out;
+    }
+    ctx->output = output / (float)mode;
+}
+
+/// <summary>
+/// StepFC: N163 整型采样模式 - 更新副权重
+/// </summary>
+/// <param name="famicom">The famicom.</param>
+/// <param name="ctx">The CTX.</param>
+void sfc_n163_smi_update_subweight(const sfc_famicom_t* famicom, sfc_n163_smi_ctx_t* ctx) {
+    ctx->subweight = (float)famicom->apu.n163.subweight_div16 / 16.f;
 }

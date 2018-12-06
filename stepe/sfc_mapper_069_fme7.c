@@ -267,12 +267,18 @@ static void sfc_mapper_45_hsync(sfc_famicom_t* famicom, uint16_t line) {
 extern inline void sfc_fme7_init(sfc_famicom_t* famicom) {
     famicom->apu.fme7.lfsr = 1;
     famicom->apu.fme7.noise_period = 0x1f;
-    famicom->apu.fme7.env_period = 0xffff;
+    famicom->apu.fme7.env_period = 0x0fff;
     famicom->apu.fme7.ch[0].period = 0xfff;
     famicom->apu.fme7.ch[1].period = 0xfff;
     famicom->apu.fme7.ch[1].period = 0xfff;
     famicom->apu.fme7.evn_shape = 0x80;
     famicom->apu.fme7.evn_index = 0;
+
+    famicom->apu.fme7.ch[0].cpu_period_step = 0xffff;
+    famicom->apu.fme7.ch[1].cpu_period_step = 0xffff;
+    famicom->apu.fme7.ch[2].cpu_period_step = 0xffff;
+    famicom->apu.fme7.noise_period_step = 0x2ff;
+    famicom->apu.fme7.env_period_step = 0xffff;
 }
 
 /// <summary>
@@ -344,20 +350,24 @@ extern void sfc_fme7_init_lut(void) {
     table[31] = SFC_FME7_CH_MAX;
     for (int i = 0; i != 30; ++i)
         table[30 - i] = table[31 - i] * qqrt2;
+    uint16_t* const table_as_u16 = (uint16_t*)table;
+    // 变成U16
+    for (int i = 0; i != 32; ++i)
+        table_as_u16[i] = (uint16_t)(table[i] + 0.5);
     // 建立LUT-A
     sfc_fme7_vol_lut[0] = 0;
     for (int i = 1; i != 16; ++i) {
-        sfc_fme7_vol_lut[i] = (uint16_t)(table[i * 2 + 1] + 0.5);
+        sfc_fme7_vol_lut[i] = table_as_u16[i * 2 + 1];
     }
     // 建立LUT-B 0->0
     for (int i = 0; i != 32; ++i) 
         sfc_fme7_env_lut[i] = 0;
     // 建立LUT-B 0->1
     for (int i = 0; i != 32; ++i)
-        sfc_fme7_env_lut[i+32] = (uint16_t)(table[i] + 0.5);
+        sfc_fme7_env_lut[i+32] = table_as_u16[i];
     // 建立LUT-B 1->0
     for (int i = 0; i != 32; ++i)
-        sfc_fme7_env_lut[i+64] = (uint16_t)(table[31 - i] + 0.5);
+        sfc_fme7_env_lut[i+64] = table_as_u16[31 - i];
     // 建立LUT-B 1->1
     for (int i = 0; i != 32; ++i)
         sfc_fme7_env_lut[i+96] = SFC_FME7_CH_MAX;
@@ -483,6 +493,8 @@ static void sfc_fme7_ym2149f_write(sfc_famicom_t* famicom, uint8_t value) {
         sfc_fme7_ch_change(famicom, selected >> 1);
         ch = &fme7->ch[selected >> 1];
         ch->period = (ch->period & 0xf00) | (uint16_t)value;
+        // 转换成CPU周期(STEP)
+        ch->cpu_period_step = (ch->period ? ch->period : 1) * 16;
         break;
     case 0x1:
     case 0x3:
@@ -491,13 +503,15 @@ static void sfc_fme7_ym2149f_write(sfc_famicom_t* famicom, uint8_t value) {
         sfc_fme7_ch_change(famicom, selected >> 1);
         ch = &fme7->ch[selected >> 1];
         ch->period = (ch->period & 0xff) | ((uint16_t)(value & 0xf) << 8);
+        // 转换成CPU周期(STEP)
+        ch->cpu_period_step = (ch->period ? ch->period : 1) * 16;
         break;
     case 0x6:
         // Noise period
         sfc_fme7_audio_change(famicom);
         fme7->noise_period = value & 0x1f;
-        // 周期为0作1
-        if (!fme7->noise_period) fme7->noise_period = 1;
+        // 噪音  Clock / (2 * 16 * Period)
+        fme7->noise_period_step = (fme7->noise_period ? fme7->noise_period : 1) * 32;
         break;
     case 0x7:
         // Noise disable/ Tone disable
@@ -523,6 +537,8 @@ static void sfc_fme7_ym2149f_write(sfc_famicom_t* famicom, uint8_t value) {
             = (fme7->env_period & (uint16_t)0xff00)
             | (uint16_t)value
             ;
+        // 包络  Clock / (2 * 256 * Period), 每步/32
+        fme7->env_period_step = (fme7->env_period ? fme7->env_period : 1) * 16;
         break;
     case 0xC:
         // Envelope high period
@@ -531,6 +547,8 @@ static void sfc_fme7_ym2149f_write(sfc_famicom_t* famicom, uint8_t value) {
             = (fme7->env_period & (uint16_t)0x00ff)
             | ((uint16_t)value << 8)
             ;
+        // 包络  Clock / (2 * 256 * Period), 每步/32
+        fme7->env_period_step = (fme7->env_period ? fme7->env_period : 1) * 16;
         break;
     case 0xD:
         // Envelope reset and shape: ---- CAaH
@@ -582,10 +600,10 @@ static inline uint16_t sfc_ym2149f_get_evn_value(uint8_t shape, uint8_t index) {
     return *(uint16_t*)data;
 }
 
-#ifndef NDEBUG
-static float fme7_clock = 0.f;
-static int sample_count = 0;
-#endif
+
+
+
+#ifdef SFC_SMF_DEFINED
 
 /// <summary>
 /// StepFC: FME7 采样模式 - 输出每个样本
@@ -596,7 +614,6 @@ static int sample_count = 0;
 /// <returns></returns>
 float sfc_fme7_per_sample(sfc_famicom_t* famicom, sfc_fme7_ctx_t* ctx, float cps) {
     sfc_fme7_data_t* const fme7 = &famicom->apu.fme7;
-    // 5B使用了倍分频器
     // 声道
     for (int i = 0; i != 3; ++i) {
         ctx->ch[i].clock += cps;
@@ -620,7 +637,6 @@ float sfc_fme7_per_sample(sfc_famicom_t* famicom, sfc_fme7_ctx_t* ctx, float cps
     uint16_t output = 0;
     const uint8_t lfsr = fme7->lfsr & 1;
     for (int i = 0; i != 3; ++i) {
-        // disable | (tone & square & noise & lfsr)
         const uint8_t disable = fme7->ch[i].disable;
         const uint8_t square  = fme7->ch[i].square;
         const uint8_t noise   = fme7->ch[i].noise;
@@ -628,7 +644,7 @@ float sfc_fme7_per_sample(sfc_famicom_t* famicom, sfc_fme7_ctx_t* ctx, float cps
         // 输出
         bool flag;
         if (tone & noise) flag = square & lfsr & 1;
-        else flag = (disable | (tone & square) | (noise & lfsr));
+        else flag = disable | (tone & square) | (noise & lfsr);
         // 检测
         if (flag) output += fme7->ch[i].env ? fme7->env_volume : fme7->ch[i].volume;
     }
@@ -647,15 +663,15 @@ void sfc_fme7_samplemode_begin(sfc_famicom_t* famicom, sfc_fme7_ctx_t* ctx) {
 
     // 音调  Clock / (2 * 16 * Period), 修改频率加倍
     for (int i = 0; i != 3; ++i) {
-        ctx->ch[i].clock = (float)fme7->ch[i].clock;
+        ctx->ch[i].clock = (float)fme7->ch[i].cpu_clock;
         const uint16_t period = fme7->ch[i].period;
-        ctx->ch[i].period = (float)(period ? period : 1) * 16.f;
+        ctx->ch[i].period = (float)fme7->ch[i].cpu_period_step;
     }
     // 噪音  Clock / (2 * 16 * Period)
-    ctx->noise_period = (float)fme7->noise_period * 32.f;
+    ctx->noise_period = (float)fme7->noise_period_step;
     ctx->noise_clock = (float)fme7->noise_clock;
-    // 包络 Clock / (2 * 256 * Period), 每步/32
-    ctx->env_period = (float)(fme7->env_period ? fme7->env_period : 1) * 16;
+    // 包络  Clock / (2 * 256 * Period), 每步/32
+    ctx->env_period = (float)fme7->env_period_step;
     ctx->env_clock = (float)fme7->env_clock;
 
 }
@@ -668,12 +684,72 @@ void sfc_fme7_samplemode_begin(sfc_famicom_t* famicom, sfc_fme7_ctx_t* ctx) {
 void sfc_fme7_samplemode_end(sfc_famicom_t* famicom, sfc_fme7_ctx_t* ctx) {
     sfc_fme7_data_t* const fme7 = &famicom->apu.fme7;
     // 音调
-    fme7->ch[0].clock = (uint16_t)ctx->ch[0].clock;
-    fme7->ch[1].clock = (uint16_t)ctx->ch[1].clock;
-    fme7->ch[2].clock = (uint16_t)ctx->ch[2].clock;
+    fme7->ch[0].cpu_clock = (uint16_t)ctx->ch[0].clock;
+    fme7->ch[1].cpu_clock = (uint16_t)ctx->ch[1].clock;
+    fme7->ch[2].cpu_clock = (uint16_t)ctx->ch[2].clock;
     // 噪音
     fme7->noise_clock = (uint16_t)ctx->noise_clock;
     // 包络
-    fme7->env_clock = (uint16_t)ctx->env_clock;
+    fme7->env_clock = (uint32_t)ctx->env_clock;
 
+}
+
+#endif
+
+
+
+/// <summary>
+/// StepFC: FME7 整型采样模式 - 每个样本
+/// </summary>
+/// <param name="famicom">The famicom.</param>
+/// <param name="ctx">The CTX.</param>
+/// <param name="chw">The CHW.</param>
+/// <param name="cps">The CPS.</param>
+/// <returns></returns>
+void sfc_fme7_smi_sample(sfc_famicom_t* famicom, sfc_fme7_smi_ctx_t* ctx, const float chw[], sfc_fixed_t cps) {
+    sfc_fme7_data_t* const fme7 = &famicom->apu.fme7;
+    // 声道
+    for (int i = 0; i != 3; ++i) {
+        const uint16_t clock = sfc_fixed_add(ctx->chn_clock + i, cps);
+        sfc_sunsoft5b_ch_t* const ch = fme7->ch + i;
+        ch->cpu_clock += clock;
+
+        const uint8_t count = ch->cpu_clock / ch->cpu_period_step;
+        ch->square ^= count;
+        ch->cpu_clock -= count * ch->cpu_period_step;
+    }
+    // 噪音
+    fme7->noise_clock += sfc_fixed_add(&ctx->noi_clock, cps);
+
+    while (fme7->noise_clock >= fme7->noise_period_step) {
+        fme7->noise_clock -= fme7->noise_period_step;
+        sfc_ym2149f_tick_noise(famicom);
+    }
+    // 包络
+    fme7->env_clock += sfc_fixed_add(&ctx->env_clock, cps);
+
+    const uint32_t count = fme7->env_clock / fme7->env_period_step;
+    fme7->env_clock -= count * fme7->env_period_step;
+    sfc_ym2149f_tick_evn_times(famicom, (uint8_t)count);
+    fme7->env_volume = sfc_ym2149f_get_evn_value(fme7->evn_shape, fme7->evn_index);
+
+    // 合并输出
+    const uint8_t lfsr = fme7->lfsr & 1;
+    for (int i = 0; i != 3; ++i) {
+        const uint8_t disable = fme7->ch[i].disable;
+        const uint8_t square = fme7->ch[i].square;
+        const uint8_t noise = fme7->ch[i].noise;
+        const uint8_t tone = fme7->ch[i].tone;
+        // 输出
+        bool flag;
+        if (tone & noise) flag = square & lfsr & 1;
+        else flag = disable | (tone & square) | (noise & lfsr);
+        // 检测
+        float output = 0.f;
+        if (flag) {
+            const uint16_t cho = fme7->ch[i].env ? fme7->env_volume : fme7->ch[i].volume;
+            output = (float)cho / (float)SFC_FME7_CH3_MAX * chw[i];
+        }
+        ctx->output[i] = output;
+    }
 }

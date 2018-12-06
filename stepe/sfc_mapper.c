@@ -94,8 +94,11 @@ static void sfc_mapper_00_write_high(sfc_famicom_t*f, uint16_t d, uint8_t v) {
 /// <param name="d">The d.</param>
 /// <param name="v">The v.</param>
 static uint8_t sfc_mapper_read_low(sfc_famicom_t*f, uint16_t d) {
-    if (d < 0x4200)
+#ifndef NDEBUG
+    if (d < 0x4100) 
         return f->bus_memory[d & 0x1ff];
+#endif
+    if (d < 0x4200) return f->bus_memory[d & 0x1ff];
     return 0;
 }
 

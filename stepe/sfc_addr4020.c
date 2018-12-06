@@ -177,10 +177,10 @@ extern inline sfc_square_set2(sfc_square_data_t* sq, uint8_t value) {
 /// <param name="sq">The sq.</param>
 /// <param name="value">The value.</param>
 /// <returns></returns>
-extern inline sfc_square_set3(sfc_square_data_t* sq, uint8_t value, uint8_t ok) {
+extern inline sfc_square_set3(sfc_square_data_t* sq, uint8_t value) {
     // LLLL LTTT
     // 禁止状态不会重置长度计数器
-    if (ok) sq->length_counter = LENGTH_COUNTER_TABLE[value >> 3];
+    if (sq->x015_flag) sq->length_counter = LENGTH_COUNTER_TABLE[value >> 3];
     // 合并11bit周期
     const uint16_t high_bits = ((uint16_t)(value & 0x07) << 8);
     sq->cur_period = (sq->cur_period & (uint16_t)0x00ff) | high_bits;
@@ -193,22 +193,42 @@ extern inline sfc_square_set3(sfc_square_data_t* sq, uint8_t value, uint8_t ok) 
 
 
 /// <summary>
+/// SFCs the audio overview.
+/// </summary>
+/// <param name="famicom">The famicom.</param>
+static inline void sfc_audio_overview(sfc_famicom_t* famicom) {
+    const uint32_t cycle = famicom->cpu_cycle_count;
+    famicom->interfaces.audio_change(famicom->argument, cycle, SFC_Overview);
+}
+
+/// <summary>
 /// StepFC: 写入CPU地址数据4020
 /// </summary>
 /// <param name="address">The address.</param>
 /// <param name="data">The data.</param>
 /// <param name="famicom">The famicom.</param>
 extern inline void sfc_write_cpu_address4020(uint16_t address, uint8_t data, sfc_famicom_t* famicom) {
-    enum sfc_channel_index type = SFC_Overview;
+    // 0-3  -> SQ1
+    // 4-7  -> SQ2
+    // 8-B  -> TRI
+    // C-F  -> NOI
+    // ...  -> DMC
+    // 前面20字节
+    if ((address & 0x1f) < 20) {
+        // 检查当前CPU周期
+        const uint32_t cycle = famicom->cpu_cycle_count;
+        // 触发事件
+        enum sfc_channel_index type = SFC_2A03_Square1 + ((address & 0xf) >> 2);
+        famicom->interfaces.audio_change(famicom->argument, cycle, type);
+    }
+    // 讨论
     switch (address & (uint16_t)0x1f)
     {
     case 0x00:
-        type = SFC_2A03_Square1;
         // $4000 DDLC NNNN 
         sfc_square_set0(&famicom->apu.square1, data);
         break;
     case 0x01:
-        type = SFC_2A03_Square1;
         // $4001 EPPP NSSS
         sfc_square_set1(&famicom->apu.square1, data);
         //if (famicom->apu.square1.sweep_enable) {
@@ -217,58 +237,47 @@ extern inline void sfc_write_cpu_address4020(uint16_t address, uint8_t data, sfc
         //}
         break;
     case 0x02:
-        type = SFC_2A03_Square1;
         // $4002 TTTT TTTT
         sfc_square_set2(&famicom->apu.square1, data);
         //famicom->apu.square1.use_period = famicom->apu.square1.cur_period;
         //assert(famicom->apu.square1.cur_period != 0xffff);
         break;
     case 0x03:
-        type = SFC_2A03_Square1;
         // $4003 LLLL LTTT
-        // 禁止状态不会重置
-        sfc_square_set3(&famicom->apu.square1, data, famicom->apu.status_write & (uint8_t)SFC_APU4015_WRITE_EnableSquare1);
+        sfc_square_set3(&famicom->apu.square1, data);
 
         //if (famicom->button_states[0]) {
         //    printf("<4003>\n");
         //}
         break;
     case 0x04:
-        type = SFC_2A03_Square2;
         // $4004 DDLC NNNN 
         sfc_square_set0(&famicom->apu.square2, data);
         break;
     case 0x05:
-        type = SFC_2A03_Square2;
         // $4005 EPPP NSSS
         sfc_square_set1(&famicom->apu.square2, data);
         break;
     case 0x06:
-        type = SFC_2A03_Square2;
         // $4006 TTTT TTTT
         sfc_square_set2(&famicom->apu.square2, data);
         break;
     case 0x07:
-        type = SFC_2A03_Square2;
         // $4007 LLLL LTTT
-        // 禁止状态不会重置
-        sfc_square_set3(&famicom->apu.square2, data, famicom->apu.status_write & (uint8_t)SFC_APU4015_WRITE_EnableSquare2);
+        sfc_square_set3(&famicom->apu.square2, data);
         break;
     case 0x08:
-        type = SFC_2A03_Triangle;
         // $4008 CRRR RRRR
         famicom->apu.triangle.value_reload = data & (uint8_t)0x7F;
         famicom->apu.triangle.flag_halt = data >> 7;
         break;
     case 0x0A:
-        type = SFC_2A03_Triangle;
         // $400A TTTT TTTT
         famicom->apu.triangle.cur_period
             = (famicom->apu.triangle.cur_period & (uint16_t)0xff00)
             | (uint16_t)data;
         break;
     case 0x0B:
-        type = SFC_2A03_Triangle;
         // $400B LLLL LTTT
         // 禁止状态不会重置
         if (famicom->apu.status_write & (uint8_t)SFC_APU4015_WRITE_EnableTriangle)
@@ -279,17 +288,14 @@ extern inline void sfc_write_cpu_address4020(uint16_t address, uint8_t data, sfc
         famicom->apu.triangle.flag_reload = 1;
         break;
     case 0x0C:
-        type = SFC_2A03_Noise;
         // $400C --LC NNNN 
         famicom->apu.noise.envelope.ctrl6 = data & (uint8_t)0x3F;
         break;
     case 0x0E:
-        type = SFC_2A03_Noise;
         // $400E S--- PPPP
         famicom->apu.noise.short_mode__period_index = data;
         break;
     case 0x0F:
-        type = SFC_2A03_Noise;
         // $400E LLLL L---
         // 禁止状态不会重置
         if (famicom->apu.status_write & (uint8_t)SFC_APU4015_WRITE_EnableNoise)
@@ -300,14 +306,12 @@ extern inline void sfc_write_cpu_address4020(uint16_t address, uint8_t data, sfc
     case 0x10:
         // $4010 IL-- RRRR
         // TODO: PAL的场合
-        type = SFC_2A03_DMC;
         famicom->apu.dmc.irq_loop = data >> 6;
         famicom->apu.dmc.period = SFC_DMC_PERIOD_LIST_NP[data & 0xF];
         break;
         //return;
     case 0x11:
         // $4011 -DDD DDDD
-        type = SFC_2A03_DMC;
         famicom->apu.dmc.value = data & (uint8_t)0x7F;
         //printf("[DMC]%d\n", data);
         break;
@@ -318,14 +322,14 @@ extern inline void sfc_write_cpu_address4020(uint16_t address, uint8_t data, sfc
         famicom->apu.dmc.orgaddr = (uint16_t)0xC000 | ((uint16_t)data << 6);
         //famicom->apu.dmc.curaddr = famicom->apu.dmc.orgaddr;
         //printf("PTR[%04X]\n", famicom->apu.dmc.orgaddr);
-        return;
+        break;
     case 0x13:
         // $4013 LLLL LLLL
         // 0000LLLL.LLLL0001
         famicom->apu.dmc.length = ((uint16_t)data << 4) | 1;
         //famicom->apu.dmc.lenleft = famicom->apu.dmc.length;
         //printf("LEN[%d]\n", famicom->apu.dmc.length);
-        return;
+        break;
     case 0x14:
         // 精灵RAM直接储存器访问
         if (famicom->ppu.data.oamaddr) {
@@ -339,10 +343,14 @@ extern inline void sfc_write_cpu_address4020(uint16_t address, uint8_t data, sfc
         else memcpy(famicom->ppu.data.sprites, sfc_get_dma_address(data, famicom), 256);
         famicom->cpu_cycle_count += 513;
         famicom->cpu_cycle_count += famicom->cpu_cycle_count & 1;
-        return;
+        break;
     case 0x15:
+        sfc_audio_overview(famicom);
         // 状态寄存器
         famicom->apu.status_write = data;
+        // 方波使能位
+        famicom->apu.square1.x015_flag = data & (uint8_t)SFC_APU4015_WRITE_EnableSquare1;
+        famicom->apu.square2.x015_flag = data & (uint8_t)SFC_APU4015_WRITE_EnableSquare2;
         // 对应通道长度计数器清零
         if (!(data & (uint8_t)SFC_APU4015_WRITE_EnableSquare1))
             famicom->apu.square1.length_counter = 0;
@@ -365,8 +373,9 @@ extern inline void sfc_write_cpu_address4020(uint16_t address, uint8_t data, sfc
             famicom->button_index_1 = 0;
             famicom->button_index_2 = 0;
         }
-        return;
+        break;
     case 0x17:
+        sfc_audio_overview(famicom);
         // 帧计数器
         // $4014:  MI-- ----
         famicom->apu.frame_counter = data;
@@ -380,13 +389,7 @@ extern inline void sfc_write_cpu_address4020(uint16_t address, uint8_t data, sfc
             sfc_clock_envelopes_and_linear_counter(&famicom->apu);
             break;
         }
-    default:
-        return;
     }
-    // 检查当前CPU周期
-    const uint32_t cycle = famicom->cpu_cycle_count;
-    // 触发事件
-    famicom->interfaces.audio_change(famicom->argument, cycle, type);
 }
 
 
@@ -463,7 +466,6 @@ void sfc_clock_length_counter_and_sweep_unit(sfc_apu_register_t* apu) {
     // 噪音-- 长度计数器
     if (!(apu->noise.envelope.ctrl6 & (uint8_t)0x20) && apu->noise.length_counter)
         --apu->noise.length_counter;
-
     // 扫描
     sfc_sweep_square(&apu->square1, 1);
     sfc_sweep_square(&apu->square2, 0);
@@ -552,6 +554,10 @@ void sfc_apu_set_interrupt(sfc_famicom_t* famicom) {
 /// <param name="famicom">The famicom.</param>
 void sfc_trigger_frame_counter(sfc_famicom_t* famicom) {
     sfc_apu_register_t* const apu = &famicom->apu;
+    // 触发一次 
+    // TODO: 优化触发
+    const uint32_t cycle = famicom->cpu_cycle_count;
+    famicom->interfaces.audio_change(famicom->argument, cycle, SFC_FrameCounter);
     // 5步模式
     if ((apu->frame_counter & (uint8_t)SFC_APU4017_ModeStep5)) {
         apu->frame_step++;
@@ -579,9 +585,6 @@ void sfc_trigger_frame_counter(sfc_famicom_t* famicom) {
         // e e e e
         sfc_clock_envelopes_and_linear_counter(apu);
     }
-    // 触发一次
-    const uint32_t cycle = famicom->cpu_cycle_count;
-    famicom->interfaces.audio_change(famicom->argument, cycle, SFC_FrameCounter);
     // MMC5 伪帧序列器
     if (famicom->rom_info.extra_sound & SFC_NSF_EX_MMC5) {
         // 方波#1 长度计数器

@@ -4,6 +4,10 @@
 #include <assert.h>
 #include <string.h>
 
+#ifndef NDEBUG
+#include <stdio.h>
+#endif
+
 // Mapper 031 - NSF 子集
 enum {
     MAPPER_031_BANK_WINDOW = 4 * 1024,
@@ -25,6 +29,8 @@ static void sfc_nsf_switch(sfc_famicom_t* famicom, uint16_t addr, uint8_t data) 
  
 // 初始化FDS
 extern void sfc_fds1_init(sfc_famicom_t* famicom);
+// 初始化FME7
+extern void sfc_fme7_init(sfc_famicom_t* famicom);
 
 
 /// <summary>
@@ -64,8 +70,9 @@ extern sfc_ecode sfc_mapper_1F_reset(sfc_famicom_t* famicom) {
         }
         // 直接载入
         else {
+            const uint16_t addr_v = famicom->rom_info.load_addr & 0xfff;
             // 终点
-            uint16_t count = ((size_prgrom + 0xfff) >> 12) + i;
+            uint16_t count = ((size_prgrom + addr_v + 0xfff) >> 12) + i;
             if (count > 8) count = 8;
             // 处理
             for (uint8_t data = 0; i != count; ++i, ++data)
@@ -82,7 +89,25 @@ extern sfc_ecode sfc_mapper_1F_reset(sfc_famicom_t* famicom) {
         famicom->prg_banks[6] = famicom->expansion_ram32 + 4 * 1024 * 0;
         famicom->prg_banks[7] = famicom->expansion_ram32 + 4 * 1024 * 4;
         // N163: 副权重
+        famicom->apu.n163.n163_count = 1;
+        famicom->apu.n163.n163_lowest_id = 7;
         famicom->apu.n163.subweight_div16 = 6 * 16;
+        // 初始化FME7
+        sfc_fme7_init(famicom);
+#ifndef NDEBUG
+        printf("name     :  %s\n", famicom->rom_info.name);
+        printf("artist   :  %s\n", famicom->rom_info.artist);
+        printf("copyright:  %s\n", famicom->rom_info.copyright);
+        printf("NSF: 2A03");
+        const uint8_t ex = famicom->rom_info.extra_sound;
+        if (ex & SFC_NSF_EX_VCR6) printf(" VRC6");
+        if (ex & SFC_NSF_EX_VCR7) printf(" VRC7");
+        if (ex & SFC_NSF_EX_FDS1) printf(" FDS1");
+        if (ex & SFC_NSF_EX_MMC5) printf(" MMC5");
+        if (ex & SFC_NSF_EX_N163) printf(" N163");
+        if (ex & SFC_NSF_EX_FME7) printf(" FME7");
+        putchar('\n');
+#endif
     }
     // Mapper-031
     else {
@@ -102,6 +127,12 @@ extern sfc_ecode sfc_mapper_1F_reset(sfc_famicom_t* famicom) {
 extern void sfc_mapper_18_write_high(sfc_famicom_t*, uint16_t, uint8_t);
 // VRC7
 extern void sfc_mapper_55_write_high(sfc_famicom_t*, uint16_t, uint8_t);
+// FME7
+extern void sfc_mapper_45_write_high(sfc_famicom_t*, uint16_t, uint8_t);
+// N163
+extern void sfc_mapper_13_write_high(sfc_famicom_t*, uint16_t, uint8_t);
+// N163
+extern void sfc_mapper_13_write_low(sfc_famicom_t*, uint16_t, uint8_t);
 // FDS1
 extern void sfc_mapper_14_write_low(sfc_famicom_t*, uint16_t, uint8_t);
 // MMC5
@@ -120,6 +151,11 @@ extern void sfc_mapper_05_write_low(sfc_famicom_t*, uint16_t, uint8_t);
 /// <param name="data">The data.</param>
 static void sfc_mapper_1F_write_low(sfc_famicom_t*famicom, uint16_t addr, uint8_t data) {
     const uint8_t ex_sound = famicom->rom_info.extra_sound;
+    // N163
+    if (ex_sound & SFC_NSF_EX_N163) {
+        if (addr == 0x4800)
+            sfc_mapper_13_write_low(famicom, addr, data);
+    }
     // MMC5
     if (ex_sound & SFC_NSF_EX_MMC5) {
         // $5000 - $5FF5
@@ -130,13 +166,28 @@ static void sfc_mapper_1F_write_low(sfc_famicom_t*famicom, uint16_t addr, uint8_
     }
     // PRG bank select $5000-$5FFF
     if (addr >= 0x5000) {
-        sfc_nsf_switch(famicom, addr, data);
+        if (addr >= 0x5FF8) 
+            sfc_nsf_switch(famicom, addr, data);
     }
     // FDS
     else if (ex_sound & SFC_NSF_EX_FDS1) {
         sfc_mapper_14_write_low(famicom, addr, data);
     }
 }
+
+
+/// <summary>
+/// Mapper - 031 - 写入低地址($4020, $6000) 标准
+/// </summary>
+/// <param name="famicom">The famicom.</param>
+/// <param name="addr">The addr.</param>
+/// <param name="data">The data.</param>
+//static void sfc_mapper_1F_write_low_std(sfc_famicom_t*famicom, uint16_t addr, uint8_t data) {
+//    // PRG bank select $5000-$5FFF
+//    if (addr >= 0x5000) {
+//        sfc_nsf_switch(famicom, addr, data);
+//    }
+//}
 
 /// <summary>
 /// SFCs the mapper 1 f write high.
@@ -166,6 +217,18 @@ static void sfc_mapper_1F_write_high(sfc_famicom_t*f, uint16_t d, uint8_t v) {
         const bool r1 = d == 0x9030;
         if (r0 | r1)
             sfc_mapper_55_write_high(f, d, v);
+    }
+    // N163
+    if (ex_sound & SFC_NSF_EX_N163) {
+        if (d == 0xF800)
+            sfc_mapper_13_write_high(f, d, v);
+    }
+    // FME7
+    if (ex_sound & SFC_NSF_EX_FME7) {
+        const bool r0 = d == 0xC000;
+        const bool r1 = d == 0xE000;
+        if (r0 | r1)
+            sfc_mapper_45_write_high(f, d, v);
     }
 }
 
@@ -235,6 +298,42 @@ extern inline sfc_ecode sfc_load_mapper_1F(sfc_famicom_t* famicom) {
     famicom->mapper.write_high = sfc_mapper_1F_write_high;
     famicom->mapper.read_ram_from_stream = sfc_mapper_1F_read_ram;
     famicom->mapper.write_ram_to_stream = sfc_mapper_1F_write_ram;
+    // 标准音源
+#if 0
+    const uint8_t exsound = famicom->rom_info.extra_sound;
+    if ((exsound & (exsound - 1)) == 0) {
+        switch (exsound)
+        {
+        case 0:
+            famicom->mapper.write_low = sfc_mapper_1F_write_low_std;
+            break;
+        case SFC_NSF_EX_VCR6:
+            famicom->mapper.write_high = sfc_mapper_18_write_high;
+            break;
+        case SFC_NSF_EX_VCR7:
+            famicom->mapper.write_high = sfc_mapper_55_write_high;
+            break;
+        case SFC_NSF_EX_FDS1:
+            famicom->mapper.write_low = sfc_mapper_14_write_low;
+            break;
+        case SFC_NSF_EX_MMC5:
+            famicom->mapper.write_low = sfc_mapper_05_write_low;
+            break;
+        case SFC_NSF_EX_N163:
+            famicom->mapper.write_low = sfc_mapper_13_write_low;
+            famicom->mapper.write_high = sfc_mapper_13_write_high;
+            break;
+        case SFC_NSF_EX_FME7:
+            famicom->mapper.write_high = sfc_mapper_45_write_high;
+            break;
+        }
+    }
+    // 扩展音源
+    else {
+        famicom->mapper.write_low = sfc_mapper_1F_write_low;
+        famicom->mapper.write_high = sfc_mapper_1F_write_high;
+    }
+#endif
     return SFC_ERROR_OK;
 }
 

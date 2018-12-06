@@ -10,13 +10,15 @@
 /// </summary>
 enum sfc_channel_index {
     // [Sunsoft 5B] FME7
-    SFC_FME7_Sun5B = -5,
+    SFC_FME7_Sun5B = -6,
     // [N163] N163
-    SFC_VRC7_N163 = -4,
+    SFC_VRC7_N163 = -5,
     // [VRC7] VRC7
-    SFC_VRC7_VRC7 = -3,
+    SFC_VRC7_VRC7 = -4,
     // [VRC6] VRC6
-    SFC_VRC6_VRC6 = -2,
+    SFC_VRC6_VRC6 = -3,
+    // [MMC5] MMC5
+    SFC_MMC5_MMC5 = -2,
     // 帧计数器/序列器/[MMC5] 伪帧序列器
     SFC_FrameCounter = -1,
     // 总体
@@ -31,6 +33,12 @@ enum sfc_channel_index {
     SFC_2A03_Noise,
     // [2A03] DMC
     SFC_2A03_DMC,
+    // [MMC5] 方波#1
+    SFC_MMC5_Square1,
+    // [MMC5] 方波#2
+    SFC_MMC5_Square2,
+    // [MMC5] PCM声道
+    SFC_MMC5_PCM,
     // [VRC6] 方波#1
     SFC_VRC6_Square1,
     // [VRC6] 方波#2
@@ -51,12 +59,6 @@ enum sfc_channel_index {
     SFC_VRC7_FM5,
     // [FDS1] 波形声道
     SFC_FDS1_Wavefrom,
-    // [MMC5] 方波#1
-    SFC_MMC5_Square1,
-    // [MMC5] 方波#2
-    SFC_MMC5_Square2,
-    // [MMC5] PCM声道
-    SFC_MMC5_PCM,
     // [N163] 波形#0
     SFC_N163_Wavefrom0,
     // [N163] 波形#1
@@ -82,6 +84,10 @@ enum sfc_channel_index {
     // 总声道数量
     SFC_CHANNEL_COUNT
 } ;
+
+
+// ----------------------------- 2A03
+
 
 /// <summary>
 /// 
@@ -151,8 +157,8 @@ typedef struct {
     uint16_t        cur_period;
     // 序列索引
     uint8_t         seq_index;
-    // 未使用/MMC5 用于$5015
-    uint8_t         unused__mmc5_5015;
+    // $X015 对应使能位
+    uint8_t         x015_flag;
     // 长度计数器
     uint8_t         length_counter;
     // 控制寄存器
@@ -189,6 +195,8 @@ typedef struct {
     uint8_t         flag_reload;
     // 长度计数器/线性计数器暂停值
     uint8_t         flag_halt;
+    // 当前序列索引
+    uint8_t         seq_index;
 } sfc_triangle_data_t;
 
 /// <summary>
@@ -220,25 +228,29 @@ typedef struct {
     uint16_t        lenleft;
     // 周期
     uint16_t        period;
-    // 周期索引
-    uint16_t        index;
+    // CPU时钟
+    uint16_t        clock;
     // 输出
     uint8_t         value;
     // 中断[D1]/循环[D0]
     uint8_t         irq_loop;
     // 8步计数
     uint8_t         count;
-    // 字节数据
+    // 字节数据[8字节位移寄存器]
     uint8_t         data;
 
 } sfc_dmc_data_t;
 
 
+// ----------------------------- VRC6
+
 /// <summary>
 /// VRC6 方波数据
 /// </summary>
 typedef struct {
-    // 周期
+    // 时钟
+    uint16_t        clock;
+    // 周期(处理后, 已+1s)
     uint16_t        period;
     // 周期-原始
     uint16_t        period_raw;
@@ -256,6 +268,8 @@ typedef struct {
 /// VRC6 锯齿波数据
 /// </summary>
 typedef struct {
+    // 时钟
+    uint16_t        clock;
     // 周期
     uint16_t        period;
     // 周期-原始
@@ -286,6 +300,10 @@ typedef struct {
     uint8_t                     halt;
 } sfc_vrc6_data_t;
 
+
+
+
+// ----------------------------- VRC7
 
 
 // 可修改
@@ -401,6 +419,8 @@ typedef struct {
 } sfc_vrc7_data_t;
 
 
+// ----------------------------- FDS1
+
 
 /// <summary>
 /// FDS 数据
@@ -471,6 +491,7 @@ enum {
 };
 
 
+// ----------------------------- MMC5
 
 /// <summary>
 /// 
@@ -515,11 +536,17 @@ typedef struct {
     // 地址递增
     uint8_t     n163_inc;
     // 历史输出位置
-    uint16_t    history_index;
+    uint8_t     history_index;
     // 当前输出
     int8_t      ch_output[8];
-    // 历史输出
-    int8_t      history_output[8];
+    // 历史
+    struct {
+        // 历史输出
+        int8_t  output;
+        // 历史索引
+        uint8_t index;
+
+    }           history[8];
 } sfc_n163_data_t;
 
 
@@ -527,8 +554,10 @@ typedef struct {
 /// Sunsoft 5B 声道
 /// </summary>
 typedef struct {
-    // 时钟
-    uint16_t        clock;
+    // 时钟(转换成CPU)
+    uint16_t        cpu_clock;
+    // 周期(STEP -> / 2, CPU -> * 32)
+    uint16_t        cpu_period_step;
     // 周期
     uint16_t        period;
     // 音量
@@ -550,17 +579,24 @@ typedef struct {
     }               ;
 } sfc_sunsoft5b_ch_t;
 
+/// <summary>
+/// FME7 用数据
+/// </summary>
 typedef struct {
     // 线性反馈移位寄存器
     uint32_t            lfsr;
+    // 包络周期: (STEP / 32, CPU * 256)
+    uint32_t            env_period_step;
+    // 包络时钟
+    uint32_t            env_clock;
     // 声道
     sfc_sunsoft5b_ch_t  ch[3];
-    // 包络时钟
-    uint16_t            env_clock;
     // 包络周期
     uint16_t            env_period;
     // 包络音量
     uint16_t            env_volume;
+    // 噪声周期: (STEP / 1, CPU * 32)
+    uint16_t            noise_period_step;
     // 噪声时钟
     uint16_t            noise_clock;
     // 噪声周期
@@ -572,6 +608,7 @@ typedef struct {
     // 包络重复
     uint8_t             evn_repeat;
 } sfc_fme7_data_t;
+
 
 /// <summary>
 /// APU寄存器数据
@@ -587,6 +624,28 @@ typedef struct {
     sfc_noise_data_t        noise;
     // DMC
     sfc_dmc_data_t          dmc;
+    // 方波 #1 时钟
+    uint16_t                square1_clock;
+    // 方波 #2 时钟
+    uint16_t                square2_clock;
+    // 三角波时钟
+    uint16_t                triangle_clock;
+    // 噪声时钟
+    uint16_t                noise_clock;
+
+
+    // 状态寄存器(写: 声道使能)
+    uint8_t                 status_write;
+    // 状态寄存器(读:)
+    //uint8_t                 status_read;
+    // 帧计数器(序列器)写入寄存器
+    uint8_t                 frame_counter;
+    // 帧中断标志
+    uint8_t                 frame_interrupt;
+    // 步数计数
+    uint8_t                 frame_step;
+
+
     // VRC6
     sfc_vrc6_data_t         vrc6;
     // VRC7
@@ -599,16 +658,6 @@ typedef struct {
     sfc_n163_data_t         n163;
     // FME7
     sfc_fme7_data_t         fme7;
-    // 状态寄存器(写: 声道使能)
-    uint8_t                 status_write;
-    // 状态寄存器(读:)
-    //uint8_t                 status_read;
-    // 帧计数器(序列器)写入寄存器
-    uint8_t                 frame_counter;
-    // 帧中断标志
-    uint8_t                 frame_interrupt;
-    // 步数计数
-    uint8_t                 frame_step;
 
 } sfc_apu_register_t;
 
@@ -624,15 +673,10 @@ void sfc_apu_on_reset(sfc_apu_register_t*);
 void sfc_trigger_frame_counter(sfc_famicom_t*);
 
 
-// LFSR 长模式
-static inline uint16_t sfc_lfsr_long(uint16_t v) {
-    const uint16_t bit = ((v >> 0) ^ (v >> 1)) & 1;
-    return (uint16_t)(v >> 1) | (uint16_t)(bit << 14);
-}
 
-// LFSR 短模式
-static inline uint16_t sfc_lfsr_short(uint16_t v) {
-    const uint16_t bit = ((v >> 0) ^ (v >> 6)) & 1;
+// 2A03 LFSR 短模式
+static inline uint16_t sfc_lfsr_2a03(uint16_t v, uint8_t c) {
+    const uint16_t bit = ((v >> 0) ^ (v >> c)) & 1;
     return (uint16_t)(v >> 1) | (uint16_t)(bit << 14);
 }
 

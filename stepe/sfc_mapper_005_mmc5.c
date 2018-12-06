@@ -424,7 +424,7 @@ extern inline sfc_square_set1(sfc_square_data_t* sq, uint8_t value);
 // 方波#2
 extern inline sfc_square_set2(sfc_square_data_t* sq, uint8_t value);
 // 方波#3
-extern inline sfc_square_set3(sfc_square_data_t* sq, uint8_t value, uint8_t ok);
+extern inline sfc_square_set3(sfc_square_data_t* sq, uint8_t value);
 
 
 /// <summary>
@@ -457,7 +457,7 @@ extern void sfc_mapper_05_write_low(sfc_famicom_t* famicom, uint16_t address, ui
     case 0x5003:
         // Pulse 1 ($5000-$5003)
         famicom->interfaces.audio_change(famicom->argument, famicom->cpu_cycle_count, SFC_MMC5_Square1);
-        sfc_square_set3(&famicom->apu.mmc5.square1, value, famicom->apu.mmc5.square1.unused__mmc5_5015);
+        sfc_square_set3(&famicom->apu.mmc5.square1, value);
         break;
     case 0x5004:
         // Pulse 2 ($5004-$5007)
@@ -477,7 +477,7 @@ extern void sfc_mapper_05_write_low(sfc_famicom_t* famicom, uint16_t address, ui
     case 0x5007:
         // Pulse 2 ($5004-$5007)
         famicom->interfaces.audio_change(famicom->argument, famicom->cpu_cycle_count, SFC_MMC5_Square2);
-        sfc_square_set3(&famicom->apu.mmc5.square2, value, famicom->apu.mmc5.square2.unused__mmc5_5015);
+        sfc_square_set3(&famicom->apu.mmc5.square2, value);
         //printf("%02x\n", value);
         break;
     case 0x5001:
@@ -497,9 +497,10 @@ extern void sfc_mapper_05_write_low(sfc_famicom_t* famicom, uint16_t address, ui
         break;
     case 0x5015:
         // Status ($5015, read/write)
-        if (!(famicom->apu.mmc5.square1.unused__mmc5_5015 = value & 1))
+        famicom->interfaces.audio_change(famicom->argument, famicom->cpu_cycle_count, SFC_MMC5_MMC5);
+        if (!(famicom->apu.mmc5.square1.x015_flag = value & 1))
             famicom->apu.mmc5.square1.length_counter = 0;
-        if (!(famicom->apu.mmc5.square2.unused__mmc5_5015 = value & 2))
+        if (!(famicom->apu.mmc5.square2.x015_flag = value & 2))
             famicom->apu.mmc5.square2.length_counter = 0;
         break;
     case 0x5100:
