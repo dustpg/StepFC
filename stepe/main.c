@@ -1026,7 +1026,7 @@ sfc_ecode this_free_rom(void* arg, sfc_rom_info_t* info);
 /// 应用程序入口
 /// </summary>
 /// <returns></returns>
-int main() {
+int main(int argc, const char* argv[]) {
     char cso_path[PATH_BUFLEN]; char png_path[PATH_BUFLEN];
     printf("Battle Control Online! \n");
     init_global();
@@ -1060,7 +1060,9 @@ int main() {
 
     sfc_famicom_t famicom;
     g_famicom = &famicom;
-    if (sfc_famicom_init(&famicom, NULL, &interfaces)) return 1;
+
+    const char* const filepath = argc > 1 ? argv[1] : NULL;
+    if (sfc_famicom_init(&famicom, (void*)filepath, &interfaces)) return 1;
     //qload();
 
     update_mask(famicom.rom_info.extra_sound);
@@ -1229,7 +1231,9 @@ sfc_ecode this_load_nsf(sfc_rom_info_t* info, FILE* file) {
 /// <returns></returns>
 sfc_ecode this_load_rom(void* arg, sfc_rom_info_t* info) {
     assert(info->data_prgrom == NULL && "FREE FIRST");
-    FILE* const file = fopen("31_test_16.nes", "rb");
+    const char* const filename = arg ? arg : "31_test_16.nes";
+    FILE* const file = fopen(filename, "rb");
+    
     // 文本未找到
     if (!file) return SFC_ERROR_FILE_NOT_FOUND;
     //sfc_ecode code = SFC_ERROR_ILLEGAL_FILE;
