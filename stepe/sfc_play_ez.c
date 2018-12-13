@@ -162,6 +162,15 @@ static void sfc_do_dmc(sfc_famicom_t* famicom) {
     }
 }
 
+/// <summary>
+/// SFCs the get triangle data.
+/// </summary>
+/// <param name="index">The index.</param>
+/// <returns></returns>
+extern inline sfc_get_triangle_data(sfc_famicom_t* famicom) {
+    return sfc_tri_seq[famicom->apu.triangle.seq_index];
+}
+
 
 /// <summary>
 /// SteFC: 2A03 整型采样模式 - 采样

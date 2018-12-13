@@ -249,7 +249,7 @@ void sfc_mapper_14_write_low(sfc_famicom_t* famicom, uint16_t address, uint8_t v
     if (address >= 0x4040 && address < 0x4080) {
         sfc_fds1_data_t* const fds = &famicom->apu.fds;
         if (fds->write_enable) {
-            famicom->interfaces.audio_change(famicom->argument, famicom->cpu_cycle_count, SFC_FDS1_Wavefrom);
+            famicom->interfaces.audio_change(famicom->argument, famicom->cpu_cycle_count, SFC_FDS1_FDS1);
             sfc_get_fds1_wavtbl(famicom)[address & 0x3f] = (value & 0x3f) | 0x40;
             fds->wavtbl_index = 0;
             fds->waveout = sfc_get_fds1_wavtbl(famicom)[0] & 0x3f;
@@ -624,6 +624,8 @@ void sfc_fds1_samplemode_end(sfc_famicom_t* famicom, sfc_fds1_ctx_t* ctx) {
 
 #endif
 
+static sfc_fixed_t s_clock = 0;
+
 /// <summary>
 /// StepFC: FDS1 整型采样模式 - 采样
 /// </summary>
@@ -641,7 +643,7 @@ void sfc_fds1_smi_sample(sfc_famicom_t* famicom, sfc_fds1_smi_ctx_t* ctx, const 
             const uint32_t clock = sfc_fixed_add(&ctx->volenv_clock, cps);
             // 每次不足就tick
             while (fds->volenv_clock <= clock) {
-                ctx->volenv_clock += fds->volenv_tpc;
+                fds->volenv_clock += fds->volenv_tpc;
                 sfc_fds1_tick_volenv(famicom);
             }
             fds->volenv_clock -= clock;
@@ -687,10 +689,23 @@ void sfc_fds1_smi_sample(sfc_famicom_t* famicom, sfc_fds1_smi_ctx_t* ctx, const 
     // 输出
     //output += sfc_fds1_get_output(famicom);
     //ctx->output =  output * chw[0] / avgcount;
+
     ctx->output = (float)sfc_fds1_get_output_u6(famicom);
     ctx->output *= chw[0];
+
+
 #else
     assert(!"NOT IMPL");
 #endif
 }
 
+
+/// <summary>
+/// StepFC: FDS更新波表
+/// </summary>
+/// <param name="famicom">The famicom.</param>
+/// <param name="table">The table.</param>
+void sfc_fds1_update_wavetable(sfc_famicom_t* famicom, float* const out) {
+    const uint8_t* const table = sfc_get_fds1_wavtbl(famicom);
+    for (int i = 0; i != 64; ++i) out[i] = (float)(table[i] & 0x3f);
+}

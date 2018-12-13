@@ -76,11 +76,11 @@ static inline float sfc_mix_tnd(float triangle, float noise, float dmc) {
 /// 方波状态
 /// </summary>
 typedef struct {
-    // 方波 周期 预乘2
+    // 方波 周期(+1s) 预乘2
     uint16_t    period_x2;
     // 方波 音量
     uint8_t     volume;
-    // 方波 占空比
+    // 方波 占空比 预乘8
     uint8_t     duty;
 
 } sfc_square_ch_state_t;

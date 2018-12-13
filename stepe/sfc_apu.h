@@ -10,21 +10,23 @@
 /// </summary>
 enum sfc_channel_index {
     // [Sunsoft 5B] FME7
-    SFC_FME7_Sun5B = -6,
+    SFC_FME7_Sun5B = -8,
     // [N163] N163
-    SFC_VRC7_N163 = -5,
+    SFC_N163_N163 = -7,
+    // [FDS1] 准备写入波形表
+    SFC_FDS1_FDS1 = -6,
     // [VRC7] VRC7
-    SFC_VRC7_VRC7 = -4,
+    SFC_VRC7_VRC7 = -5,
     // [VRC6] VRC6
-    SFC_VRC6_VRC6 = -3,
+    SFC_VRC6_VRC6 = -4,
     // [MMC5] MMC5
-    SFC_MMC5_MMC5 = -2,
+    SFC_MMC5_MMC5 = -3,
     // 帧计数器/序列器/[MMC5] 伪帧序列器
-    SFC_FrameCounter = -1,
+    SFC_FrameCounter = -2,
     // 总体
-    SFC_Overview = 0,
+    SFC_Overview = -1,
     // [2A03] 方波#1
-    SFC_2A03_Square1,
+    SFC_2A03_Square1 = 0,
     // [2A03] 方波#2
     SFC_2A03_Square2,
     // [2A03] 三角波
@@ -205,7 +207,7 @@ typedef struct {
 typedef struct  {
     // 包络
     sfc_envelope_t  envelope;
-    // 线性反馈移位寄存器(暂时没用到)
+    // 线性反馈移位寄存器
     uint16_t        lfsr;
     // 长度计数器
     uint8_t         length_counter;
@@ -572,6 +574,8 @@ typedef struct {
     uint8_t         env;
     // 方波值
     uint8_t         square;
+    // 原始音量值
+    uint8_t         vol_raw;
     // 不同声道使用不同
     union {
         // [0]    寄存器选择

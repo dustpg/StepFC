@@ -34,8 +34,8 @@ typedef struct {
     uint8_t     four_screen;
     // 是否有SRAM(电池供电的) D0, D1为1则为超过8KiB的WRAM
     uint8_t     save_ram_flags;
-    // 保留以对齐
-    uint8_t     reserved;
+    // 初始播放曲目ID(从一开始)
+    uint8_t     start_play;
     // PAL/NTSC 位
     uint8_t     pal_ntsc_bits;
     // 扩展音源 位
@@ -48,6 +48,8 @@ typedef struct {
     uint16_t    init_addr;
     // 播放地址
     uint16_t    play_addr;
+    // 未使用
+    uint16_t    unsued;
     // Bankswitch 初始值
     uint8_t     bankswitch_init[8];
     // 歌曲名称

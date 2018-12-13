@@ -95,6 +95,7 @@ typedef struct {
 /// <param name="ptr">The PTR.</param>
 /// <returns></returns>
 static uint32_t sfc_make_offset(sfc_famicom_t* famicom, const uint8_t* ptr) {
+    if (!ptr) return 0xffffffff;
     const uint8_t* const fc0 = famicom->video_memory;
     const uint8_t* const fc1 = (const uint8_t*)(famicom + 1);
     // RAM
@@ -120,6 +121,7 @@ static uint32_t sfc_make_offset(sfc_famicom_t* famicom, const uint8_t* ptr) {
 /// <param name="offset">The offset.</param>
 /// <returns></returns>
 static uint8_t* sfc_make_pointer(sfc_famicom_t* famicom, uint32_t offset) {
+    if (offset == 0xffffffff) return NULL;
     // ROM
     if (offset & 0x80000000) return famicom->rom_info.data_prgrom + (offset & 0x7fffffff);
      // RAM

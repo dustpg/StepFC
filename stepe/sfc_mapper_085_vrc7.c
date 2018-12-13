@@ -589,6 +589,7 @@ enum sfc_envelope_phase_state {
     SFC_VRC7_Decay,
     SFC_VRC7_Sustain,
     SFC_VRC7_Release,
+    SFC_VRC7_Debug,
 };
 
 
@@ -666,6 +667,9 @@ static uint32_t sfc_vrc7_envelope(sfc_vrc7_operator_t* op) {
             op->egc = SFC_VRC7_AttenuationMax;
             op->state = SFC_VRC7_Idle;
         }
+        break;
+    case SFC_VRC7_Debug:
+        rv = 0;
         break;
     }
     return rv;
@@ -973,6 +977,67 @@ void sfc_vrc7_49716hz(sfc_famicom_t* famicom, int32_t output[]) {
 // -----------------------------------------------------
 
 
+// -----------------------------------------------------
+//                   VRC7 Wave Gen
+// -----------------------------------------------------
+
+/// <summary>
+/// SFCs the VRC7 write sound.
+/// </summary>
+/// <param name="famicom">The famicom.</param>
+/// <param name="addr">The addr.</param>
+/// <param name="value">The value.</param>
+static void sfc_vrc7_write_sound(sfc_famicom_t* famicom, uint8_t addr, uint8_t value) {
+    famicom->apu.vrc7.selected = addr;
+    sfc_mapper_55_regwrite(famicom, value);
+}
+
+// 默认事件
+extern void sfc_audio_changed(void*a, uint32_t b, enum sfc_channel_index c);
+/// <summary>
+/// StepFC: VRC7生成波表
+/// </summary>
+/// <remarks>
+/// out是 长度为128 x 2的缓冲区
+/// </remarks>
+/// <param name="famicom">The famicom.</param>
+/// <param name="out">The out.</param>
+/// <param name="instrument">The instrument.</param>
+void sfc_vrc7_wavetable_gen(sfc_famicom_t* famicom, float* const out, uint8_t instrument) {
+    void(*audio_change_bk)(void*, uint32_t, enum sfc_channel_index);
+    const sfc_vrc7_data_t vrc7_bk = famicom->apu.vrc7;
+    audio_change_bk = famicom->interfaces.audio_change;
+    famicom->interfaces.audio_change = sfc_audio_changed;
+    instrument <<= 4;
+    // 正式处理
+    const uint8_t data[] = {
+        0x30, instrument | 0x4,
+        0x10, 0, 0x20, 0,
+        0x20, (4 << 1) | (1 << 4) | 1,
+    };
+    for (int i = 0; i != sizeof(data); i += 2) 
+        sfc_vrc7_write_sound(famicom, data[i], data[i + 1]);
+    // 128样本
+
+    famicom->apu.vrc7.ch[0].carrier.state = SFC_VRC7_Debug;
+    famicom->apu.vrc7.ch[0].modulator.state = SFC_VRC7_Debug;
+    
+    for (int i = 0; i != 128; ++i) {
+        int32_t vrc7_output[6];
+        sfc_vrc7_49716hz(famicom, vrc7_output);
+
+        //if (vrc7_output[0]) {
+        //    int bk = 9;
+        //}
+
+        const double v0 = (double)vrc7_output[0] / (double)(1 << 20);
+
+        out[i] = (float)v0;
+    }
+    // 回退
+    famicom->interfaces.audio_change = audio_change_bk;
+    famicom->apu.vrc7 = vrc7_bk;
+}
 
 // -----------------------------------------------------
 //                   VRC7 Play
@@ -1002,8 +1067,8 @@ void sfc_vrc7_smi_sample(sfc_famicom_t* famicom, sfc_vrc7_smi_ctx_t* ctx, const 
     ctx->mixed = 0.f;
     for (int i = 0; i != 6; ++i) {
         const double v = (double)vrc7_output[i] / (double)(1 << 23);
-        const float chv = (float)v * chw[i];
-        ctx->output[i] = chv;
-        ctx->mixed += chv;
+        const float thisv = (float)v;
+        ctx->output[i] = thisv;
+        ctx->mixed += thisv * chw[i];
     }
 }

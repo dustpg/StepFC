@@ -99,9 +99,6 @@
     <ClCompile Include="sfc_state_sl.c">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="..\common\d2d_draw2.cpp">
-      <Filter>cpp</Filter>
-    </ClCompile>
     <ClCompile Include="..\common\xa2_play1.cpp">
       <Filter>cpp</Filter>
     </ClCompile>
@@ -131,6 +128,9 @@
     </ClCompile>
     <ClCompile Include="sfc_mapper_069_fme7.c">
       <Filter>mapper</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\d2d_draw3.cpp">
+      <Filter>cpp</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

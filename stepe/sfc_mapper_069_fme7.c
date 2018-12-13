@@ -527,7 +527,7 @@ static void sfc_fme7_ym2149f_write(sfc_famicom_t* famicom, uint8_t value) {
         // Channel A/B/C envelope enable (E), volume (V)
         sfc_fme7_ch_change(famicom, selected - 8);
         ch = &fme7->ch[selected - 8];
-        ch->volume = sfc_fme7_vol_lut[value & 0xf];
+        ch->volume = sfc_fme7_vol_lut[ch->vol_raw = value & 0xf];
         ch->env = value & 0x10;
         break;
     case 0xB:
@@ -718,6 +718,7 @@ void sfc_fme7_smi_sample(sfc_famicom_t* famicom, sfc_fme7_smi_ctx_t* ctx, const 
         ch->square ^= count;
         ch->cpu_clock -= count * ch->cpu_period_step;
     }
+
     // 噪音
     fme7->noise_clock += sfc_fixed_add(&ctx->noi_clock, cps);
 

@@ -72,6 +72,7 @@ static inline int8_t sfc_n163_sample(sfc_famicom_t* famicom, uint8_t addr) {
     return (data >> ((addr & 1) << 2)) & 0xf;
 }
 
+
 /// <summary>
 /// SFCs the N163 load prgrom.
 /// </summary>
@@ -107,6 +108,17 @@ extern inline void sfc_operation_IRQ_acknowledge(sfc_famicom_t* famicom);
 // 尝试触发
 extern inline void sfc_operation_IRQ_try(sfc_famicom_t* famicom);
 
+
+/// <summary>
+/// Calculates the index.
+/// </summary>
+/// <param name="addr">The addr.</param>
+/// <returns></returns>
+static inline enum sfc_channel_index calc_index(uint8_t addr) {
+    if (addr < 0x40) return SFC_N163_N163;
+    return SFC_N163_Wavefrom0 + (addr >> 3) & 7;
+}
+
 /// <summary>
 /// SFCs the mapper 15 write low.
 /// </summary>
@@ -120,7 +132,11 @@ void sfc_mapper_13_write_low(sfc_famicom_t* famicom, uint16_t address, uint8_t v
     {
         uint8_t tmp;
     case 1:
-        famicom->interfaces.audio_change(famicom->argument, famicom->cpu_cycle_count, SFC_VRC7_N163);
+        famicom->interfaces.audio_change(
+            famicom->argument, 
+            famicom->cpu_cycle_count, 
+            calc_index(famicom->apu.n163.n163_addr)
+        );
         // Data Port ($4800-$4FFF)
         sfc_n163_internal_chip(famicom)[famicom->apu.n163.n163_addr] = value;
         famicom->apu.n163.n163_addr += famicom->apu.n163.n163_inc;
@@ -375,6 +391,49 @@ enum {
     SFC_N163_7E,
     SFC_N163_7F,
 };
+
+typedef struct { uint32_t freq; uint16_t len; uint8_t vol; uint8_t addr; } sfc_n163info_t;
+
+/// <summary>
+/// SFCs the N163 get information.
+/// </summary>
+/// <param name="famicom">The famicom.</param>
+/// <param name="ch">The ch.</param>
+extern sfc_n163info_t sfc_n163_get_info(sfc_famicom_t* famicom, uint8_t ch) {
+    // 基础地址
+    uint8_t* const ram = sfc_n163_internal_chip(famicom);
+    // 把声道映射到地址
+    uint8_t* const chn = ram + ((ch << 3) | 0x40);
+    const uint32_t freq
+        = ((uint32_t)(chn[SFC_N163_7C] & 0x03) << 16)
+        | (uint32_t)(chn[SFC_N163_7A] << 8)
+        | (uint32_t)(chn[SFC_N163_78])
+        ;
+    const uint16_t length = 256 - (chn[SFC_N163_7C] & 0xFC);
+    const uint8_t volume = chn[SFC_N163_7F] & 0x0F;
+    const uint8_t offset = chn[SFC_N163_7E];
+
+    const sfc_n163info_t rv = { freq, length, volume, offset };
+    return rv;
+}
+
+
+/// <summary>
+/// SFCs the N163 update wavetable.
+/// </summary>
+/// <param name="famicom">The famicom.</param>
+/// <param name="out">The out.</param>
+/// <param name="ch">The ch.</param>
+extern void sfc_n163_update_wavetable(sfc_famicom_t* famicom, float* out, uint16_t len) {
+    const uint8_t * const ram = sfc_n163_internal_chip(famicom);
+    const uint16_t count = len >> 1;
+    for (uint16_t i = 0; i != count; ++i) {
+        const uint8_t data = ram[i];
+        out[0] = (float)(data & 0xf);
+        out[1] = (float)((data >> 4) & 0xf);
+        out += 2;
+    }
+}
 
 /// <summary>
 /// SFCs the N163 update.

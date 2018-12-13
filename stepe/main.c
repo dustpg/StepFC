@@ -1,7 +1,7 @@
 ﻿#include "sfc_famicom.h"
 #include "sfc_cpu.h"
 #include "sfc_play.h"
-#include "../common/d2d_interface2.h"
+#include "../common/d2d_interface3.h"
 #include "../common/xa2_interface1.h"
 #include "sfc_audio_filter.h"
 #include <math.h>
@@ -17,7 +17,7 @@ enum {
     VRC7_OUTPUT_PER_SEC = 49716,
     SAMPLES_PER_FRAME = SAMPLES_PER_SEC / 60,
     SAMPLES_ALIGNED = 8,
-    SAMPLES_PER_FRAME_ALIGNED = (SAMPLES_PER_FRAME / SAMPLES_ALIGNED + 1) * SAMPLES_ALIGNED,
+    SAMPLES_PER_FRAME_ALIGNED = ((SAMPLES_PER_FRAME + SAMPLES_ALIGNED - 1) / SAMPLES_ALIGNED ) * SAMPLES_ALIGNED,
     BASIC_BUFFER_COUNT = 16,
     BUFFER_MAX = 4
 };
@@ -62,6 +62,12 @@ struct interface_audio_state {
     uint32_t                        input_length;
     uint32_t                        last_cycle;
 
+    uint8_t                         change_2a03;
+    uint8_t                         change_mmc5;
+
+    uint8_t                         change_vrc7_custompatch;
+
+
     sfc_1storder_rc_lopass_filter_t lp_14kHz;
     sfc_1storder_rc_hipass_filter_t hp_440Hz;
     sfc_1storder_rc_hipass_filter_t hp__90Hz;
@@ -76,16 +82,53 @@ struct interface_audio_state {
     sfc_n163_smi_ctx_t              ctx_n163;
     sfc_fme7_smi_ctx_t              ctx_fme7;
 
-    float vrc6_squ1_cycle       ;
-    float vrc6_squ2_cycle       ;
-    float vrc6_saw__cycle       ;
 
-    float                           vrc7_index;
     float                           max_vol;
 
     float                           ch_weight[SFC_CHANNEL_COUNT];
+
+    sfc_visualizers_t               visualizers[SFC_CHANNEL_COUNT];
+
+    float                           fds1_wave_table[64];
+    float                           n163_wave_table[256];
+    float                           vrc7_wave_table[128 * 16];
+
+
+    float                           current_chn[SAMPLES_PER_FRAME * SFC_VIS_PCM_COUNT];
 } g_states;
 
+
+
+void update_mask(uint8_t exsound) {
+    for (int i = 0; i != SFC_CHANNEL_COUNT; ++i)
+        g_states.visualizers[i].mask = 0;
+    // 2A03  x 5
+    for (int i = 0; i != 5; ++i)
+        g_states.visualizers[SFC_2A03_Square1 + i].mask = 1;
+    // VRC6  x 3
+    if (exsound & SFC_NSF_EX_VCR6)
+        for (int i = 0; i != 3; ++i)
+            g_states.visualizers[SFC_VRC6_Square1 + i].mask = 1;
+    // VRC7  x 6
+    if (exsound & SFC_NSF_EX_VCR7)
+        for (int i = 0; i != 6; ++i)
+            g_states.visualizers[SFC_VRC7_FM0 + i].mask = 1;
+    // FDS1  x 1
+    if (exsound & SFC_NSF_EX_FDS1)
+        g_states.visualizers[SFC_FDS1_Wavefrom].mask = 1;
+    // MMC5  x 3
+    if (exsound & SFC_NSF_EX_MMC5)
+        for (int i = 0; i != 3; ++i)
+            g_states.visualizers[SFC_MMC5_Square1 + i].mask = 1;
+    // N163  x 8
+    if (exsound & SFC_NSF_EX_N163)
+        for (int i = 0; i != 8; ++i)
+            g_states.visualizers[SFC_N163_Wavefrom0 + i].mask = 1;
+    // FME7  x 3
+    if (exsound & SFC_NSF_EX_FME7)
+        for (int i = 0; i != 3; ++i)
+            g_states.visualizers[SFC_FME7_ChannelA + i].mask = 1;
+}
 
 #define LP14kHz(x) sfc_filter_rclp(&g_states.lp_14kHz, x)
 #define HP440Hz(x) sfc_filter_rchp(&g_states.hp_440Hz, x)
@@ -160,6 +203,25 @@ static void ib_try_load_record() {
     }
 }
 
+void log_this_sample(uint32_t i) {
+    // 记录2A03-NOI
+    g_states.current_chn[SFC_VIS_PCM_NOISE * SAMPLES_PER_FRAME + i] = g_states.ctx_2a03.noi_output;
+    // 记录2A03-DMC
+    g_states.current_chn[SFC_VIS_PCM_DMC * SAMPLES_PER_FRAME + i] = g_states.ctx_2a03.dmc_output;
+    // 记录MMC5-PCM
+    g_states.current_chn[SFC_VIS_PCM_PCM * SAMPLES_PER_FRAME + i] = g_states.ctx_mmc5.pcm_output;
+    // 记录VRC7-FMC
+    //for (int j = 0; j != 6; ++j) {
+    //    g_states.current_chn[(SFC_VRC7_FM0 + j) * SAMPLES_PER_FRAME + i] = g_states.ctx_vrc7.output[j];
+    //}
+    // 记录N163-WAV
+    //for (int j = 0; j != 8; ++j) {
+    //    g_states.current_chn[(SFC_N163_Wavefrom0 + j) * SAMPLES_PER_FRAME + i] = (float)g_famicom->apu.n163.ch_output[j];
+    //}
+    // 记录FDS1
+    //g_states.current_chn[SFC_FDS1_Wavefrom * SAMPLES_PER_FRAME + i] = g_states.ctx_fds1.output;
+}
+
 // 生成样本
 static void make_samples(const uint32_t begin, const uint32_t end) {
     if (begin >= end) return;
@@ -170,17 +232,10 @@ static void make_samples(const uint32_t begin, const uint32_t end) {
         *  (g_famicom->frame_counter % BASIC_BUFFER_COUNT)
         ;
 
-    const float cpu_cycle_per_sample 
-        = (float)NTSC_CPU_RATE 
-        / (float)SAMPLES_PER_SEC
-        ;
-
+    // TODO: 移动至合适位置
     const sfc_fixed_t cps_fixed = sfc_fixed_make(NTSC_CPU_RATE, SAMPLES_PER_SEC);
-
-
     // TODO: 移动至合适位置
     sfc_n163_smi_update_subweight(g_famicom, &g_states.ctx_n163);
-
 
     const uint8_t extra_sound = g_famicom->rom_info.extra_sound;
 
@@ -245,12 +300,11 @@ static void make_samples(const uint32_t begin, const uint32_t end) {
             // FME7 权重近似0.1494*2.4*3 近似 = 1
             output += ctx->output[0] + ctx->output[1] + ctx->output[2];
         }
-
+        // 记录当前
+        log_this_sample(i);
+        // 限制最大音量
         if (output > g_states.max_vol) g_states.max_vol = output;
-
-        buffer[i] = output / g_states.max_vol
-            //* 2.f
-            ;
+        buffer[i] = output / g_states.max_vol;
     }
 }
 
@@ -267,47 +321,327 @@ static void this_audio_event(void* arg, uint32_t cycle, enum sfc_channel_index t
     // 将目前的状态覆盖 区间[old_index, now_index)
 
     // 更新状态
+    if (now_index > old_index && (g_states.change_2a03 | g_states.change_mmc5)) {
+        if (g_states.change_2a03 & 1) 
+            sfc_2a03_smi_update_sq1(g_famicom, &g_states.ctx_2a03);
+        if (g_states.change_2a03 & 2)
+            sfc_2a03_smi_update_sq2(g_famicom, &g_states.ctx_2a03);
+        if (g_states.change_2a03 & 4)
+            sfc_2a03_smi_update_tri(g_famicom, &g_states.ctx_2a03);
+        if (g_states.change_2a03 & 8)
+            sfc_2a03_smi_update_noi(g_famicom, &g_states.ctx_2a03);
+
+        if (g_states.change_mmc5 & 1)
+            sfc_mmc5_smi_update_sq1(g_famicom, &g_states.ctx_mmc5);
+        if (g_states.change_mmc5 & 2)
+            sfc_mmc5_smi_update_sq2(g_famicom, &g_states.ctx_mmc5);
+
+        g_states.change_2a03 = 0;
+        g_states.change_mmc5 = 0;
+    }
+    // 处理修改
     const uint8_t extra_sound = g_famicom->rom_info.extra_sound;
     switch (type)
     {
     case SFC_Overview:
     case SFC_FrameCounter:
-        sfc_2a03_smi_update_sq1(g_famicom, &g_states.ctx_2a03);
-        sfc_2a03_smi_update_sq2(g_famicom, &g_states.ctx_2a03);
-        sfc_2a03_smi_update_tri(g_famicom, &g_states.ctx_2a03);
-        sfc_2a03_smi_update_noi(g_famicom, &g_states.ctx_2a03);
+        g_states.change_2a03 = 0xf;
         if (type != SFC_Overview && (extra_sound & SFC_NSF_EX_MMC5)) {
     case SFC_MMC5_MMC5:
-            sfc_mmc5_smi_update_sq1(g_famicom, &g_states.ctx_mmc5);
-            sfc_mmc5_smi_update_sq2(g_famicom, &g_states.ctx_mmc5);
+        g_states.change_mmc5 = 0xf;
         }
         break;
     case SFC_2A03_Square1:
-        sfc_2a03_smi_update_sq1(g_famicom, &g_states.ctx_2a03);
+        g_states.change_2a03 |= 1;
         break;
     case SFC_2A03_Square2:
-        sfc_2a03_smi_update_sq2(g_famicom, &g_states.ctx_2a03);
+        g_states.change_2a03 |= 2;
         break;
     case SFC_2A03_Triangle:
-        sfc_2a03_smi_update_tri(g_famicom, &g_states.ctx_2a03);
+        g_states.change_2a03 |= 3;
         break;
     case SFC_2A03_Noise:
-        sfc_2a03_smi_update_noi(g_famicom, &g_states.ctx_2a03);
+        g_states.change_2a03 |= 4;
         break;
     case SFC_2A03_DMC:
         break;
     case SFC_MMC5_Square1:
-        sfc_mmc5_smi_update_sq1(g_famicom, &g_states.ctx_mmc5);
+        g_states.change_mmc5 |= 1;
         break;
     case SFC_MMC5_Square2:
-        sfc_mmc5_smi_update_sq2(g_famicom, &g_states.ctx_mmc5);
+        g_states.change_mmc5 |= 2;
         break;
     case SFC_MMC5_PCM:
         break;
+    case SFC_VRC7_VRC7:
+        g_states.change_vrc7_custompatch = 1;
+        break;
     }
 
+
+
     make_samples(old_index, now_index);
+
     g_states.last_cycle = cycle;
+}
+
+
+static inline float vol2alpha(float vol) {
+    vol *= 2.f; return vol > 1.f ? 1.f : vol;
+}
+
+
+void sfc_make_2a03_squ(const sfc_square_ch_state_t* state, sfc_visualizers_t* data) {
+    data->key_on = 0;
+    if (state->volume) {
+        data->key_on = 1;
+        data->color[3] = vol2alpha((float)state->volume / 15.f);
+        data->freq = g_famicom->config.cpu_clock_f / 8.f / (float)state->period_x2;
+        data->volume = state->volume;
+        data->ud.sq_duty = state->duty >> 3;
+    }
+}
+
+
+extern inline sfc_get_triangle_data(sfc_famicom_t* famicom);
+
+void sfc_make_2a03_tri(const sfc_triangle_ch_state_t* state, sfc_visualizers_t* data) {
+    data->key_on = 0;
+    data->volume = state->play_mask ? sfc_get_triangle_data(g_famicom) : 0;
+    if (state->play_mask & state->inc_mask) {
+        data->volume = 15;
+        data->key_on = 1;
+        data->freq = g_famicom->config.cpu_clock_f / 32.f / (float)state->period;
+    }
+}
+
+void sfc_make_2a03_noi(const sfc_noise_ch_state_t* state, sfc_visualizers_t* data) {
+    //data->key_on = 0;
+    data->key_on = !!state->volume;
+    data->volume = state->volume;
+    data->ud.noi_mode = state->count - 1;
+    data->freq = g_famicom->config.cpu_clock_f / (float)state->period;
+}
+
+
+void sfc_make_2a03_dmc(const sfc_dmc_data_t* state, sfc_visualizers_t* data) {
+    data->key_on = !!(g_famicom->apu.status_write & SFC_APU4015_WRITE_EnableDMC);
+    data->freq = g_famicom->config.cpu_clock_f / (float)state->period;
+}
+
+
+void sfc_make_vrc6_squ(const sfc_vrc6_square_data_t* state, sfc_visualizers_t* data) {
+    data->key_on = 0;
+    data->volume = state->volume;
+    data->ud.sq_duty = state->duty;
+    if (state->enable && state->volume) {
+        data->key_on = 1;
+        data->color[3] = vol2alpha((float)state->volume / 15.f);
+        data->freq = g_famicom->config.cpu_clock_f / 16.f / (float)state->period;
+    }
+}
+
+
+void sfc_make_vrc6_saw(const sfc_vrc6_saw_data_t* state, sfc_visualizers_t* data) {
+    data->key_on = 0;
+    data->volume = state->rate;
+    if (state->enable && state->rate) {
+        data->key_on = 1;
+        data->color[3] = vol2alpha((float)state->rate / 42.f);
+        data->freq = g_famicom->config.cpu_clock_f / 14.f / (float)state->period;
+    }
+}
+
+
+void sfc_vrc7_wavetable_gen(sfc_famicom_t* famicom, float* const out, uint8_t instrument);
+
+void make_inited_vrc7_wavtable(void) {
+    for (uint8_t i = 1; i != 16; ++i) {
+        sfc_vrc7_wavetable_gen(g_famicom, g_states.vrc7_wave_table + 128 * i, i);
+    }
+}
+
+
+
+void sfc_make_vrc7_fmc(const sfc_vrc7_ch_t* state, sfc_visualizers_t* data) {
+    data->key_on = state->trigger;
+    /*
+              49716 Hz * freq
+        F = -----------------
+             2^(19 - octave)
+    */
+    const uint32_t a = VRC7_OUTPUT_PER_SEC * state->freq;
+    const uint32_t b = 1 << (19 - state->octave);
+    data->freq = (float)((double)a / (double)b);
+    // VRC7的音量是非线性的
+    data->color[3] = vol2alpha((float)state->volume / 15.f);
+
+    data->volume = state->volume;
+
+    data->ex.vrc7.instrument = state->instrument8 >> 3;
+    data->ex.vrc7.mod_state = state->modulator.state;
+    data->ex.vrc7.car_state = state->carrier.state;
+    // AM/FM
+    const uint8_t* const patch = sfc_get_vrc7_patch(g_famicom) + state->instrument8;
+    data->ex.vrc7.mod_am = patch[0] & 0x80;
+    data->ex.vrc7.mod_fm = patch[0] & 0x40;
+    data->ex.vrc7.car_am = patch[1] & 0x80;
+    data->ex.vrc7.car_fm = patch[1] & 0x40;
+}
+
+extern void sfc_fds1_update_wavetable(sfc_famicom_t*, float*);
+
+void update_fds1_wavtbl() {
+    sfc_fds1_update_wavetable(g_famicom, g_states.fds1_wave_table);
+
+}
+
+void sfc_make_fds1_wav(const sfc_fds1_data_t* state, sfc_visualizers_t* data) {
+    data->key_on = 0;
+    if (!(state->flags_4083 & SFC_FDS_4083_HaltWave)) {
+        //  CPU * current_picth / 65536 / 64
+        data->key_on = 1;
+        const float freq = g_famicom->config.cpu_clock_f / 64.f / 65536.f * (float)state->freq_gained;
+        data->freq = freq;
+
+        data->volume = state->volenv_gain_clamped * state->master_volume;
+        const float volb = (float)data->volume;
+        data->color[3] = vol2alpha(volb / (32.f * 30.f));
+    }
+}
+
+typedef struct { uint32_t freq; uint16_t len; uint8_t vol; uint8_t addr; } sfc_n163info_t;
+extern sfc_n163info_t sfc_n163_get_info(sfc_famicom_t* famicom, uint8_t ch);
+
+extern void sfc_n163_update_wavetable(sfc_famicom_t*, float*, uint16_t);
+
+void update_n163_wavtbl(uint16_t l) {
+    sfc_n163_update_wavetable(g_famicom, g_states.n163_wave_table, l);
+}
+
+
+void sfc_make_n163_wav(uint8_t i, sfc_visualizers_t* data, uint16_t* maxl) {
+    data->key_on = 0;
+    if (i < g_famicom->apu.n163.n163_lowest_id) return;
+    /*
+        f = wave frequency
+        l = wave length
+        c = number of channels
+        p = 18-bit frequency value
+        n = CPU clock rate (≈1789773 Hz)
+
+        f = (n * p) / (15 * 65536 * l * c)
+    */
+    const sfc_n163info_t info = sfc_n163_get_info(g_famicom, i);
+    data->ex.n163.wavtbl_len = info.len;
+    data->ex.n163.wavtbl_off = info.addr;
+    data->volume = (uint8_t)info.vol;
+    // 当前尺度
+    const uint16_t current = info.len + (uint16_t)info.addr;
+    if (current > *maxl) *maxl = current;
+    // 有效
+    if (info.vol) {
+        data->key_on = 1;
+        const uint32_t c = g_famicom->apu.n163.n163_count;
+        const double a = g_famicom->config.cpu_clock_f * info.freq;
+        const double b = 15 * 65536 * info.len * c;
+        data->freq = (float)(a / b);
+        data->color[3] = vol2alpha((float)info.vol / 15.f);
+    }
+}
+
+
+
+
+void sfc_make_fme7_squ(
+    const sfc_fme7_data_t* fme7,
+    const sfc_sunsoft5b_ch_t* state, 
+    sfc_visualizers_t* data) {
+    data->key_on = 0;
+    data->ud.sq_duty = 2;
+    data->ex.fme7.noi = state->noise;
+    data->ex.fme7.env = state->env;
+    data->ex.fme7.tone = state->tone;
+    // 包络模式
+    if (state->env) {
+        /*
+        包络频率: f1 = CPU / (2 * 256 * Period)
+        适用于: $08/$0C
+        包络频率: f2 = CPU / (2 * 256 * Period * 2)
+        适用于: $0A/$0E
+        */
+        const float period = (float)(fme7->env_period_step * 32);
+        float base = g_famicom->config.cpu_clock_f / period;
+        const uint8_t step3 = (fme7->evn_shape >> 2) & 3;
+        const uint8_t step4 = (fme7->evn_shape >> 0) & 3;
+        if (step3 != step4) base *= 0.5f;
+        data->key_on = 1;
+        data->freq = base;
+    }
+    // Tone模式
+    else {
+        // f = CPU / (2 * 16 * Period)
+        if (state->volume) {
+            data->volume = state->vol_raw;
+            data->key_on = 1;
+            const float freq = g_famicom->config.cpu_clock_f / (float)(state->cpu_period_step * 2);
+            data->freq = freq;
+            data->color[3] = vol2alpha((float)state->volume / 15.f);
+        }
+    }
+}
+
+void update_infomation(void) {
+    // 2A03 方波#1
+    sfc_make_2a03_squ(&g_states.ctx_2a03.sq1_state, g_states.visualizers + SFC_2A03_Square1);
+    // 2A03 方波#2
+    sfc_make_2a03_squ(&g_states.ctx_2a03.sq2_state, g_states.visualizers + SFC_2A03_Square2);
+    // 2A03 三角波
+    sfc_make_2a03_tri(&g_states.ctx_2a03.tri_state, g_states.visualizers + SFC_2A03_Triangle);
+    //  2A03 噪音
+    sfc_make_2a03_noi(&g_states.ctx_2a03.noi_state, g_states.visualizers + SFC_2A03_Noise);
+    //  2A03 DMC
+    sfc_make_2a03_dmc(&g_famicom->apu.dmc, g_states.visualizers + SFC_2A03_DMC);
+
+    // VRC6 方波#1
+    sfc_make_vrc6_squ(&g_famicom->apu.vrc6.square1, g_states.visualizers + SFC_VRC6_Square1);
+    // VRC6 方波#2
+    sfc_make_vrc6_squ(&g_famicom->apu.vrc6.square2, g_states.visualizers + SFC_VRC6_Square2);
+    // VRC6 锯齿波
+    sfc_make_vrc6_saw(&g_famicom->apu.vrc6.saw, g_states.visualizers + SFC_VRC6_Saw);
+
+    // VRC7
+    for (int i = 0; i != 6; ++i) 
+        sfc_make_vrc7_fmc(g_famicom->apu.vrc7.ch + i, g_states.visualizers + SFC_VRC7_FM0 + i);
+    // VRC7 自定义乐器
+    if (g_states.change_vrc7_custompatch) {
+        g_states.change_vrc7_custompatch = 0;
+        sfc_vrc7_wavetable_gen(g_famicom, g_states.vrc7_wave_table, 0);
+    }
+
+    // FDS1
+    sfc_make_fds1_wav(&g_famicom->apu.fds, g_states.visualizers + SFC_FDS1_Wavefrom);
+    // TODO: 更新时更新
+    update_fds1_wavtbl();
+
+
+    // MMC5 方波#1
+    sfc_make_2a03_squ(&g_states.ctx_mmc5.sq1_state, g_states.visualizers + SFC_MMC5_Square1);
+    // MMC5 方波#2
+    sfc_make_2a03_squ(&g_states.ctx_mmc5.sq2_state, g_states.visualizers + SFC_MMC5_Square2);
+
+    // N163 波表调制
+    uint16_t max_len = 0;
+    for (uint8_t i = 0; i != 8; ++i) {
+        sfc_make_n163_wav(i, g_states.visualizers + SFC_N163_Wavefrom0 + i, &max_len);
+    }
+    // TODO: 更新时更新
+    update_n163_wavtbl(max_len);
+
+
+    // FME7 声道
+    for(int i = 0; i != 3; ++i)
+        sfc_make_fme7_squ(&g_famicom->apu.fme7, g_famicom->apu.fme7.ch + i, g_states.visualizers + SFC_FME7_ChannelA + i);
 }
 
 
@@ -369,6 +703,8 @@ static void play_audio(void* rgba) {
     const uint32_t old_index = g_states.last_cycle * SAMPLES_PER_SEC / NTSC_CPU_RATE;
     make_samples(old_index, SAMPLES_PER_FRAME);
     g_states.last_cycle = 0;
+    // 更新当前信息
+    update_infomation();
     // 提交当前缓存
     submit_now_buffer(rgba);
 }
@@ -568,6 +904,7 @@ void init_global() {
     g_states.ctx_2a03.sq2_state.period_x2 = 2;
     g_states.ctx_2a03.tri_state.period = 1;
     g_states.ctx_2a03.noi_state.period = 1;
+    g_states.ctx_2a03.noi_state.count = 1;
 
     g_states.ctx_mmc5.sq1_state.period_x2 = 2;
     g_states.ctx_mmc5.sq2_state.period_x2 = 2;
@@ -576,16 +913,66 @@ void init_global() {
 
     g_states.max_vol = 1.f;
 
+    //srand(233);
+    void ui_function_hsla_to_rgba_float32(const float hsla[4], float rgba[4]);
+
+
+    float hsla[4];
+    hsla[1] = 1.0f;
+    hsla[2] = 0.7f;
+    hsla[3] = 1.f;
 
     for (int i = 0; i != SFC_CHANNEL_COUNT; ++i) {
         g_states.ch_weight[i] = 1.f;
+
+        float* const color = g_states.visualizers[i].color;
+        hsla[0] = (float)((360 * i * 9 / SFC_CHANNEL_COUNT) % 360);
+        ui_function_hsla_to_rgba_float32(hsla, color);
     }
 
-    //g_states.ch_weight[SFC_2A03_Square1] = 0.f;
-    //g_states.ch_weight[SFC_2A03_Square2] = 0.f;
-    //g_states.ch_weight[SFC_2A03_Triangle] = 0.f;
-    //g_states.ch_weight[SFC_2A03_Noise] = 0.f;
-    //g_states.ch_weight[SFC_2A03_DMC] = 0.f;
+    // 
+
+    d2d_set_visualizers(
+        g_states.visualizers, SFC_CHANNEL_COUNT,
+        g_states.n163_wave_table,
+        g_states.fds1_wave_table,
+        g_states.vrc7_wave_table, 128,
+        g_states.current_chn, SAMPLES_PER_FRAME
+    );
+
+    //g_states.ch_weight[SFC_2A03_Square1] = 1.f;
+    //g_states.ch_weight[SFC_2A03_Square2] = 1.f;
+    //g_states.ch_weight[SFC_2A03_Triangle] = 1.f;
+    //g_states.ch_weight[SFC_2A03_Noise] = 1.f;
+    //g_states.ch_weight[SFC_2A03_DMC] = 1.f;
+
+    //g_states.ch_weight[SFC_VRC6_Square1] = 1.f;
+    //g_states.ch_weight[SFC_VRC6_Square2] = 1.f;
+    //g_states.ch_weight[SFC_VRC6_Saw] = 1.f;
+
+
+    //g_states.ch_weight[SFC_VRC7_FM0] = 1.f;
+    //g_states.ch_weight[SFC_VRC7_FM1] = 1.f;
+    //g_states.ch_weight[SFC_VRC7_FM2] = 1.f;
+    //g_states.ch_weight[SFC_VRC7_FM3] = 1.f;
+    //g_states.ch_weight[SFC_VRC7_FM4] = 1.f;
+    //g_states.ch_weight[SFC_VRC7_FM5] = 1.f;
+
+
+    //g_states.ch_weight[SFC_FDS1_Wavefrom] = 1.f;
+
+    //g_states.ch_weight[SFC_N163_Wavefrom0] = 1.f;
+    //g_states.ch_weight[SFC_N163_Wavefrom1] = 1.f;
+    //g_states.ch_weight[SFC_N163_Wavefrom2] = 1.f;
+    //g_states.ch_weight[SFC_N163_Wavefrom3] = 1.f;
+    //g_states.ch_weight[SFC_N163_Wavefrom4] = 1.f;
+    //g_states.ch_weight[SFC_N163_Wavefrom5] = 1.f;
+    //g_states.ch_weight[SFC_N163_Wavefrom6] = 1.f;
+    //g_states.ch_weight[SFC_N163_Wavefrom7] = 1.f;
+
+    //g_states.ch_weight[SFC_FME7_ChannelA] = 1.f;
+    //g_states.ch_weight[SFC_FME7_ChannelB] = 1.f;
+    //g_states.ch_weight[SFC_FME7_ChannelC] = 1.f;
 }
 
 
@@ -676,12 +1063,21 @@ int main() {
     if (sfc_famicom_init(&famicom, NULL, &interfaces)) return 1;
     //qload();
 
+    update_mask(famicom.rom_info.extra_sound);
+
+
     printf(
         "ROM: PRG-ROM: %d x 16kb   CHR-ROM %d x 8kb   Mapper: %03d\n",
         (int)famicom.rom_info.size_prgrom / (16*1024),
         (int)famicom.rom_info.size_chrrom / (8 *1024),
         (int)famicom.rom_info.mapper_number
     );
+
+    //
+    make_inited_vrc7_wavtable();
+
+    //getchar();
+
     xa2_init(SAMPLES_PER_SEC);
     main_cpp(cso_path, png_path);
     xa2_clean();
@@ -814,8 +1210,10 @@ sfc_ecode this_load_nsf(sfc_rom_info_t* info, FILE* file) {
         info->play_addr = header.play_addr_le;
         info->pal_ntsc_bits = header.pal_ntsc_bits;
         info->extra_sound = header.extra_sound;
+        info->start_play = header.start;
         // 状态
-
+        //info->start_play = 5;
+        // 播放曲目
         return SFC_ERROR_OK;
     }
     fseek(file, 0, SEEK_SET);
@@ -890,6 +1288,8 @@ sfc_ecode this_load_rom(void* arg, sfc_rom_info_t* info) {
                 assert(!(nes_header.control1 & SFC_NES_TRAINER) && "unsupported");
                 assert(!(nes_header.control2 & SFC_NES_VS_UNISYSTEM) && "unsupported");
                 assert(!(nes_header.control2 & SFC_NES_Playchoice10) && "unsupported");
+
+                d2d_set_visualizers(0, 0, 0, 0, 0, 0, 0, 0);
             }
             // 内存不足
             else code = SFC_ERROR_OUT_OF_MEMORY;
@@ -944,4 +1344,66 @@ void sfc_before_execute(void* ctx, sfc_famicom_t* famicom) {
         (int)famicom->registers.status,
         (int)famicom->registers.stack_pointer
     );
+}
+
+
+#include <math.h>
+
+/// <summary>
+/// 以A4为基础计算键ID
+/// </summary>
+/// <param name="freq">The freq.</param>
+/// <returns></returns>
+float calc_key_id_a4(float freq) {
+    /*
+    换底公式
+                 log(c, b)
+    log(a, b) = ------------
+                 log(c, a)
+    */
+    const float a4 = 440.f;
+    return logf(freq / a4) * 17.3123404907f;
+}
+
+
+
+/// <summary>
+/// UIs the function HSL to RGB float32.
+/// </summary>
+/// <param name="data">The data.</param>
+void ui_function_hsla_to_rgba_float32(const float hsla[4], float rgba[4]) {
+    // 将A弄过去
+    rgba[3] = hsla[3];
+    // 准备数据
+    const float h = hsla[0];
+    assert(0.f <= h && h < 360.f && "out of range");
+    const float s = hsla[1];
+    const float l = hsla[2];
+    float *r = rgba + 0;
+    float *g = rgba + 1;
+    float *b = rgba + 2;
+    // Q
+    const float v = (l <= 0.5f) ? (l * (1.0f + s)) : (l + s - l * s);
+    // 黑色
+    if (v <= 0.0f) {
+        *r = *g = *b = 0.f;
+    }
+    // 其他
+    else {
+        const float m = l + l - v;
+        const float sv = (v - m) / v;
+        const int sextant = (int)(h / 60.0f);
+        const float fract = h / 60.0f - sextant;
+        const float vsf = v * sv * fract;
+        const float mid1 = m + vsf;
+        const float  mid2 = v - vsf;
+        switch (sextant) {
+        case 0: *r = v; *g = mid1; *b = m; break;
+        case 1: *r = mid2; *g = v; *b = m; break;
+        case 2: *r = m; *g = v; *b = mid1; break;
+        case 3: *r = m; *g = mid2; *b = v; break;
+        case 4: *r = mid1; *g = m; *b = v; break;
+        case 5: *r = v; *g = m; *b = mid2; break;
+        }
+    }
 }
