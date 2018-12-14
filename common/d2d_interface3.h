@@ -46,6 +46,7 @@ typedef struct {
     union {
         sfc_byte_t  sq_duty;
         sfc_byte_t  noi_mode;
+        sfc_byte_t  dmc_pcm;
     }               ud;
     union {
         // VRC7
@@ -92,12 +93,12 @@ enum {
     SFC_VIS_PCM_COUNT,
 };
 
-SFC_EXTERN_C void d2d_set_time_lines()  SFC_NOEXCEPT;
+//SFC_EXTERN_C void d2d_n163_wavtbl_changed(unsigned)  SFC_NOEXCEPT;
+//SFC_EXTERN_C void d2d_fds1_wavtbl_changed()  SFC_NOEXCEPT;
+//SFC_EXTERN_C void d2d_vrc7_wavtbl_changed(unsigned)  SFC_NOEXCEPT;
 
 
-SFC_EXTERN_C void d2d_n163_wavtbl_changed(unsigned)  SFC_NOEXCEPT;
-SFC_EXTERN_C void d2d_fds1_wavtbl_changed()  SFC_NOEXCEPT;
-SFC_EXTERN_C void d2d_vrc7_wavtbl_changed(unsigned)  SFC_NOEXCEPT;
-
-
+SFC_EXTERN_C unsigned d2d_reset_timeline(unsigned perframe_count, unsigned fps) SFC_NOEXCEPT;
+SFC_EXTERN_C void d2d_timeline_newframe() SFC_NOEXCEPT;
+SFC_EXTERN_C void d2d_logevent(unsigned ch, float freq, float vol) SFC_NOEXCEPT;
 

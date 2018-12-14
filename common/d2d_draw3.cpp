@@ -112,7 +112,14 @@ enum {
     SFC_CHANNEL_COUNT
 };
 
+struct TimeLineBlock {
+    float               vol;
+    float               freq;
+};
+
 struct SFCChannelInfo {
+    TimeLineBlock*          blocks;
+
     IDWriteTextLayout*      chn_name;
     IDWriteTextLayout*      freqnote;
     IDWriteTextLayout*      volinfo;
@@ -165,8 +172,14 @@ struct alignas(sizeof(float)*4) GlobalData {
     ID2D1SolidColorBrush*   d2d_6cf;
 
     IDWriteFactory1*        dw_factory;
+
     IDWriteTextFormat*      dw_basetf;
+    IDWriteTextFormat*      dw_dbltf;
     IDWriteTextLayout*      dw_frequnit;
+
+
+
+
 
     IDWriteTextLayout*      vrc7_name[vrc7_text_count];
 
@@ -174,13 +187,19 @@ struct alignas(sizeof(float)*4) GlobalData {
     IDWriteTextLayout*      fme7_noise;
     IDWriteTextLayout*      fme7_env;
     IDWriteTextLayout*      fme7_s5b_noview;
-    D2D1_POINT_2F           dw_unit_offset;
-    D2D1_POINT_2F           s5b_noview_offset;
 
     IDWriteTextLayout*      noise_mode0;
     IDWriteTextLayout*      noise_mode1;
     IDWriteTextLayout*      dmc_dpcm;
+    IDWriteTextLayout*      dmc_pcm;
+    IDWriteTextLayout*      timeline_note[12];
+    IDWriteTextLayout*      timeline_sect[12];
 
+    IDWriteTextLayout*      timeline_fm;
+
+
+    D2D1_POINT_2F           dw_unit_offset;
+    D2D1_POINT_2F           s5b_noview_offset;
 
     ID2D1Effect*            d2d_effect;
     ID2D1Image*             d2d_output;
@@ -206,9 +225,17 @@ struct alignas(sizeof(float)*4) GlobalData {
     unsigned                vrc7_tablelen;
 
 
-    void*                   timelines;
+
+    unsigned                timeline_percount;
+    unsigned                timeline_percount_mask;
+    unsigned                timeline_percount_len;
+    unsigned                timeline_fps;
+    unsigned                timeline_frame_id;
 
     uint8_t                 all_keyboard_mask[SFC_CHANNEL_COUNT];
+
+
+
 
 } g_data = { 1, 0 };
 
@@ -255,7 +282,7 @@ static const GUID CLSID_DustPG_FamicomAE = {
 
 
 enum { WINDOW_WIDTH = 1280, WINDOW_HEIGHT = 720 };
-enum { FONT_SIZE = 14 };
+enum { FONT_SIZE = 14, EXFONT_SIZE = 16 };
 static const wchar_t WINDOW_TITLE[] = L"D2D Draw";
 //static bool doit = true;
 
@@ -655,7 +682,7 @@ bool InitD3D(HWND hwnd, const char* res) noexcept {
             reinterpret_cast<IUnknown**>(&g_data.dw_factory)
         );
     }
-    // 创建DWrite工厂
+    // 创建基础字体
     if (SUCCEEDED(hr)) {
         hr = g_data.dw_factory->CreateTextFormat(
             //L"Arial" , nullptr,  
@@ -668,9 +695,23 @@ bool InitD3D(HWND hwnd, const char* res) noexcept {
             &g_data.dw_basetf
         );
     }
+    // 创建双倍基础字体
+    if (SUCCEEDED(hr)) {
+        hr = g_data.dw_factory->CreateTextFormat(
+            //L"Arial" , nullptr,  
+            L"Courier New", nullptr,
+            DWRITE_FONT_WEIGHT_NORMAL,
+            DWRITE_FONT_STYLE_NORMAL,
+            DWRITE_FONT_STRETCH_NORMAL,
+            float(EXFONT_SIZE - 1),
+            L"",
+            &g_data.dw_dbltf
+        );
+    }
     // 创建单位
     if (SUCCEEDED(hr)) {
         g_data.dw_basetf->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
+        g_data.dw_dbltf->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
         hr = ::CreateFreqUnitTL();
     }
     // 创建D2D工厂
@@ -849,11 +890,20 @@ void ClearD3D() noexcept {
     ::SafeRelease(g_data.noise_mode0);
     ::SafeRelease(g_data.noise_mode1);
     ::SafeRelease(g_data.dmc_dpcm);
+    ::SafeRelease(g_data.dmc_pcm);
 
     for (auto& x : g_data.vrc7_name)
         ::SafeRelease(x);
+    for (auto& x : g_data.timeline_note)
+        ::SafeRelease(x);
+    for (auto& x : g_data.timeline_sect)
+        ::SafeRelease(x);
+    
+    ::SafeRelease(g_data.timeline_fm);
+
 
     ::SafeRelease(g_data.dw_basetf);
+    ::SafeRelease(g_data.dw_dbltf);
     ::SafeRelease(g_data.dw_factory);
     ::SafeRelease(g_data.wic_factory);
     
@@ -1300,7 +1350,7 @@ inline int calc_key_id_c4(float freq) {
                  log(c, a)
     */
     const float a4 = 440.f;
-    const float code = logf(freq / a4) * 17.3123404907f + 9.f;
+    const float code = logf(freq / a4) * 17.3123404907f + float(NOTE_A);
     //return static_cast<int>(floorf(code + 0.5f));
     const float adj = code < 0.f ? -0.5f : 0.5f;
     return int(code + adj);
@@ -1665,9 +1715,10 @@ void DrawWaveTable(
     const unsigned len_raw, 
     float vmax, float wmax,
     float half
-) {
+) noexcept {
 
     if (!len_raw) return;
+
 
     constexpr float offx = WW_LSTART;
     constexpr float offy = WW_TSTART + WW_PADDING;
@@ -1688,7 +1739,20 @@ void DrawWaveTable(
         );
         return;
     }
-
+    // 方波检测
+    const bool is_sq = [=]() noexcept {
+        if (len_raw > 32) return false;
+        if (len_raw <= 4) return true;
+        unsigned count = (unsigned)-1;
+        float ele = wt[0];
+        for (unsigned i = 1; i != len_raw; ++i) {
+            if (ele != wt[i]) {
+                ele = wt[i];
+                count++;
+            }
+        }
+        return !count;
+    }();
 
     // 波形窗口区
 
@@ -1705,7 +1769,8 @@ void DrawWaveTable(
     const float xplus = wwww * rate / (float)len_raw;
 
 
-    const auto mapper = [wmax, vol, y, half](D2D1_POINT_2F pt) {
+
+    const auto mapper = [wmax, vol, y, half](D2D1_POINT_2F pt) noexcept {
         constexpr float offy = WW_TSTART + WW_PADDING;
         constexpr float cont = WW_CONT_HEIGHT;
         pt.y = offy + y + (1.f - (pt.y * vol * wmax)) * cont * half;
@@ -1719,24 +1784,35 @@ void DrawWaveTable(
         offx, WW_PADDING + y, offx + wwww, offy + WW_CONT_HEIGHT + y
         }, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
 
+    const auto drawline1 = [=](D2D1_POINT_2F p1, D2D1_POINT_2F p2) noexcept {
+        if (is_sq) {
+            const D2D1_POINT_2F newpt = { p1.x, p2.y };
+            ctx->DrawLine(p1, newpt, brush, line_width);
+            ctx->DrawLine(newpt, p2, brush, line_width);
+        }
+        else
+            ctx->DrawLine(p1, p2, brush, line_width);
+    };
 
+    int last_i = 0;
     for (int i = 1, j = 1; j != repeat; ++j) {
         x += xplus;
         const int next_i = i == len_raw - 1 ? 0 : i + 1;
+        last_i = next_i;
         // 斜率一致则合并
         if ((base[next_i] - base[i]) == (p2.y - p1.y)) {
             p2 = { x, base[i] };
         }
         else {
-            ctx->DrawLine(mapper(p1), mapper(p2), brush, line_width);
+            drawline1(mapper(p1), mapper(p2));
             p1 = p2;
             p2 = { x, base[i] };
         }
         i = next_i;
     }
 
-    p2 = { x, base[len] };
-    ctx->DrawLine(mapper(p1), mapper(p2), brush, line_width);
+    p2 = { x, base[last_i] };
+    drawline1(mapper(p1), mapper(p2));
 
     ctx->PopAxisAlignedClip();
 
@@ -1766,7 +1842,7 @@ void DrawWaveTable(
             p2 = { x, base[i] };
         }
     }
-    p2 = { x, base[len_raw-1] };
+    p2 = { x, base[len] };
     ctx->DrawLine(mapper2(p1), mapper2(p2), brush, line_width);
 }
 
@@ -1872,6 +1948,12 @@ void Draw2A03DMCInfo(float y, const sfc_visualizers_t& d) {
         { offx + FONT_SIZE , offy + y },
         g_data.dmc_dpcm,
         d.key_on ? g_data.d2d_white : g_data.d2d_grey
+    );
+
+    ctx->DrawTextLayout(
+        { offx + FONT_SIZE * 4, offy + y },
+        g_data.dmc_pcm,
+        d.ud.dmc_pcm ? (d.ud.dmc_pcm == 2 ? g_data.d2d_white : g_data.d2d_6cf) : g_data.d2d_grey
     );
 }
 
@@ -2028,7 +2110,7 @@ void RenderWaveWindow(float y) noexcept {
 
             y += float(CH_ZONE_HEIGHT);
             ++y_count;
-            if (!g_data.timelines) {
+            if (!g_data.timeline_percount) {
                 constexpr int count_per_col = 5;
                 if (y_count == count_per_col) {
                     y_count = 0;
@@ -2044,6 +2126,8 @@ void RenderWaveWindow(float y) noexcept {
 }
 
 
+void RenderTimeLine(float y);
+
 // 音频可视化
 void DoVisualizer() noexcept {
     const auto len = g_data.visualizer_len;
@@ -2051,9 +2135,13 @@ void DoVisualizer() noexcept {
     const float c4 = 512 + 256;
     const float y = 4;
     RenderKeyboard(c4, y);
-    g_data.d2d_context->SetTransform(D2D1::Matrix3x2F::Scale({ 1.3f, 1.3f }));
+    //g_data.d2d_context->SetTransform(D2D1::Matrix3x2F::Scale({ 0.7f, 0.7f }));
+    //g_data.d2d_context->SetTransform(D2D1::Matrix3x2F::Scale({ 0.9f, 0.9f }));
+    g_data.d2d_context->SetTransform(D2D1::Matrix3x2F::Scale({ 1.1f, 1.1f }));
+    //g_data.d2d_context->SetTransform(D2D1::Matrix3x2F::Scale({ 1.3f, 1.3f }));
     //g_data.d2d_context->SetTransform(D2D1::Matrix3x2F::Scale({ 1.7f, 1.7f }));
     RenderWaveWindow(y + KB_WHITE_HEIGHT + 20);
+    RenderTimeLine(y + KB_WHITE_HEIGHT + 20);
 }
 
 
@@ -2174,9 +2262,12 @@ const wchar_t* const vrc7_name_table[] = {
 
 };
 
-SFC_EXTERN_C void d2d_n163_wavtbl_changed(unsigned i)  SFC_NOEXCEPT {
 
-}
+const wchar_t note_name[] = L"C-C#D-D#E-F-F#G-G#A-A#B-";
+
+//SFC_EXTERN_C void d2d_n163_wavtbl_changed(unsigned i)  SFC_NOEXCEPT {
+//
+//}
 
 auto CreateFreqUnitTL() noexcept->HRESULT {
     auto hr = g_data.dw_factory->CreateTextLayout(
@@ -2249,12 +2340,21 @@ auto CreateFreqUnitTL() noexcept->HRESULT {
             &g_data.noise_mode1
         );
     }
+    const auto dpcm_str = L"ΔPCM";
     if (SUCCEEDED(hr)) {
         hr = g_data.dw_factory->CreateTextLayout(
-            L"ΔPCM", 4,
+            dpcm_str, 4,
             g_data.dw_basetf,
             0, 0,
             &g_data.dmc_dpcm
+        );
+    }
+    if (SUCCEEDED(hr)) {
+        hr = g_data.dw_factory->CreateTextLayout(
+            dpcm_str + 1, 3,
+            g_data.dw_basetf,
+            0, 0,
+            &g_data.dmc_pcm
         );
     }
     for (int i = 0; i != vrc7_text_count; ++i) {
@@ -2268,6 +2368,43 @@ auto CreateFreqUnitTL() noexcept->HRESULT {
             );
         }
     }
+    constexpr int LA = sizeof(g_data.timeline_note) / sizeof(g_data.timeline_note[0]);
+    constexpr int LB = sizeof(g_data.timeline_sect) / sizeof(g_data.timeline_sect[0]);
+    for (int i = 0; i != LA; ++i) {
+        if (SUCCEEDED(hr)) {
+            hr = g_data.dw_factory->CreateTextLayout(
+                note_name + i * 2, 2,
+                g_data.dw_dbltf,
+                0, 0,
+                &g_data.timeline_note[i]
+            );
+        }
+    }
+    for (int i = 0; i != LB; ++i) {
+        constexpr int LB_HALF = LB / 2;
+        if (SUCCEEDED(hr)) {
+            const int j = i - LB_HALF + 4;
+            wchar_t buf[2];
+            buf[0] = j < 0 ? '-' : ' ';
+            buf[1] = std::abs(j) + '0';
+            hr = g_data.dw_factory->CreateTextLayout(
+                buf, 2,
+                g_data.dw_dbltf,
+                0, 0,
+                &g_data.timeline_sect[i]
+            );
+        }
+
+    }
+    if (SUCCEEDED(hr)) {
+        const wchar_t wave_fm[] = { '~', '~' };
+        hr = g_data.dw_factory->CreateTextLayout(
+            wave_fm, sizeof(wave_fm)/sizeof(wave_fm[0]),
+            g_data.dw_dbltf,
+            0, 0,
+            &g_data.timeline_fm
+        );
+    }
     return hr;
 }
 
@@ -2276,13 +2413,12 @@ auto CreateFreqUnitTL() noexcept->HRESULT {
 
 #include <cwchar>
 
-const wchar_t note_name[] = L"C-C#D-D#E-F-F#G-G#A-A#B-";
-
 void SFCChannelInfo::Release() {
     ::SafeRelease(this->freqnote);
     ::SafeRelease(this->chn_name);
     ::SafeRelease(this->volinfo);
-    
+    std::free(this->blocks);
+    this->blocks = nullptr;
 }
 
 void SFCChannelInfo::UpdateVol(unsigned i , uint16_t v) {
@@ -2345,3 +2481,183 @@ HRESULT SFCChannelInfo::MakeChnName(const wchar_t* name, uint32_t len) {
         &this->chn_name
     );
 }
+
+
+// -------------------------------------------------------------------------
+
+enum {
+    TIMELINE_START = WW_WIDTH * 2 - WW_WIDTH / 3,
+    TIMELINE_WIDTH = WW_WIDTH * 4,
+};
+
+
+void RenderTimeLineFor(float y, const SFCChannelInfo& info) {
+    // -1/2 ~ 0
+    const auto fid = g_data.timeline_frame_id;
+    //const auto len = g_data.timeline_percount_len;
+    const auto len2 = g_data.timeline_percount_len / 2;
+
+    const auto mask = g_data.timeline_percount_mask;
+    const auto ptr = info.blocks;
+
+    constexpr float vol_height = WW_CONT_HEIGHT;
+
+    const auto ctx = g_data.d2d_context;
+    const auto brush = g_data.d2d_white;
+    const auto novol = g_data.d2d_grey;
+    const auto b6cf = g_data.d2d_6cf;
+
+    const float lx = TIMELINE_START;
+    const float ww = TIMELINE_WIDTH;
+    const float xplus = float(TIMELINE_WIDTH) / float(len2);
+    
+    float x = lx;
+
+    const auto start_index = fid >= len2 ? 0 : len2;
+
+    //const auto get_at = [=](unsigned i) {
+    //    return ptr[(fid + i + len2) & mask];
+    //};
+
+    const auto get_at = [=](unsigned i) {
+        return ptr[i + start_index];
+    };
+
+    const auto mapper = [=](float vol) {
+        constexpr float cont = float(WW_CONT_HEIGHT) * 0.8f;
+        return WW_CONT_HEIGHT - vol * cont + WW_TSTART * 2 + y;
+    };
+    const auto drawline = [=](D2D1_POINT_2F p1, D2D1_POINT_2F p2, ID2D1Brush* b) {
+        const D2D1_POINT_2F p3 = { p1.x, p2.y };
+        ctx->DrawLine(p1, p3, b6cf);
+        ctx->DrawLine(p3, p2, b);
+    };
+
+    auto last_block = get_at(0);
+    int last_id = calc_key_id_c4(last_block.freq);
+
+    D2D1_POINT_2F p1 = { lx, mapper(last_block.vol) }, p2;
+
+    bool fm = true;
+
+    for (unsigned i = 0; i != len2; ++i) {
+        const auto block = get_at(i);
+        // 频率
+        if (block.freq) {
+            const int id = calc_key_id_c4(block.freq);
+            if (last_id != id) {
+                last_id = id;
+                fm = true;
+                //last_block.freq = block.freq;
+                const int note = (id % 12 + 12) % 12;
+
+                ctx->DrawTextLayout({ x, y }, g_data.timeline_note[note], brush);
+
+
+                constexpr int LB = sizeof(g_data.timeline_sect) / sizeof(g_data.timeline_sect[0]);
+                constexpr int LBH = LB / 2;
+                const int section = (id - note) / 12 + LBH;
+                if (section >= 0 && section < LB) {
+                    ctx->DrawTextLayout({ x - EXFONT_SIZE / 2, y + EXFONT_SIZE }, g_data.timeline_sect[section], brush);
+                }
+                else {
+                    int bk = 9;
+                }
+            }
+            else if (last_block.freq != block.freq && fm) {
+                fm = false;
+                ctx->DrawTextLayout({ x , y + FONT_SIZE * 2 }, g_data.timeline_fm, brush);
+
+            }
+        }
+        else fm = false;
+
+        // 音量
+        if (last_block.vol != block.vol) {
+            //last_block.vol = block.vol;
+            p2.x = x;
+            p2.y = mapper(last_block.vol);
+            drawline(p1, p2, last_block.vol ? b6cf : novol);
+            p1 = p2;
+        }
+        last_block = block;
+        x += xplus;
+    }
+
+    p2.x = x;
+    p2.y = mapper(last_block.vol);
+    drawline(p1, p2, last_block.vol ? b6cf : novol);
+}
+
+void RenderTimeLine(float y) {
+    if (!g_data.timeline_percount) return;
+    const auto ybk = y;
+    const auto ptr = g_data.visualizer_data;
+    const auto len = g_data.visualizer_len;
+    //const auto len = 1;
+    for (unsigned j = 0; j != len; ++j) {
+        const auto i = d2d_custom_index[j];
+        if (ptr[i].mask) {
+            RenderTimeLineFor(y, g_data.infos[i]);
+            y += float(CH_ZONE_HEIGHT);
+        }
+    }
+    // 时间线
+    const auto ctx = g_data.d2d_context;
+    const auto brush = g_data.d2d_white;
+    const auto fid = g_data.timeline_frame_id;
+    const auto mask = g_data.timeline_percount_mask >> 1;
+    const auto len2 = mask + 1;
+
+    const float lx = TIMELINE_START;
+    const float ww = TIMELINE_WIDTH;
+    const float xplus = ww / float(len2);
+
+    const auto pos = lx + float(fid & mask) * xplus;
+    ctx->DrawLine({ pos, ybk }, { pos, y }, brush);
+}
+
+
+uint32_t round_up_2_power_mask(uint32_t v) noexcept {
+    v--;
+    v |= v >> 1;
+    v |= v >> 2;
+    v |= v >> 4;
+    v |= v >> 8;
+    v |= v >> 16;
+    return v;
+}
+
+
+SFC_EXTERN_C unsigned d2d_reset_timeline(unsigned perframe_count, unsigned fps) SFC_NOEXCEPT {
+    g_data.timeline_percount = perframe_count;
+    g_data.timeline_percount_mask = round_up_2_power_mask(perframe_count);
+    g_data.timeline_percount_len = g_data.timeline_percount_mask + 1;
+    g_data.timeline_fps = fps;
+    g_data.timeline_frame_id = 0;
+    const auto len = g_data.timeline_percount_len * sizeof(TimeLineBlock);
+    for (int i = 0; i != SFC_CHANNEL_COUNT; ++i) {
+        const auto ptr = std::realloc(g_data.infos[i].blocks, len);
+        if ((g_data.infos[i].blocks = reinterpret_cast<TimeLineBlock*>(ptr)))
+            std::memset(ptr, 0, len);
+        else
+            std::exit(-1);
+    }
+    return g_data.timeline_percount_len >> 1;
+}
+
+SFC_EXTERN_C void d2d_timeline_newframe() SFC_NOEXCEPT {
+    ++g_data.timeline_frame_id;
+    g_data.timeline_frame_id &= g_data.timeline_percount_mask;
+}
+
+SFC_EXTERN_C void d2d_logevent(unsigned ch, float freq, float vol) SFC_NOEXCEPT {
+    assert(ch < SFC_CHANNEL_COUNT);
+    const auto index = g_data.timeline_frame_id;
+    assert(index < g_data.timeline_percount_len);
+    TimeLineBlock block;
+    block.freq = freq;
+    block.vol = vol;
+    g_data.infos[ch].blocks[index] = block;
+}
+

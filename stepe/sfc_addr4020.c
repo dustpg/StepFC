@@ -213,8 +213,8 @@ extern inline void sfc_write_cpu_address4020(uint16_t address, uint8_t data, sfc
     // 8-B  -> TRI
     // C-F  -> NOI
     // ...  -> DMC
-    // 前面20字节
-    if ((address & 0x1f) < 20) {
+    // 前面16字节
+    if ((address & 0x1f) < 16) {
         // 检查当前CPU周期
         const uint32_t cycle = famicom->cpu_cycle_count;
         // 触发事件
@@ -309,26 +309,34 @@ extern inline void sfc_write_cpu_address4020(uint16_t address, uint8_t data, sfc
         famicom->apu.dmc.irq_loop = data >> 6;
         famicom->apu.dmc.period = SFC_DMC_PERIOD_LIST_NP[data & 0xF];
         break;
-        //return;
     case 0x11:
         // $4011 -DDD DDDD
+        famicom->interfaces.audio_change(
+            famicom->argument, 
+            famicom->cpu_cycle_count,
+            SFC_2A03_DMC
+        );
         famicom->apu.dmc.value = data & (uint8_t)0x7F;
-        //printf("[DMC]%d\n", data);
         break;
-        //return;
     case 0x12:
+        famicom->interfaces.audio_change(
+            famicom->argument,
+            famicom->cpu_cycle_count,
+            SFC_2A03_DMC_ADDRLEN
+        );
         // $4012 AAAA AAAA
         // 11AAAAAA.AA000000
         famicom->apu.dmc.orgaddr = (uint16_t)0xC000 | ((uint16_t)data << 6);
-        //famicom->apu.dmc.curaddr = famicom->apu.dmc.orgaddr;
-        //printf("PTR[%04X]\n", famicom->apu.dmc.orgaddr);
         break;
     case 0x13:
+        famicom->interfaces.audio_change(
+            famicom->argument,
+            famicom->cpu_cycle_count,
+            SFC_2A03_DMC_ADDRLEN
+        );
         // $4013 LLLL LLLL
         // 0000LLLL.LLLL0001
         famicom->apu.dmc.length = ((uint16_t)data << 4) | 1;
-        //famicom->apu.dmc.lenleft = famicom->apu.dmc.length;
-        //printf("LEN[%d]\n", famicom->apu.dmc.length);
         break;
     case 0x14:
         // 精灵RAM直接储存器访问

@@ -9,6 +9,8 @@
 /// 
 /// </summary>
 enum sfc_channel_index {
+    // [2A03] DMC - Addr[$4012, $4013]
+    SFC_2A03_DMC_ADDRLEN = -9,
     // [Sunsoft 5B] FME7
     SFC_FME7_Sun5B = -8,
     // [N163] N163

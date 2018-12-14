@@ -12,8 +12,8 @@
 
 enum {
     NTSC_CPU_RATE = 1789773,
-    //SAMPLES_PER_SEC = 44100,
-    SAMPLES_PER_SEC = 48000,
+    SAMPLES_PER_SEC = 44100,
+    //SAMPLES_PER_SEC = 48000,
     VRC7_OUTPUT_PER_SEC = 49716,
     SAMPLES_PER_FRAME = SAMPLES_PER_SEC / 60,
     SAMPLES_ALIGNED = 8,
@@ -62,11 +62,13 @@ struct interface_audio_state {
     uint32_t                        input_length;
     uint32_t                        last_cycle;
 
-    uint8_t                         change_2a03;
-    uint8_t                         change_mmc5;
+    uint16_t                        change_2a03_mmc5;
 
-    uint8_t                         change_vrc7_custompatch;
+    uint16_t                        change_vrc7_custompatch;
 
+    uint16_t                        change_dmc_times;
+
+    uint16_t                        logger_on;
 
     sfc_1storder_rc_lopass_filter_t lp_14kHz;
     sfc_1storder_rc_hipass_filter_t hp_440Hz;
@@ -95,8 +97,12 @@ struct interface_audio_state {
 
 
     float                           current_chn[SAMPLES_PER_FRAME * SFC_VIS_PCM_COUNT];
-} g_states;
 
+    // 
+    sfc_famicom_t                   logger;
+
+
+} g_states;
 
 
 void update_mask(uint8_t exsound) {
@@ -321,23 +327,22 @@ static void this_audio_event(void* arg, uint32_t cycle, enum sfc_channel_index t
     // 将目前的状态覆盖 区间[old_index, now_index)
 
     // 更新状态
-    if (now_index > old_index && (g_states.change_2a03 | g_states.change_mmc5)) {
-        if (g_states.change_2a03 & 1) 
+    if (now_index > old_index && g_states.change_2a03_mmc5) {
+        if (g_states.change_2a03_mmc5 & 0x0001)
             sfc_2a03_smi_update_sq1(g_famicom, &g_states.ctx_2a03);
-        if (g_states.change_2a03 & 2)
+        if (g_states.change_2a03_mmc5 & 0x0002)
             sfc_2a03_smi_update_sq2(g_famicom, &g_states.ctx_2a03);
-        if (g_states.change_2a03 & 4)
+        if (g_states.change_2a03_mmc5 & 0x0004)
             sfc_2a03_smi_update_tri(g_famicom, &g_states.ctx_2a03);
-        if (g_states.change_2a03 & 8)
+        if (g_states.change_2a03_mmc5 & 0x0008)
             sfc_2a03_smi_update_noi(g_famicom, &g_states.ctx_2a03);
 
-        if (g_states.change_mmc5 & 1)
+        if (g_states.change_2a03_mmc5 & 0x0100)
             sfc_mmc5_smi_update_sq1(g_famicom, &g_states.ctx_mmc5);
-        if (g_states.change_mmc5 & 2)
+        if (g_states.change_2a03_mmc5 & 0x0200)
             sfc_mmc5_smi_update_sq2(g_famicom, &g_states.ctx_mmc5);
 
-        g_states.change_2a03 = 0;
-        g_states.change_mmc5 = 0;
+        g_states.change_2a03_mmc5 = 0;
     }
     // 处理修改
     const uint8_t extra_sound = g_famicom->rom_info.extra_sound;
@@ -345,31 +350,32 @@ static void this_audio_event(void* arg, uint32_t cycle, enum sfc_channel_index t
     {
     case SFC_Overview:
     case SFC_FrameCounter:
-        g_states.change_2a03 = 0xf;
+        g_states.change_2a03_mmc5 = 0xf;
         if (type != SFC_Overview && (extra_sound & SFC_NSF_EX_MMC5)) {
     case SFC_MMC5_MMC5:
-        g_states.change_mmc5 = 0xf;
+        g_states.change_2a03_mmc5 |= 0xf00;
         }
         break;
     case SFC_2A03_Square1:
-        g_states.change_2a03 |= 1;
+        g_states.change_2a03_mmc5 |= 0x1;
         break;
     case SFC_2A03_Square2:
-        g_states.change_2a03 |= 2;
+        g_states.change_2a03_mmc5 |= 0x2;
         break;
     case SFC_2A03_Triangle:
-        g_states.change_2a03 |= 3;
+        g_states.change_2a03_mmc5 |= 0x4;
         break;
     case SFC_2A03_Noise:
-        g_states.change_2a03 |= 4;
+        g_states.change_2a03_mmc5 |= 0x8;
         break;
     case SFC_2A03_DMC:
+        g_states.change_dmc_times++;
         break;
     case SFC_MMC5_Square1:
-        g_states.change_mmc5 |= 1;
+        g_states.change_2a03_mmc5 |= 0x100;
         break;
     case SFC_MMC5_Square2:
-        g_states.change_mmc5 |= 2;
+        g_states.change_2a03_mmc5 |= 0x200;
         break;
     case SFC_MMC5_PCM:
         break;
@@ -425,8 +431,21 @@ void sfc_make_2a03_noi(const sfc_noise_ch_state_t* state, sfc_visualizers_t* dat
 
 
 void sfc_make_2a03_dmc(const sfc_dmc_data_t* state, sfc_visualizers_t* data) {
-    data->key_on = !!(g_famicom->apu.status_write & SFC_APU4015_WRITE_EnableDMC);
+    data->key_on 
+        = (g_famicom->apu.status_write & SFC_APU4015_WRITE_EnableDMC)
+        && g_famicom->apu.dmc.lenleft
+        ;
+
     data->freq = g_famicom->config.cpu_clock_f / (float)state->period;
+
+    if (g_states.change_dmc_times > 4)
+        data->ud.dmc_pcm = 2;
+    else if(!g_states.change_dmc_times)
+        data->ud.dmc_pcm = 0;
+    else
+        data->ud.dmc_pcm = 1;
+
+    g_states.change_dmc_times = 0;
 }
 
 
@@ -642,6 +661,8 @@ void update_infomation(void) {
     // FME7 声道
     for(int i = 0; i != 3; ++i)
         sfc_make_fme7_squ(&g_famicom->apu.fme7, g_famicom->apu.fme7.ch + i, g_states.visualizers + SFC_FME7_ChannelA + i);
+
+
 }
 
 
@@ -714,6 +735,9 @@ static void play_audio(void* rgba) {
 extern uint32_t sfc_stdpalette[];
 
 
+void nsf_logger_once(void);
+
+
 /// <summary>
 /// SFCs the play NSF once.
 /// </summary>
@@ -756,8 +780,10 @@ extern void main_render(void* rgba) {
 
     // 记录信息
     ib_try_record_replay();
-    if (g_famicom->rom_info.song_count)
+    if (g_famicom->rom_info.song_count) {
         sfc_play_nsf_once(g_famicom);
+        nsf_logger_once();
+    }
     else
         sfc_render_frame_easy(g_famicom, buffer);
 
@@ -1025,6 +1051,8 @@ sfc_ecode this_free_rom(void* arg, sfc_rom_info_t* info);
 /// <summary>
 /// 应用程序入口
 /// </summary>
+/// <param name="argc">The argc.</param>
+/// <param name="argv">The argv.</param>
 /// <returns></returns>
 int main(int argc, const char* argv[]) {
     char cso_path[PATH_BUFLEN]; char png_path[PATH_BUFLEN];
@@ -1078,7 +1106,9 @@ int main(int argc, const char* argv[]) {
     //
     make_inited_vrc7_wavtable();
 
-    //getchar();
+
+    void init_logger(void);
+    if (famicom.rom_info.song_count) init_logger();
 
     xa2_init(SAMPLES_PER_SEC);
     main_cpp(cso_path, png_path);
@@ -1214,7 +1244,7 @@ sfc_ecode this_load_nsf(sfc_rom_info_t* info, FILE* file) {
         info->extra_sound = header.extra_sound;
         info->start_play = header.start;
         // 状态
-        //info->start_play = 5;
+        info->start_play = 6;
         // 播放曲目
         return SFC_ERROR_OK;
     }
@@ -1351,26 +1381,6 @@ void sfc_before_execute(void* ctx, sfc_famicom_t* famicom) {
 }
 
 
-#include <math.h>
-
-/// <summary>
-/// 以A4为基础计算键ID
-/// </summary>
-/// <param name="freq">The freq.</param>
-/// <returns></returns>
-float calc_key_id_a4(float freq) {
-    /*
-    换底公式
-                 log(c, b)
-    log(a, b) = ------------
-                 log(c, a)
-    */
-    const float a4 = 440.f;
-    return logf(freq / a4) * 17.3123404907f;
-}
-
-
-
 /// <summary>
 /// UIs the function HSL to RGB float32.
 /// </summary>
@@ -1410,4 +1420,175 @@ void ui_function_hsla_to_rgba_float32(const float hsla[4], float rgba[4]) {
         case 5: *r = v; *g = m; *b = mid2; break;
         }
     }
+}
+
+
+// ----------------------------------------------------------------------------
+//                                        Logger
+// ----------------------------------------------------------------------------
+
+sfc_ecode logger_load_rom(void* arg, sfc_rom_info_t* info) {
+    *info = ((sfc_famicom_t*)arg)->rom_info;
+    return SFC_ERROR_OK;
+}
+
+sfc_ecode logger_free_rom(void* arg, sfc_rom_info_t* info) {
+    return SFC_ERROR_OK;
+
+}
+
+void nsf_logger_once(void) {
+    if (!g_states.logger_on) return;
+
+    float freq, vol;
+    sfc_famicom_t* const fc = &g_states.logger;
+
+    sfc_play_nsf_once(fc);
+
+    const uint8_t exsound = fc->rom_info.extra_sound;
+    sfc_2a03_smi_ctx_t              ctx_2a03;
+    sfc_mmc5_smi_ctx_t              ctx_mmc5;
+    // 2A03 
+    sfc_2a03_smi_update_sq1(fc, &ctx_2a03);
+    sfc_2a03_smi_update_sq2(fc, &ctx_2a03);
+    sfc_2a03_smi_update_tri(fc, &ctx_2a03);
+    sfc_2a03_smi_update_noi(fc, &ctx_2a03);
+    // 2A03-SQ1
+    if (ctx_2a03.sq1_state.volume) {
+        vol = (float)ctx_2a03.sq1_state.volume / 15.f;
+        freq = fc->config.cpu_clock_f / 8.f / (float)ctx_2a03.sq1_state.period_x2;
+    }
+    else freq = vol = 0.f;
+    d2d_logevent(SFC_2A03_Square1, freq, vol);
+    // 2A03-SQ2
+    if (ctx_2a03.sq2_state.volume) {
+        vol = (float)ctx_2a03.sq2_state.volume / 15.f;
+        freq = fc->config.cpu_clock_f / 8.f / (float)ctx_2a03.sq2_state.period_x2;
+    }
+    else freq = vol = 0.f;
+    d2d_logevent(SFC_2A03_Square2, freq, vol);
+    // 2A03-TRI
+    if (ctx_2a03.tri_state.play_mask & ctx_2a03.tri_state.inc_mask) {
+        vol = 1.f;
+        freq = g_famicom->config.cpu_clock_f / 32.f / (float)ctx_2a03.tri_state.period;
+    }
+    else freq = vol = 0.f;
+    d2d_logevent(SFC_2A03_Triangle, freq, vol);
+    // VRC6
+    if (exsound & SFC_NSF_EX_VCR6) {
+        // VRC6-SQ1
+        if (fc->apu.vrc6.square1.enable && fc->apu.vrc6.square1.volume) {
+            vol = (float)fc->apu.vrc6.square1.volume / 15.f;
+            freq = fc->config.cpu_clock_f / 16.f / (float)fc->apu.vrc6.square1.period;
+        }
+        else freq = vol = 0.f;
+        d2d_logevent(SFC_VRC6_Square1, freq, vol);
+        // VRC6-SQ2
+        if (fc->apu.vrc6.square2.enable && fc->apu.vrc6.square2.volume) {
+            vol = (float)fc->apu.vrc6.square2.volume / 15.f;
+            freq = fc->config.cpu_clock_f / 16.f / (float)fc->apu.vrc6.square2.period;
+        }
+        else freq = vol = 0.f;
+        d2d_logevent(SFC_VRC6_Square2, freq, vol);
+        // VRC6-SAW
+        if (fc->apu.vrc6.saw.enable && fc->apu.vrc6.saw.rate) {
+            vol = (float)fc->apu.vrc6.saw.rate / 42.f;
+            freq = fc->config.cpu_clock_f / 14.f / (float)fc->apu.vrc6.saw.period;
+        }
+        else freq = vol = 0.f;
+        d2d_logevent(SFC_VRC6_Saw, freq, vol);
+    }
+    // VRC7
+    if (exsound & SFC_NSF_EX_VCR7) {
+        for (int i = 0; i != 6; ++i) {
+            const sfc_vrc7_ch_t* const state = fc->apu.vrc7.ch + i;
+            const uint32_t a = VRC7_OUTPUT_PER_SEC * state->freq;
+            const uint32_t b = 1 << (19 - state->octave);
+            freq = (float)((double)a / (double)b);
+            vol = (float)(state->volume * state->trigger) / 15.f;
+            d2d_logevent(SFC_VRC7_FM0 + i, freq, vol);
+        }
+    }
+    // FDS1
+    if (exsound & SFC_NSF_EX_FDS1) {
+        if (!(fc->apu.fds.flags_4083 & SFC_FDS_4083_HaltWave)) {
+            freq = fc->config.cpu_clock_f / 64.f / 65536.f * (float)fc->apu.fds.freq_gained;
+            vol = (float)(fc->apu.fds.volenv_gain_clamped * fc->apu.fds.master_volume);
+            vol *= 1.f / (32.f * 30.f);
+        }
+        else freq = vol = 0.f;
+        d2d_logevent(SFC_FDS1_Wavefrom, freq, vol);
+
+    }
+    // MMC5
+    if (exsound & SFC_NSF_EX_MMC5) {
+        sfc_mmc5_smi_update_sq1(fc, &ctx_mmc5);
+        sfc_mmc5_smi_update_sq2(fc, &ctx_mmc5);
+        // MMC5-SQ1
+        if (ctx_mmc5.sq1_state.volume) {
+            vol = (float)ctx_mmc5.sq1_state.volume / 15.f;
+            freq = fc->config.cpu_clock_f / 8.f / (float)ctx_mmc5.sq1_state.period_x2;
+        }
+        else freq = vol = 0.f;
+        d2d_logevent(SFC_MMC5_Square1, freq, vol);
+        // MMC5-SQ2
+        if (ctx_mmc5.sq2_state.volume) {
+            vol = (float)ctx_mmc5.sq2_state.volume / 15.f;
+            freq = fc->config.cpu_clock_f / 8.f / (float)ctx_mmc5.sq2_state.period_x2;
+        }
+        else freq = vol = 0.f;
+        d2d_logevent(SFC_MMC5_Square2, freq, vol);
+    }
+    // N163
+    if (exsound & SFC_NSF_EX_N163) {
+        const uint32_t c = g_famicom->apu.n163.n163_count;
+        for (uint8_t i = fc->apu.n163.n163_lowest_id; i != 8; ++i) {
+            const sfc_n163info_t info = sfc_n163_get_info(fc, i);
+            if (info.vol) {
+                const double a = g_famicom->config.cpu_clock_f * info.freq;
+                const double b = 15 * 65536 * info.len * c;
+                freq = (float)(a / b);
+                vol = (float)info.vol / 15.f;
+            }
+            else freq = vol = 0.f;
+            d2d_logevent(SFC_N163_Wavefrom0 + i, freq, vol);
+        }
+    }
+    // FME7
+    if (exsound & SFC_NSF_EX_FME7) {
+        for (int i = 0; i != 3; ++i) {
+            sfc_visualizers_t data;
+            data.volume = 0;
+            sfc_make_fme7_squ(&fc->apu.fme7, fc->apu.fme7.ch + i, &data);
+            freq = data.freq;
+            vol = (float)data.volume / 15.f;
+            d2d_logevent(SFC_FME7_ChannelA + i, freq, vol);
+        }
+    }
+    // LOG IT
+    d2d_timeline_newframe();
+}
+
+void init_logger(void) {
+    //getchar();
+    //return;
+
+    g_states.logger_on = 1;
+
+    const unsigned fps = 60;
+    const unsigned logtimex2 = 4;
+    const unsigned percount = d2d_reset_timeline(fps * logtimex2, fps);
+    sfc_interface_t interfaces = { NULL };
+
+    interfaces.load_rom = logger_load_rom;
+    interfaces.free_rom = logger_free_rom;
+
+
+    if (sfc_famicom_init(&g_states.logger, g_famicom, &interfaces)) {
+        int bk = 9;
+        return;
+    }
+
+    for (unsigned i = 0; i != percount; ++i) nsf_logger_once();
+
 }
