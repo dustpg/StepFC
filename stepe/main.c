@@ -1244,7 +1244,7 @@ sfc_ecode this_load_nsf(sfc_rom_info_t* info, FILE* file) {
         info->extra_sound = header.extra_sound;
         info->start_play = header.start;
         // 状态
-        info->start_play = 6;
+        //info->start_play = 6;
         // 播放曲目
         return SFC_ERROR_OK;
     }
@@ -1474,6 +1474,12 @@ void nsf_logger_once(void) {
     }
     else freq = vol = 0.f;
     d2d_logevent(SFC_2A03_Triangle, freq, vol);
+    // 2A03-NOI
+    vol = (float)ctx_2a03.noi_state.volume / 15.f;
+    if (ctx_2a03.noi_state.count == 6)
+        freq = g_famicom->config.cpu_clock_f / 93.f / (float)ctx_2a03.noi_state.period;
+    else freq = 0.f;
+    d2d_logevent(SFC_2A03_Noise, freq, vol);
     // VRC6
     if (exsound & SFC_NSF_EX_VCR6) {
         // VRC6-SQ1
@@ -1571,7 +1577,7 @@ void nsf_logger_once(void) {
 
 void init_logger(void) {
     //getchar();
-    //return;
+    return;
 
     g_states.logger_on = 1;
 
