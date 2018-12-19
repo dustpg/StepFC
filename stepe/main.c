@@ -501,7 +501,7 @@ void sfc_make_vrc7_fmc(const sfc_vrc7_ch_t* state, sfc_visualizers_t* data) {
     const uint32_t b = 1 << (19 - state->octave);
     data->freq = (float)((double)a / (double)b);
     // VRC7的音量是非线性的
-    data->color[3] = vol2alpha((float)state->volume / 15.f);
+    data->color[3] = vol2alpha(1.f - (float)state->volume / 15.f);
 
     data->volume = state->volume;
 
