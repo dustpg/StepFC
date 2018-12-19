@@ -1731,7 +1731,7 @@ void DrawWaveTable(
     brush->SetColor(color);
 
     // 渲染直线
-    if (!d.key_on) {
+    if (!d.key_on && half > 0.5f) {
         ctx->DrawLine(
             { offx, offy + WW_CONT_HEIGHT * half + y},
             { offx + wwww, offy + WW_CONT_HEIGHT * half + y},
@@ -1758,7 +1758,8 @@ void DrawWaveTable(
 
     const auto base = wt;
     const auto len = len_raw - 1;
-    const float vol = (float)d.volume * vmax;
+    // VRC7不是用直接音量控制
+    const float vol = half > 0.5f ? (float)d.volume * vmax : 1.f;
 
     const auto count = d.freq / float(WW_UNIT);
     const auto repeat = std::min(int(count * (float)len_raw + 1.f), int(WW_MAX_WAVESECTION * len_raw));
@@ -2077,7 +2078,7 @@ void RenderWaveWindow(float y) noexcept {
             case SFC_VRC7_FM5:
                 DrawWaveTable(
                     y, ptr[i],
-                    g_data.vrc7_wavtable + g_data.vrc7_tablelen * ptr[i].ex.vrc7.instrument,
+                    g_data.vrc7_wavtable + g_data.vrc7_tablelen *  (i - SFC_VRC7_FM0),
                     g_data.vrc7_tablelen,
                     2.f / 15.f, 2.f,
                     0.5f
@@ -2212,12 +2213,12 @@ const wchar_t vol_unit[] = {
     L"  Linear x"
     L"  Linear x"
 
-    L"  3.00dB x"
-    L"  3.00dB x"
-    L"  3.00dB x"
-    L"  3.00dB x"
-    L"  3.00dB x"
-    L"  3.00dB x"
+    L" -3.00dB x"
+    L" -3.00dB x"
+    L" -3.00dB x"
+    L" -3.00dB x"
+    L" -3.00dB x"
+    L" -3.00dB x"
 
     L"L 1/1000 x"
 

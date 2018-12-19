@@ -11,7 +11,7 @@ extern sfc_ecode sfc_load_mapper(sfc_famicom_t* famicom, uint8_t);
 static sfc_ecode sfc_loadfree_rom(void* arg, sfc_rom_info_t* info) { return SFC_ERROR_FAILED; }
 
 // 默认音频事件
-extern void sfc_audio_changed(void*a, uint32_t b, enum sfc_channel_index c) {}
+static void sfc_audio_changed(void*a, uint32_t b, enum sfc_channel_index c) {}
 // 默认SRAM读写事件
 static void sfc_save_load_sram(void*a, const sfc_rom_info_t*b, const sfc_data_set_t*c, uint32_t l) {}
 // 默认状态读写事件

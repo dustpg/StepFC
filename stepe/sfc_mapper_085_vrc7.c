@@ -136,7 +136,7 @@ static void sfc_mapper_55_read_ram(sfc_famicom_t* famicom) {
 
 // 算子修改
 static void sfc_vrc7_operator_changed(
-    sfc_famicom_t*,
+    const uint8_t* const vrc7_patch,
     sfc_vrc7_ch_t*,
     sfc_vrc7_operator_t*, 
     uint8_t carrier
@@ -156,19 +156,20 @@ static inline void sfc_vrc7_audio_trigger(
 /// <param name="value">The value.</param>
 static void sfc_mapper_55_regwrite(sfc_famicom_t* famicom, uint8_t value) {
     sfc_vrc7_data_t* const vrc7 = &famicom->apu.vrc7;
+    uint8_t* const vrc7_patch = sfc_get_vrc7_patch(famicom);
     const uint8_t selected = vrc7->selected;
     // 00-07: 自定义PATCH
     if (selected < 0x08) {
         famicom->interfaces.audio_change(famicom->argument, famicom->cpu_cycle_count, SFC_VRC7_VRC7);
-        sfc_get_vrc7_patch(famicom)[selected] = value;
+        vrc7_patch[selected] = value;
     }
     // 10-15: 声道低八位频率
     else if (selected >= 0x10 && selected <= 0x15) {
         famicom->interfaces.audio_change(famicom->argument, famicom->cpu_cycle_count, SFC_VRC7_FM0 + (selected & 0x7));
         sfc_vrc7_ch_t* const ch = &famicom->apu.vrc7.ch[selected & 0x7];
         ch->freq = (ch->freq & 0xff00) | (uint16_t)value;
-        sfc_vrc7_operator_changed(famicom, ch, &ch->modulator, 0);
-        sfc_vrc7_operator_changed(famicom, ch, &ch->carrier, 1);
+        sfc_vrc7_operator_changed(vrc7_patch, ch, &ch->modulator, 0);
+        sfc_vrc7_operator_changed(vrc7_patch, ch, &ch->carrier, 1);
     }
     // 20-25: 控制信息
     else if (selected >= 0x20 && selected <= 0x25) {
@@ -184,8 +185,8 @@ static void sfc_mapper_55_regwrite(sfc_famicom_t* famicom, uint8_t value) {
         ch->trigger = trigger;
         sfc_vrc7_audio_trigger(&ch->carrier, changed, trigger);
         sfc_vrc7_audio_trigger(&ch->modulator, changed, trigger);
-        sfc_vrc7_operator_changed(famicom, ch, &ch->modulator, 0);
-        sfc_vrc7_operator_changed(famicom, ch, &ch->carrier, 1);
+        sfc_vrc7_operator_changed(vrc7_patch, ch, &ch->modulator, 0);
+        sfc_vrc7_operator_changed(vrc7_patch, ch, &ch->carrier, 1);
     }
     // 30-35: 乐器音量
     else if (selected >= 0x30 && selected <= 0x35) {
@@ -194,8 +195,8 @@ static void sfc_mapper_55_regwrite(sfc_famicom_t* famicom, uint8_t value) {
         sfc_vrc7_ch_t* const ch = &famicom->apu.vrc7.ch[selected & 0x7];
         ch->volume = value & 0xf;
         ch->instrument8 = (value & 0xf0) >> 1;
-        sfc_vrc7_operator_changed(famicom, ch, &ch->modulator, 0);
-        sfc_vrc7_operator_changed(famicom, ch, &ch->carrier, 1);
+        sfc_vrc7_operator_changed(vrc7_patch, ch, &ch->modulator, 0);
+        sfc_vrc7_operator_changed(vrc7_patch, ch, &ch->carrier, 1);
     }
 }
 
@@ -695,7 +696,8 @@ static inline uint32_t sfc_vrc7_sustain_level(uint32_t egc) {
 /// <param name="op">The op.</param>
 /// <param name="carrier">The carrier.</param>
 static void sfc_vrc7_operator_changed(
-    sfc_famicom_t* famicom,
+    //sfc_famicom_t* famicom,
+    const uint8_t* const vrc7_patch,
     sfc_vrc7_ch_t* ch,
     sfc_vrc7_operator_t* op, uint8_t carrier) {
     /*
@@ -709,7 +711,7 @@ static void sfc_vrc7_operator_changed(
     M = $0/$1 经过查表的倍乘因子. 由于第一个是乘以二分之一, 可以考虑LUT预乘2, 最后再除以2
     V = vibrato(FM)输出. 如果vibrato=0, V=1. 后面说明AM/FM的情况
     */
-    const uint8_t* const patch = sfc_get_vrc7_patch(famicom) + ch->instrument8;
+    const uint8_t* const patch = vrc7_patch + ch->instrument8;
     const uint8_t first = patch[carrier];
     const uint32_t phase_rate_x
         = (uint32_t)ch->freq
@@ -862,21 +864,23 @@ static void sfc_vrc7_operator_changed(
 /// <param name="carrier">The carrier.</param>
 /// <returns></returns>
 static int32_t sfc_vrc7_operator_ouput(
-    sfc_famicom_t* famicom,
+    //sfc_famicom_t* famicom,
+    sfc_vrc7_data_t* vrc7,
+    const uint8_t* const vrc7_patch,
     sfc_vrc7_ch_t* ch,
     sfc_vrc7_operator_t* op, 
     uint32_t adj,
     uint8_t carrier) {
     // Idle??
     if (op->state == SFC_VRC7_Idle) return 0;
-    const uint8_t* const patch = sfc_get_vrc7_patch(famicom) + ch->instrument8;
+    const uint8_t* const patch = vrc7_patch + ch->instrument8;
     // 相位处理
     // phase += [F * (1 << B) * M] * V
 
     
     // 使用FM
     if (patch[carrier] & 0x40)
-        op->phase += sfc_vrc7_fm_do(op->phase_rate_x4, famicom->apu.vrc7.fm_output);
+        op->phase += sfc_vrc7_fm_do(op->phase_rate_x4, vrc7->fm_output);
     else
         op->phase += op->phase_rate_x4 >> 2;
 
@@ -886,7 +890,7 @@ static int32_t sfc_vrc7_operator_ouput(
     // TOTAL = half_sine_table[I] + base + key_scale + envelope + AM
 
     const uint32_t envelope = sfc_vrc7_envelope(op);
-    const uint32_t am = patch[carrier] & 0x80 ? famicom->apu.vrc7.am_output : 0;
+    const uint32_t am = patch[carrier] & 0x80 ? vrc7->am_output : 0;
 
     const uint32_t total
         = sfc_vrc7_half_sine(phase_secondary)
@@ -926,8 +930,9 @@ static int32_t sfc_vrc7_operator_ouput(
 /// </summary>
 /// <param name="ch">The ch.</param>
 /// <returns></returns>
-static inline uint32_t sfc_vrc7_modulator_adj(sfc_famicom_t* famicom, sfc_vrc7_ch_t* ch) {
-    const uint8_t* const patch = sfc_get_vrc7_patch(famicom) + ch->instrument8;
+static inline uint32_t sfc_vrc7_modulator_adj(
+    const uint8_t* const vrc7_patch, sfc_vrc7_ch_t* ch) {
+    const uint8_t* const patch = vrc7_patch  + ch->instrument8;
     // - 当F为0: adj=0
     // - 其他情况, adj = previous_output_of_modulator >> (8 - F)
     const uint8_t f = patch[3] & 7;
@@ -939,8 +944,10 @@ static inline uint32_t sfc_vrc7_modulator_adj(sfc_famicom_t* famicom, sfc_vrc7_c
 /// StepFC: VRC7 每周期(49716Hz)
 /// </summary>
 /// <param name="famicom">The famicom.</param>
-void sfc_vrc7_49716hz(sfc_famicom_t* famicom, int32_t output[]) {
-    sfc_vrc7_data_t* const vrc7 = &famicom->apu.vrc7;
+void sfc_vrc7_49716hz(
+    sfc_vrc7_data_t* const vrc7,
+    const uint8_t* const vrc7_patch,
+    int32_t output[]) {
     // 计算AM/FM
     /*
         AM:
@@ -961,9 +968,9 @@ void sfc_vrc7_49716hz(sfc_famicom_t* famicom, int32_t output[]) {
     // 处理所有声道
     for (int i = 0; i != 6; ++i) {
         sfc_vrc7_ch_t* const ch = vrc7->ch + i;
-        const uint32_t ma = sfc_vrc7_modulator_adj(famicom, ch);
-        const uint32_t mo = sfc_vrc7_operator_ouput(famicom, ch, &ch->modulator, ma, 0);
-        const  int32_t co = sfc_vrc7_operator_ouput(famicom, ch, &ch->carrier, mo, 1);
+        const uint32_t ma = sfc_vrc7_modulator_adj(vrc7_patch, ch);
+        const uint32_t mo = sfc_vrc7_operator_ouput(vrc7, vrc7_patch, ch, &ch->modulator, ma, 0);
+        const  int32_t co = sfc_vrc7_operator_ouput(vrc7, vrc7_patch, ch, &ch->carrier, mo, 1);
         //output += co;
         output[i] = co;
     }
@@ -992,18 +999,20 @@ static void sfc_vrc7_write_sound(sfc_famicom_t* famicom, uint8_t addr, uint8_t v
     sfc_mapper_55_regwrite(famicom, value);
 }
 
+#if 0
 // 默认事件
 extern void sfc_audio_changed(void*a, uint32_t b, enum sfc_channel_index c);
 /// <summary>
 /// StepFC: VRC7生成波表
 /// </summary>
 /// <remarks>
-/// out是 长度为128 x 2的缓冲区
+/// out是 长度为128 x 16的缓冲区
 /// </remarks>
 /// <param name="famicom">The famicom.</param>
 /// <param name="out">The out.</param>
 /// <param name="instrument">The instrument.</param>
 void sfc_vrc7_wavetable_gen(sfc_famicom_t* famicom, float* const out, uint8_t instrument) {
+    assert(!"FAKE FUNC");
     void(*audio_change_bk)(void*, uint32_t, enum sfc_channel_index);
     const sfc_vrc7_data_t vrc7_bk = famicom->apu.vrc7;
     audio_change_bk = famicom->interfaces.audio_change;
@@ -1024,7 +1033,7 @@ void sfc_vrc7_wavetable_gen(sfc_famicom_t* famicom, float* const out, uint8_t in
     
     for (int i = 0; i != 128; ++i) {
         int32_t vrc7_output[6];
-        sfc_vrc7_49716hz(famicom, vrc7_output);
+        sfc_vrc7_49716hz(&famicom->apu.vrc7, sfc_get_vrc7_patch(famicom), vrc7_output);
 
         //if (vrc7_output[0]) {
         //    int bk = 9;
@@ -1037,6 +1046,41 @@ void sfc_vrc7_wavetable_gen(sfc_famicom_t* famicom, float* const out, uint8_t in
     // 回退
     famicom->interfaces.audio_change = audio_change_bk;
     famicom->apu.vrc7 = vrc7_bk;
+}
+#endif
+
+
+/// <summary>
+/// StepFC: VRC7生成波表
+/// </summary>
+/// <remarks>
+/// out是 长度为128 x 6的缓冲区
+/// </remarks>
+/// <param name="famicom">The famicom.</param>
+/// <param name="out">The out.</param>
+/// <param name="instrument">The instrument.</param>
+void sfc_vrc7_wavetable_update(sfc_famicom_t* famicom, float* const out) {
+    // 获取当前VRC7状态
+    sfc_vrc7_data_t vrc7_bk = famicom->apu.vrc7;
+    const uint8_t* const vrc7_patch = sfc_get_vrc7_patch(famicom);
+    // 仅仅重置音量与频率
+    for (int i = 0; i != 6; ++i) {
+        sfc_vrc7_ch_t* const ch = vrc7_bk.ch + i;
+        ch->freq = 256;
+        ch->octave = 4;
+        ch->carrier.phase = 0;
+        sfc_vrc7_operator_changed(vrc7_patch, ch, &ch->modulator, 0);
+        sfc_vrc7_operator_changed(vrc7_patch, ch, &ch->carrier, 1);
+    }
+    // 生成样本
+    for (int i = 0; i != 128; ++i) {
+        int32_t vrc7_output[6];
+        sfc_vrc7_49716hz(&vrc7_bk, vrc7_patch, vrc7_output);
+        for (int j = 0; j != 6; ++j) {
+            const double v0 = (double)vrc7_output[j] / (double)(1 << 20);
+            out[128 * j + i] = (float)v0;
+        }
+    }
 }
 
 // -----------------------------------------------------
@@ -1061,7 +1105,7 @@ void sfc_vrc7_smi_sample(sfc_famicom_t* famicom, sfc_vrc7_smi_ctx_t* ctx, const 
     ctx->clock += cps;
     while (ctx->clock >= VRC7_CPUCYCLE_PER_VRC7) {
         ctx->clock -= VRC7_CPUCYCLE_PER_VRC7;
-        sfc_vrc7_49716hz(famicom, vrc7_output);
+        sfc_vrc7_49716hz(&famicom->apu.vrc7, sfc_get_vrc7_patch(famicom), vrc7_output);
     }
     // TODO: 弃值
     ctx->mixed = 0.f;

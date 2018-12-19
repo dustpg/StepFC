@@ -22,6 +22,15 @@ enum {
     BUFFER_MAX = 4
 };
 
+typedef struct {
+    const char*     filename;
+    const char*     record_replay_filename;
+    uint8_t         nsf_start;
+    uint8_t         logger_on;
+    uint8_t         record;
+    uint8_t         replay;
+} app_ctx_t;
+
 sfc_famicom_t* g_famicom = NULL;
 static float s_buffer[SAMPLES_PER_FRAME_ALIGNED * (BASIC_BUFFER_COUNT + 1)];
 
@@ -52,12 +61,9 @@ extern void sfc_render_frame_easy(
     uint8_t* buffer
 );
 
-enum {
-    IB_IS_RECORD = 0,
-    IB_IS_REPLAY = 0,
-};
 
 struct interface_audio_state {
+    const app_ctx_t*                app_ctx;
     uint8_t*                        input_buffer_1mb;
     uint32_t                        input_length;
     uint32_t                        last_cycle;
@@ -68,7 +74,7 @@ struct interface_audio_state {
 
     uint16_t                        change_dmc_times;
 
-    uint16_t                        logger_on;
+    uint16_t                        unused;
 
     sfc_1storder_rc_lopass_filter_t lp_14kHz;
     sfc_1storder_rc_hipass_filter_t hp_440Hz;
@@ -93,7 +99,7 @@ struct interface_audio_state {
 
     float                           fds1_wave_table[64];
     float                           n163_wave_table[256];
-    float                           vrc7_wave_table[128 * 16];
+    float                           vrc7_wave_table[128 * 6];
 
 
     float                           current_chn[SAMPLES_PER_FRAME * SFC_VIS_PCM_COUNT];
@@ -176,32 +182,32 @@ static inline void ib_unpack_u8x8(uint8_t value, uint8_t data[8]) {
     data[7] = (value >> 7) & 1;
 }
 
-static void ib_try_record_replay() {
+static void ib_try_record_replay(const app_ctx_t* const ctx) {
     // 记录
-    if (IB_IS_RECORD) {
+    if (ctx->record) {
         const uint8_t state = ib_pack_u8x8(g_famicom->button_states);
         ib_set_keys(g_famicom->frame_counter, state);
     }
     // 回放
-    else if (IB_IS_REPLAY) {
+    else if (ctx->replay) {
         const uint8_t state = g_states.input_buffer_1mb[g_famicom->frame_counter];
         ib_unpack_u8x8(state, g_famicom->button_states);
     }
 }
 
 
-static void ib_try_save_record() {
-    if (IB_IS_RECORD) {
-        FILE* const file = fopen("record.rep", "wb");
+static void ib_try_save_record(const app_ctx_t* const ctx) {
+    if (ctx->record) {
+        FILE* const file = fopen(ctx->record_replay_filename, "wb");
         if (!file);
         fwrite(g_states.input_buffer_1mb, g_states.input_length, 1, file);
         fclose(file);
     }
 }
 
-static void ib_try_load_record() {
-    if (IB_IS_REPLAY) {
-        FILE* const file = fopen("record.rep", "rb");
+static void ib_try_load_record(const app_ctx_t* const ctx) {
+    if (ctx->replay) {
+        FILE* const file = fopen(ctx->record_replay_filename, "rb");
         if (!file);
         const size_t len = fread(g_states.input_buffer_1mb, 1, 1 << 20, file);
         g_states.input_length = len;
@@ -379,9 +385,9 @@ static void this_audio_event(void* arg, uint32_t cycle, enum sfc_channel_index t
         break;
     case SFC_MMC5_PCM:
         break;
-    case SFC_VRC7_VRC7:
-        g_states.change_vrc7_custompatch = 1;
-        break;
+    //case SFC_VRC7_VRC7:
+    //    g_states.change_vrc7_custompatch = 1;
+    //    break;
     }
 
 
@@ -472,13 +478,15 @@ void sfc_make_vrc6_saw(const sfc_vrc6_saw_data_t* state, sfc_visualizers_t* data
 }
 
 
-void sfc_vrc7_wavetable_gen(sfc_famicom_t* famicom, float* const out, uint8_t instrument);
+//void sfc_vrc7_wavetable_gen(sfc_famicom_t* famicom, float* const out, uint8_t instrument);
 
-void make_inited_vrc7_wavtable(void) {
-    for (uint8_t i = 1; i != 16; ++i) {
-        sfc_vrc7_wavetable_gen(g_famicom, g_states.vrc7_wave_table + 128 * i, i);
-    }
-}
+void sfc_vrc7_wavetable_update(sfc_famicom_t* famicom, float* const out);
+
+//void make_inited_vrc7_wavtable(void) {
+//    for (uint8_t i = 1; i != 16; ++i) {
+//        sfc_vrc7_wavetable_gen(g_famicom, g_states.vrc7_wave_table + 128 * i, i);
+//    }
+//}
 
 
 
@@ -611,6 +619,8 @@ void sfc_make_fme7_squ(
 }
 
 void update_infomation(void) {
+    const uint8_t exsound = g_famicom->rom_info.extra_sound;
+
     // 2A03 方波#1
     sfc_make_2a03_squ(&g_states.ctx_2a03.sq1_state, g_states.visualizers + SFC_2A03_Square1);
     // 2A03 方波#2
@@ -630,12 +640,17 @@ void update_infomation(void) {
     sfc_make_vrc6_saw(&g_famicom->apu.vrc6.saw, g_states.visualizers + SFC_VRC6_Saw);
 
     // VRC7
-    for (int i = 0; i != 6; ++i) 
-        sfc_make_vrc7_fmc(g_famicom->apu.vrc7.ch + i, g_states.visualizers + SFC_VRC7_FM0 + i);
-    // VRC7 自定义乐器
-    if (g_states.change_vrc7_custompatch) {
-        g_states.change_vrc7_custompatch = 0;
-        sfc_vrc7_wavetable_gen(g_famicom, g_states.vrc7_wave_table, 0);
+    if (exsound & SFC_NSF_EX_VCR7) {
+        for (int i = 0; i != 6; ++i)
+            sfc_make_vrc7_fmc(g_famicom->apu.vrc7.ch + i, g_states.visualizers + SFC_VRC7_FM0 + i);
+        // VRC7 自定义乐器
+        //if (g_states.change_vrc7_custompatch) {
+        //    g_states.change_vrc7_custompatch = 0;
+        //    sfc_vrc7_wavetable_gen(g_famicom, g_states.vrc7_wave_table, 0);
+        //}
+        // SEC 2:
+        // 更新状态
+        sfc_vrc7_wavetable_update(g_famicom, g_states.vrc7_wave_table);
     }
 
     // FDS1
@@ -779,7 +794,7 @@ extern void main_render(void* rgba) {
     uint8_t buffer[(256+8) * 256];
 
     // 记录信息
-    ib_try_record_replay();
+    ib_try_record_replay(g_states.app_ctx);
     if (g_famicom->rom_info.song_count) {
         sfc_play_nsf_once(g_famicom);
         nsf_logger_once();
@@ -1048,6 +1063,47 @@ sfc_ecode this_free_rom(void* arg, sfc_rom_info_t* info);
 
 
 
+void parse_cmd(app_ctx_t* ctx, int argc, const char* argv[]) {
+    if (argc <= 1) return;
+    ctx->filename = argv[1];
+    // HELP
+    if (!strcmp(ctx->filename, "--help")) {
+        printf("CMD --help                  : this help \n");
+        printf("CMD [--open] FILENAME       : open with file\n");
+        printf("CMD [--nsf-start STARTID]   : [NSF]set nsf start song id\n");
+        printf("CMD [--logger]              : [NSF]logger mode on\n");
+        printf("CMD [--debug]               : call 'getchar() on start'\n");
+        printf("CMD [--record FILENAME]     : [NES]record mode on\n");
+        printf("CMD [--replay FILENAME]     : [NES]replay mode on\n");
+        exit(0);
+    }
+    for (int i = 0; i < argc; ++i) {
+        if (!strncmp(argv[i], "--", 2)) {
+            const char* const p = argv[i] + 2;
+            if (!strcmp(p, "open")) {
+                ++i;
+                ctx->filename = argv[i];
+            }
+            else if (!strcmp(p, "nsf-start")) {
+                ++i;
+                ctx->nsf_start = (uint8_t)atoi(argv[i]);
+            }
+            else if (!strcmp(p, "record")) {
+                ++i;
+                ctx->record = 1;
+                ctx->record_replay_filename = argv[i];
+            }
+            else if (!strcmp(p, "replay")) {
+                ++i;
+                ctx->replay = 1;
+                ctx->record_replay_filename = argv[i];
+            }
+            else if (!strcmp(p, "logger")) ctx->logger_on = 1;
+            else if (!strcmp(p, "debug")) getchar();
+        }
+    }
+}
+
 /// <summary>
 /// 应用程序入口
 /// </summary>
@@ -1055,9 +1111,15 @@ sfc_ecode this_free_rom(void* arg, sfc_rom_info_t* info);
 /// <param name="argv">The argv.</param>
 /// <returns></returns>
 int main(int argc, const char* argv[]) {
-    char cso_path[PATH_BUFLEN]; char png_path[PATH_BUFLEN];
-    printf("Battle Control Online! \n");
     init_global();
+    app_ctx_t app_ctx = { 0 };
+    parse_cmd(&app_ctx, argc, argv);
+    g_states.app_ctx = &app_ctx;
+
+
+    printf("Battle Control Online! \n");
+
+    char cso_path[PATH_BUFLEN], png_path[PATH_BUFLEN];
     get_cso_file_path(cso_path);
     // 把CSO后缀换成png
     strcpy(png_path, cso_path);
@@ -1072,7 +1134,7 @@ int main(int argc, const char* argv[]) {
     g_states.input_buffer_1mb = malloc(1 << 20);
     if (!g_states.input_buffer_1mb) return -1;
     memset(g_states.input_buffer_1mb, 0, 1 << 20);
-    ib_try_load_record();
+    ib_try_load_record(g_states.app_ctx);
 
     memset(s_buffer, 0, sizeof(s_buffer));
     sfc_interface_t interfaces = { NULL };
@@ -1089,8 +1151,7 @@ int main(int argc, const char* argv[]) {
     sfc_famicom_t famicom;
     g_famicom = &famicom;
 
-    const char* const filepath = argc > 1 ? argv[1] : NULL;
-    if (sfc_famicom_init(&famicom, (void*)filepath, &interfaces)) return 1;
+    if (sfc_famicom_init(&famicom, &app_ctx, &interfaces)) return 1;
     //qload();
 
     update_mask(famicom.rom_info.extra_sound);
@@ -1104,7 +1165,7 @@ int main(int argc, const char* argv[]) {
     );
 
     //
-    make_inited_vrc7_wavtable();
+    //make_inited_vrc7_wavtable();
 
 
     void init_logger(void);
@@ -1113,7 +1174,7 @@ int main(int argc, const char* argv[]) {
     xa2_init(SAMPLES_PER_SEC);
     main_cpp(cso_path, png_path);
     xa2_clean();
-    ib_try_save_record();
+    ib_try_save_record(g_states.app_ctx);
     free(g_states.input_buffer_1mb);
     sfc_famicom_uninit(&famicom);
     printf("Battle Control Terminated! \n");
@@ -1191,7 +1252,7 @@ static inline uint8_t this_is_be() {
 /// </summary>
 /// <param name="info">The information.</param>
 /// <returns></returns>
-sfc_ecode this_load_nsf(sfc_rom_info_t* info, FILE* file) {
+sfc_ecode this_load_nsf(sfc_rom_info_t* info, FILE* file, uint8_t start_play) {
     sfc_nsf_header_t header;
     const size_t count = fread(&header, sizeof(header), 1, file);
     // 交换大小端
@@ -1244,7 +1305,7 @@ sfc_ecode this_load_nsf(sfc_rom_info_t* info, FILE* file) {
         info->extra_sound = header.extra_sound;
         info->start_play = header.start;
         // 状态
-        //info->start_play = 6;
+        if (start_play) info->start_play = start_play;
         // 播放曲目
         return SFC_ERROR_OK;
     }
@@ -1260,14 +1321,15 @@ sfc_ecode this_load_nsf(sfc_rom_info_t* info, FILE* file) {
 /// <param name="info">The information.</param>
 /// <returns></returns>
 sfc_ecode this_load_rom(void* arg, sfc_rom_info_t* info) {
+    app_ctx_t* const app_ctx = arg;
     assert(info->data_prgrom == NULL && "FREE FIRST");
-    const char* const filename = arg ? arg : "31_test_16.nes";
+    const char* const filename = app_ctx->filename ? app_ctx->filename : "31_test_16.nes";
     FILE* const file = fopen(filename, "rb");
     
     // 文本未找到
     if (!file) return SFC_ERROR_FILE_NOT_FOUND;
     //sfc_ecode code = SFC_ERROR_ILLEGAL_FILE;
-    sfc_ecode code = this_load_nsf(info, file);
+    sfc_ecode code = this_load_nsf(info, file, app_ctx->nsf_start);
     // 读取文件头
     sfc_nes_header_t nes_header;
     if (fread(&nes_header, sizeof(nes_header), 1, file)) {
@@ -1359,7 +1421,7 @@ int g_debug_return = 1;
 /// <param name="data">The data.</param>
 void user_input(int index, unsigned char data) {
     assert(index >= 0 && index < 16);
-    if (IB_IS_REPLAY) return;
+    if (g_states.app_ctx->replay) return;
     g_famicom->button_states[index] = data;
 }
 
@@ -1438,7 +1500,7 @@ sfc_ecode logger_free_rom(void* arg, sfc_rom_info_t* info) {
 }
 
 void nsf_logger_once(void) {
-    if (!g_states.logger_on) return;
+    if (!g_states.app_ctx->logger_on) return;
 
     float freq, vol;
     sfc_famicom_t* const fc = &g_states.logger;
@@ -1577,9 +1639,7 @@ void nsf_logger_once(void) {
 
 void init_logger(void) {
     //getchar();
-    return;
-
-    g_states.logger_on = 1;
+    if (!g_states.app_ctx->logger_on) return;
 
     const unsigned fps = 60;
     const unsigned logtimex2 = 4;
