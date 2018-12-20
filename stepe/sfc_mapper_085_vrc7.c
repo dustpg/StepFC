@@ -1063,7 +1063,7 @@ void sfc_vrc7_wavetable_update(sfc_famicom_t* famicom, float* const out) {
     // 获取当前VRC7状态
     sfc_vrc7_data_t vrc7_bk = famicom->apu.vrc7;
     const uint8_t* const vrc7_patch = sfc_get_vrc7_patch(famicom);
-    // 仅仅重置音量与频率
+    // 仅仅重置频率
     for (int i = 0; i != 6; ++i) {
         sfc_vrc7_ch_t* const ch = vrc7_bk.ch + i;
         ch->freq = 256;

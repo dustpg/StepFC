@@ -22,7 +22,8 @@ enum {
 /// <param name="data">The data.</param>
 static void sfc_nsf_switch(sfc_famicom_t* famicom, uint16_t addr, uint8_t data) {
     // 0101 .... .... .AAA  --    PPPP PPPP
-    const uint16_t count = (famicom->rom_info.size_prgrom + 0x0fff)>>12;
+    const uint16_t addr_v = famicom->rom_info.load_addr & 0xfff;
+    const uint16_t count = (famicom->rom_info.size_prgrom + addr_v + 0x0fff)>>12;
     const uint16_t src = data;
     sfc_load_prgrom_4k(famicom, addr & 0x07, src%count);
 }
