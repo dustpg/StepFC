@@ -310,6 +310,58 @@ freq = 256
 
 ![vrc7](./vrc7.png)
 
+
+### VRC7补漏
+
+补充说明: 这里VRC7有一些不太影响的'小错误', 下面是后面补充的. 果然小细节就容易忘记! VRC7的音量是'衰减值', 15是最小音量, 0是最大音量. 所以单位变成负数了 ```-3.00dB x N```.
+
+然后自己又想到一个稍微精确的波形计算, 更简单但是需要一点额外的运算(也不多, 和上次一样128样本, 只不过是每帧都需要):
+
+
+ - 仅仅将当前声道频率频率修改至和 上节所述频率一致(256/4)
+ - 将载波器相位重置(更好的办法: 运行至起点, 缺点: 由于声道不同步所以计算量会乘以6)
+
+
+```c
+/// <summary>
+/// StepFC: VRC7生成波表
+/// </summary>
+/// <remarks>
+/// out是 长度为128 x 6的缓冲区
+/// </remarks>
+/// <param name="famicom">The famicom.</param>
+/// <param name="out">The out.</param>
+/// <param name="instrument">The instrument.</param>
+void sfc_vrc7_wavetable_update(sfc_famicom_t* famicom, float* const out) {
+    // 获取当前VRC7状态
+    sfc_vrc7_data_t vrc7_bk = famicom->apu.vrc7;
+    const uint8_t* const vrc7_patch = sfc_get_vrc7_patch(famicom);
+    // 仅仅重置频率
+    for (int i = 0; i != 6; ++i) {
+        sfc_vrc7_ch_t* const ch = vrc7_bk.ch + i;
+        ch->freq = 256;
+        ch->octave = 4;
+        ch->carrier.phase = 0;
+        sfc_vrc7_operator_changed(vrc7_patch, ch, &ch->modulator, 0);
+        sfc_vrc7_operator_changed(vrc7_patch, ch, &ch->carrier, 1);
+    }
+    // 生成样本
+    for (int i = 0; i != 128; ++i) {
+        int32_t vrc7_output[6];
+        sfc_vrc7_49716hz(&vrc7_bk, vrc7_patch, vrc7_output);
+        for (int j = 0; j != 6; ++j) {
+            const double v0 = (double)vrc7_output[j] / (double)(1 << 20);
+            out[128 * j + i] = (float)v0;
+        }
+    }
+}
+```
+
+这样生成的波形依然不准确, 但是可以体现ASDR的衰减和调制器!
+
+
+![vrc7](./vrc7.gif)
+
 ### 减少DrawCall
 
 减少DrawCall是提示图形显示效率的最直接的办法. 这里, 如果相邻的两条线段斜率一致则可以进行合并.
