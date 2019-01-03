@@ -2,7 +2,7 @@
 
 项目地址: [Github-StepFC-StepF](https://github.com/dustpg/StepFC/tree/master/stepf). 本文github[备份地址](https://github.com/dustpg/BlogFM/issues/51). 不光如此, 本系列博客还有Markdown文件位于[GitHub-StepFC-Blog](https://github.com/dustpg/StepFC/tree/master/blog)供离线查看.
 
-StepF的目的是成为一个真正的模拟, 本文由于时间关系不能面面俱到. 但是很多功能可以参考其他的成熟的模拟器, 再进行实现. 
+StepF的目的是成为一个真正的模拟器, 本文由于时间关系不能面面俱到. 但是很多功能可以参考其他的成熟的模拟器, 再进行实现. 
 
 
 ### C vs C++
