@@ -447,10 +447,10 @@ LRESULT CALLBACK ThisWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
                 ::user_input(index, msg == WM_KEYDOWN);
             }
             else if (unsigned(wParam) == VK_F1) {
-                qsave();
+                if (msg == WM_KEYDOWN) qsave();
             }
             else if (unsigned(wParam) == VK_F2) {
-                qload();
+                if (msg == WM_KEYDOWN) qload();
             }
             else if (unsigned(wParam) == VK_SPACE) {
                 g_sync = msg != WM_KEYDOWN;
