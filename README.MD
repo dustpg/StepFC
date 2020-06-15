@@ -1,6 +1,8 @@
 ### Make FC(NES) Emulator Step by Step
 Re: 从零开始的红白机模拟
 
+![StepFC](./blog/re0fc-37-visualizers1/demo1.gif)
+
 ### 项目说明
 同时拥有VS2017和CodeLite的项目工程以保证在不同编译器上能够成功编译.
 
