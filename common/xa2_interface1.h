@@ -4,9 +4,11 @@
 #ifdef __cplusplus
 #define SFC_EXTERN_C extern "C" 
 #define SFC_NOEXCEPT noexcept
+#include <cstdint>
 #else
 #define SFC_EXTERN_C extern
 #define SFC_NOEXCEPT
+#include <stdint.h>
 #endif
 #endif
 
