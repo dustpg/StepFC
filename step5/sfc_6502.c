@@ -1591,7 +1591,7 @@ void sfc_6502_disassembly(sfc_6502_code_t code, char buf[SFC_DISASSEMBLY_BUF_LEN
         sfc_btoh(buf + ADDR_FIRSH + 1, code.a1);
         if (opname.mode == SFC_AM_ZPG) break;
         buf[ADDR_FIRSH + 3] = ',';
-        buf[ADDR_FIRSH + 5] = opname.mode == SFC_AM_ABX ? 'X' : 'Y';
+        buf[ADDR_FIRSH + 5] = opname.mode == SFC_AM_ZPX ? 'X' : 'Y';
         break;
     case SFC_AM_INX:
         // XXX ($AB, X)
