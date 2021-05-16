@@ -234,7 +234,7 @@ A |= READ(address);
 CHECK_ZSFLAG(A);
 ```
   
-### ERA - "Exclusive-Or" memory with A
+### EOR - "Exclusive-Or" memory with A
 | 寻址模式| 汇编格式| OP代码 |指令字节|指令周期|
 |--------|-----------|----|---------|----------| 
 |  立即   |  EOR #Oper   |   49   |    2    |    2     |
@@ -314,7 +314,7 @@ CHECK_ZSFLAG(X);
 |--------|-----------|----|---------|----------|
 |  隐含   |   TXA      |    8A   |    1    |    2     |
 
-将累加器A的内容送入变址寄存器X, 影响FLAG:Z(ero),S(ign), 伪C代码:
+将变址寄存器X的内容送入累加器A, 影响FLAG:Z(ero),S(ign), 伪C代码:
 ```c
 A = X;
 CHECK_ZSFLAG(A);
